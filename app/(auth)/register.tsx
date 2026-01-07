@@ -1,20 +1,20 @@
 
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 // Note: Ensure you have installed lucide-react-native and react-native-svg
 // npm install lucide-react-native react-native-svg
 import { supabase } from '@/src/lib/supabase';

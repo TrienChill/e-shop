@@ -6,8 +6,10 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking // <-- Đã thêm Linking để mở trình duyệt xác thực
+  ,
+
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -16,18 +18,19 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // Constants for colors to match the design exactly
 const COLORS = {
-  background: '#FFFFFF', // Clean white background for the card/screen
+  background: '#FFFFFF',
   textMain: '#1A1A1A',
-  textSecondary: '#6B7280', // Gray-500
+  textSecondary: '#6B7280',
   textPlaceholder: '#9CA3AF',
-  primary: '#1A1A1A', // Black button
-  accent: '#6467f2', // Purple focus/accent
-  border: '#E5E7EB', // Gray-200
+  primary: '#1A1A1A',
+  accent: '#6467f2',
+  border: '#E5E7EB',
   inputBg: '#FFFFFF',
   googleBlue: '#4285F4',
   facebookBlue: '#1877F2',
@@ -43,23 +46,52 @@ const App = () => {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-const [loading, setLoading] = useState(false);
-
-async function handleLogin() {
-  setLoading(true);
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  setLoading(false);
-  if (error) {
-    if (error.message.includes('Email not confirmed')) {
-      Alert.alert('Chưa xác thực email', 'Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.');
+  // Xử lý đăng nhập bằng Email/Password
+  async function handleLogin() {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    
+    if (error) {
+      if (error.message.includes('Email not confirmed')) {
+        Alert.alert('Chưa xác thực email', 'Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.');
+      } else {
+        Alert.alert('Đăng nhập thất bại', error.message);
+      }
     } else {
-      Alert.alert('Đăng nhập thất bại', error.message);
+      router.replace('/');
     }
-  } else {
-    router.replace('/');
   }
-}
+
+  // --- MỚI THÊM: Xử lý đăng nhập bằng Google/Facebook ---
+  async function handleOAuthLogin(provider: 'google' | 'facebook') {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          // Quan trọng: Phải khớp với scheme bạn khai báo trong app.json (eshop)
+          redirectTo: 'eshop://', 
+        },
+      });
+
+      if (error) throw error;
+
+      // Mở trình duyệt để người dùng đăng nhập
+      if (data?.url) {
+        await Linking.openURL(data.url);
+      }
+    } catch (error) {
+      Alert.alert('Đăng nhập thất bại', (error as Error).message);
+    } finally {
+      // Lưu ý: setLoading(false) ở đây chỉ tắt loading ban đầu. 
+      // Khi quay lại app từ trình duyệt, app sẽ reload lại state auth.
+      setLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -165,14 +197,22 @@ async function handleLogin() {
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Social Buttons */}
+            {/* Social Buttons (Đã cập nhật onPress) */}
             <View style={styles.socialRow}>
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity 
+                style={styles.socialButton}
+                onPress={() => handleOAuthLogin('google')} // <-- Gọi hàm Google
+                disabled={loading}
+              >
                 <Image source={{ uri: SOCIAL_LOGOS.google }} style={styles.socialIcon} resizeMode="contain" />
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.socialButton}>
+              <TouchableOpacity 
+                style={styles.socialButton}
+                onPress={() => handleOAuthLogin('facebook')} // <-- Gọi hàm Facebook
+                disabled={loading}
+              >
                 <Image source={{ uri: SOCIAL_LOGOS.facebook }} style={styles.socialIcon} resizeMode="contain" />
                 <Text style={styles.socialButtonText}>Facebook</Text>
               </TouchableOpacity>
@@ -237,12 +277,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '700', // Emulate Serif bold
+    fontWeight: '700',
     color: COLORS.textMain,
     marginBottom: 8,
     textAlign: 'center',
-    // Note: Android doesn't support 'serif' well without custom fonts, 
-    // but this is the closest system default.
     fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', 
   },
   subtitle: {
@@ -316,7 +354,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 56,
     backgroundColor: COLORS.primary,
-    borderRadius: 28, // Fully rounded
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 16,
@@ -347,7 +385,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     fontSize: 12,
     fontWeight: '600',
-    color: '#9CA3AF', // Gray-400
+    color: '#9CA3AF',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -356,7 +394,7 @@ const styles = StyleSheet.create({
   socialRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 16, // Use gap if RN version supports it, else use margin on child
+    gap: 16,
   },
   socialButton: {
     flex: 1,
