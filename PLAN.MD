@@ -1,85 +1,31 @@
-# Kế hoạch dự án
+# Plan to Link Hero Section to Collection Page
 
-📅 Kế hoạch Phát triển Dự án: E-Shop Fashion & AI Chatbot
-Thời gian: 2 Tháng (Tháng 1 & Tháng 2) - Mục tiêu: MVP (Sản phẩm khả dụng tối thiểu) hoàn chỉnh. Công nghệ: React Native (Expo), Supabase. Nền tảng: Mobile App (iOS/Android) & Web.
+This document outlines the steps taken to link the Hero Section on the home page to the corresponding collection page, and to fix related issues on the collection page itself.
 
-👥 Phân quyền (Roles) & Bảo mật (Supabase RLS)
-User (Khách hàng): Xem hàng, đặt hàng, chat bot, xem lịch sử đơn.
+## 1. Update Home Page (`app/(shop)/(tabs)/index.tsx`)
 
-Staff (Nhân viên): Xử lý đơn hàng, chat support (khi AI chuyển giao), xem kho cơ bản.
+- **Modify Hero Section Data Fetching:**
+  - The `useEffect` hook was changed to fetch the most recent category from the `categories` table in Supabase.
+  - The `heroCollection` state is now populated with the ID, name, and image of this category. This replaces the old logic that incorrectly fetched a single product.
 
-Admin (Quản lý): Quản lý user, nhập liệu sản phẩm, xem báo cáo doanh thu, cấu hình AI.
+- **Update Hero Section Link:**
+  - The `onPress` event for the Hero Section `TouchableOpacity` was updated.
+  - It now navigates to `/collection/[id]`, passing the ID of the fetched category. The previous implementation incorrectly linked to a product page.
 
-## Giai đoạn 1: Tháng 1 - Xây dựng Core E-Commerce (Nền tảng bán hàng)
+## 2. Fix and Update Collection Page (`app/(shop)/collection/[id].tsx`)
 
-Mục tiêu: Người dùng có thể Đăng nhập -> Xem hàng -> Bỏ giỏ -> Đặt hàng.
+- **Correct Data Fetching Logic:**
+  - The `fetchCollectionData` function was updated to query the `categories` table instead of the non-existent `collections` table.
+  - The query to fetch products was corrected to filter by `category_id` instead of `collection_id` to align with the database schema.
 
-## Giai đoạn 2: Tháng 2 - Quản trị, Chat Realtime & AI Integration
+- **Fix Data Mapping:**
+  - Corrected an issue where product prices were being formatted with `toLocalString()` instead of `toLocaleString()`.
+  - Fixed the logic for retrieving product images to correctly use the `images` array from the product data, preventing crashes if the image data is missing.
 
-Mục tiêu: Admin quản lý được hệ thống và Chatbot bắt đầu hoạt động.
+- **Fix Component Rendering Logic:**
+  - The component's structure was corrected to properly handle the `loading` state.
+  - An `ActivityIndicator` is now displayed while data is being fetched.
+  - The main component content is rendered only after the loading is complete, fixing a critical bug that caused the component to only render *during* the loading phase.
 
-## Giai đoạn 3: Tháng 3 (Hoặc cuối tháng 2 nếu nhanh) - Nâng cao
-
-Triển khai sau
-
-## Cấu trúc dự án
-
-MY-ESHOP/
-├── app/                       # 👈 QUAN TRỌNG: Nơi định nghĩa màn hình & điều hướng (Expo Router)
-│   ├── (auth)/                # Nhóm màn hình xác thực (Login, Register)
-│   │   ├── login.tsx
-│   │   ├── register.tsx
-│   │   └── _layout.tsx
-│   │
-│   ├── (shop)/                # 🛍️ Giao diện KHÁCH HÀNG (App/Web User)
-│   │   ├── (tabs)/            # Thanh điều hướng dưới đáy (Home, Cart, Profile)
-│   │   │   ├── index.tsx      # Màn hình Home
-│   │   │   ├── cart.tsx
-│   │   │   ├── profile.tsx
-│   │   │   └──_layout.tsx
-│   │   ├── product/
-│   │   │   └── [id].tsx       # Chi tiết sản phẩm (Dynamic Route)
-│   │   └── checkout.tsx
-│   │
-│   ├── (admin)/               # 🛡️ Giao diện ADMIN & STAFF (Ưu tiên Web Dashboard)
-│   │   ├── dashboard.tsx
-│   │   ├── products/          # CRUD Sản phẩm
-│   │   │   ├── index.tsx      # Danh sách
-│   │   │   └── [id].tsx       # Sửa sản phẩm
-│   │   ├── orders/            # Quản lý đơn hàng
-│   │   └── _layout.tsx        # Layout riêng cho Admin (Sidebar bên trái)
-│   │
-│   ├──_layout.tsx            # Layout gốc (xử lý Auth Guard & Theme)
-│   ├── index.tsx              # Màn hình chờ (Splash) để điều hướng theo Role
-│   └── +not-found.tsx
-│
-├── src/                       # 🧠 LOGIC & TÀI NGUYÊN DÙNG CHUNG
-│   ├── components/            # UI Components nhỏ lẻ
-│   │   ├── common/            # Nút bấm, Input, Loading (Dùng chung cả Admin/Shop)
-│   │   ├── shop/              # Card sản phẩm, Banner (Chỉ cho Shop)
-│   │   └── admin/             # Bảng biểu, Stats Card (Chỉ cho Admin)
-│   │
-│   ├── constants/             # Màu sắc, Font chữ, Config
-│   │   └── Colors.ts
-│   │
-│   ├── hooks/                 # Custom Hooks
-│   │   ├── useAuth.ts         # Lấy thông tin user hiện tại
-│   │   └── useCart.ts         # Logic giỏ hàng
-│   │
-│   ├── lib/                   # Cấu hình bên thứ 3
-│   │   └── supabase.ts        # Supabase Client
-│   │
-│   ├── services/              # 📡 Gọi API Supabase (Tách biệt logic gọi DB ra khỏi UI)
-│   │   ├── auth.service.ts
-│   │   ├── product.service.ts
-│   │   ├── order.service.ts
-│   │   └── chat.service.ts
-│   │
-│   ├── types/                 # TypeScript Interfaces (Quan trọng!)
-│   │   └── database.types.ts  # Type sinh ra từ Supabase
-│   │
-│   └── utils/                 # Hàm hỗ trợ (Format tiền, Format ngày)
-│
-├── assets/                    # Ảnh tĩnh, Font, Icon
-├── package.json
-└── tsconfig.jso
+- **Fix Product Link:**
+  - Corrected a bug in the `ProductCard` component where the `onPress` handler used incorrect string interpolation (`''` instead of ` `` `), which would have prevented links to product detail pages from working.

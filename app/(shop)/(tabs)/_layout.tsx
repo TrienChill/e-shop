@@ -7,20 +7,39 @@ const { width } = Dimensions.get('window');
 
 // Custom Tab Bar Component
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  // const onTabPress = (routeName: string, isFocused: boolean) => {
+  //   const event = navigation.emit({
+  //     type: 'tabPress',
+  //     target: routeName,
+  //     canPreventDefault: true,
+  //   });
+
+  //   if (!isFocused && !event.defaultPrevented) {
+  //     navigation.navigate(routeName);
+  //   }
+  // };
+
+  const activeIndex = state.index;
+  const routes = ['index', 'search', 'ai-chat', 'cart', 'profile'];
+
+  // -- Logic mới thêm: kiểm tra xem màn hình hiện tại có yêu cầu ẩn tab bar không --
+  const focusedRoute = state.routes[activeIndex];
+  const { options } = descriptors[focusedRoute.key];
+  if (options.tabBarStyle?.display === 'none') {
+    return null; // Ẩn tab bar nếu thuộc tính tabBarVisible là false
+  }
+  
   const onTabPress = (routeName: string, isFocused: boolean) => {
     const event = navigation.emit({
       type: 'tabPress',
       target: routeName,
       canPreventDefault: true,
     });
-
+    
     if (!isFocused && !event.defaultPrevented) {
       navigation.navigate(routeName);
     }
   };
-
-  const activeIndex = state.index;
-  const routes = ['index', 'search', 'ai-chat', 'cart', 'profile'];
 
   return (
     <View style={styles.bottomNavContainer}>
@@ -94,7 +113,14 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="search" />
       <Tabs.Screen name="ai-chat" />
-      <Tabs.Screen name="cart" />
+      {/* {Thêm option display none} */}
+      <Tabs.Screen name="cart" 
+        options={{
+          tabBarStyle: {
+            display: 'none',
+          },
+        }}
+      />
       <Tabs.Screen name="profile" />
     </Tabs>
   );

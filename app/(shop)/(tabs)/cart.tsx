@@ -1,4 +1,6 @@
-
+import { useCart } from '@/src/context/CartContext';
+import { CartItem as CartItemType } from '@/src/types/types';
+import { router } from 'expo-router';
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -21,50 +24,6 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// --- Types ---
-interface Product {
-  id: string;
-  name: string;
-  size: string;
-  color: string;
-  price: number;
-  image: string;
-  quantity: number;
-  hasBadge?: boolean;
-}
-
-// --- Mock Data ---
-const INITIAL_DATA: Product[] = [
-  {
-    id: '1',
-    name: 'Oversized Wool Blazer',
-    size: 'M',
-    color: 'Beige',
-    price: 120.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBXOpQBIDi-leFeAIhLUomXo5zTlpAZzzeA0I8kdvOMwG5tOg4HSpjIzKQ73HtYOGH62DtIdZHTJX0op7EcunBoQTSkyNnvPdANxDP-eS6wusMy2S5SAH8Tn8oBmYe48im02qwfGwG1lozi97q9UMGIBL-twD_pGeUf7Hjq07y-7Q1SLVoDRsMNR3finCpXUpofqk-zFMpu5AYd61gbzPoD7luAMqV8m9yu7OXBDKRXH92-anmS5OGTBgFmSY6lEA0u2FvGJTjnRuE',
-    quantity: 1,
-    hasBadge: true,
-  },
-  {
-    id: '2',
-    name: 'Pleated Trousers',
-    size: '32',
-    color: 'Charcoal',
-    price: 85.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBMa_KMlDH9gNOrn2RRbpx9tp0DzwUWvKvIuHjK6wnWRZQEylKiNxQ0AzcfNuJJPgFUobNvRGY6NwNLz7ntOpddAKGRxC89plVqjZXnsFbWYs-UZ0uSOaNY2nVYfpZGce-hy7XXiDF0zVsfBm6YeLFAsyqNnud9U1ykFCbkyYBsTpI8RkXxCjdD0IflYk5i14LAIefhQIAriCgj3DAcTTWHhpy7MKXMAzQvxMcTtqsBiv6OOg9ySmUNCmFcmJXF9bpfLpKjnGOfTY',
-    quantity: 1,
-  },
-  {
-    id: '3',
-    name: 'Minimalist Sneakers',
-    size: '42',
-    color: 'White',
-    price: 145.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBZkpgdiIr19CF1u0Kh2WgVRbftc5X11zl1RC8mdIuCNHuyYojeOSWmgMQ8FsMMiOpF_0OcMoFxq-Sprtwty13psJIsERx9VxAuNhfOK041V5s5CZOLdX8jS7G76S9cxlJpSombQcfwmjPbas6P4HslzWr42ZQS_nVzcd5EaNOmUr4rqXwuVCxnU7idUlEAI7QkNWIJIqv8fx5mQUd7z-mOoJ2ni8hHr5wH1D3rIAu8ePN_9ki84nFdP7QRSULYTtcOW5SNhQTyIWE',
-    quantity: 1,
-  },
-];
 
 // --- Colors & Theme ---
 const COLORS = {
@@ -81,47 +40,40 @@ const COLORS = {
 
 // --- Components ---
 
-const CartItem = ({ item }: { item: Product }) => {
+const CartItem = ({ item }: { item: CartItemType }) => {
+  const { updateItemQuantity, removeItem } = useCart();
   return (
     <View style={styles.itemContainer}>
       {/* Image Section */}
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
+        <Image source={{ uri: item.product.image }} style={styles.itemImage} resizeMode="cover" />
       </View>
 
       {/* Details Section */}
       <View style={styles.itemDetails}>
         <View>
           <View style={styles.itemHeader}>
-            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-            <TouchableOpacity style={styles.deleteButton}>
+            <Text style={styles.itemName} numberOfLines={1}>{item.product.name}</Text>
+            <TouchableOpacity style={styles.deleteButton} onPress={() => removeItem(item.id)}>
               <Trash2 size={20} color="#a3a3a3" />
             </TouchableOpacity>
           </View>
           
           <Text style={styles.itemMeta}>
-            Size: {item.size} • Color: {item.color}
+            Size: {item.size}
           </Text>
-
-          {/* AI Badge */}
-          {item.hasBadge && (
-            <View style={styles.aiBadge}>
-              <Sparkles size={14} color={COLORS.purpleText} style={{ marginRight: 4 }} />
-              <Text style={styles.aiBadgeText}>Matches your style</Text>
-            </View>
-          )}
         </View>
 
         {/* Price & Quantity Stepper */}
         <View style={styles.priceRow}>
-          <Text style={styles.priceText}>${item.price.toFixed(2)}</Text>
+          <Text style={styles.priceText}>vnđ{item.product.price.toFixed(2)}</Text>
           
           <View style={styles.stepperContainer}>
-            <TouchableOpacity style={styles.stepperBtn}>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => updateItemQuantity(item.id, -1)}>
               <Minus size={16} color={COLORS.textSecondary} />
             </TouchableOpacity>
             <Text style={styles.quantityText}>{item.quantity}</Text>
-            <TouchableOpacity style={styles.stepperBtn}>
+            <TouchableOpacity style={styles.stepperBtn} onPress={() => updateItemQuantity(item.id, 1)}>
               <Plus size={16} color={COLORS.primary} />
             </TouchableOpacity>
           </View>
@@ -131,7 +83,19 @@ const CartItem = ({ item }: { item: Product }) => {
   );
 };
 
-const PromoCodeSection = () => (
+const PromoCodeSection = () => {
+  const { applyDiscount } = useCart();
+  const [promoCode, setPromoCode] = useState('');
+
+  const handleApply = () => {
+    if (applyDiscount(promoCode)) {
+      Alert.alert('Success', 'Promo code applied!');
+    } else {
+      Alert.alert('Error', 'Invalid promo code.');
+    }
+  };
+
+  return (
   <View style={styles.promoContainer}>
     <Text style={styles.sectionTitle}>PROMO CODE</Text>
     <View style={styles.promoInputWrapper}>
@@ -139,36 +103,57 @@ const PromoCodeSection = () => (
         placeholder="Enter voucher code" 
         placeholderTextColor="#a3a3a3"
         style={styles.promoInput}
+        value={promoCode}
+        onChangeText={setPromoCode}
       />
-      <TouchableOpacity style={styles.applyButton}>
+      <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
         <Text style={styles.applyButtonText}>Apply</Text>
       </TouchableOpacity>
     </View>
   </View>
-);
+  )
+};
 
-const OrderSummary = ({ subtotal }: { subtotal: number }) => (
-  <View style={styles.summaryContainer}>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Subtotal</Text>
-      <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+const OrderSummary = () => {
+  const { subtotal, discount } = useCart();
+  return (
+    <View style={styles.summaryContainer}>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Subtotal</Text>
+        <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Shipping</Text>
+        <Text style={[styles.summaryValue, { color: COLORS.green }]}>Free</Text>
+      </View>
+      <View style={styles.summaryRow}>
+        <Text style={styles.summaryLabel}>Discount</Text>
+        <Text style={styles.summaryValue}>-${discount.toFixed(2)}</Text>
+      </View>
     </View>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Shipping</Text>
-      <Text style={[styles.summaryValue, { color: COLORS.green }]}>Free</Text>
-    </View>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Discount</Text>
-      <Text style={styles.summaryValue}>-$0.00</Text>
-    </View>
-  </View>
-);
+  );
+}
 
 // --- Main App Component ---
-export default function App() {
-  const [items] = useState<Product[]>(INITIAL_DATA);
+export default function CartScreen() {
+  const { items, total, subtotal } = useCart();
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  if (items.length === 0) {
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.header}>
+                <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
+                    <ArrowLeft size={24} color={COLORS.primary} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>My Bag (0)</Text>
+                <View style={{width: 40}} />
+            </View>
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                <Text style={{fontSize: 18, color: COLORS.textSecondary}}>Your cart is empty</Text>
+            </View>
+      </SafeAreaView>
+    )
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -176,7 +161,7 @@ export default function App() {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color={COLORS.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Bag ({items.length})</Text>
@@ -200,9 +185,9 @@ export default function App() {
             <>
               <View style={styles.divider} />
               <PromoCodeSection />
-              <OrderSummary subtotal={subtotal} />
+              <OrderSummary />
               {/* Padding for bottom fixed button */}
-              <View style={{ height: 100 }} /> 
+              <View style={{ height: 120 }} /> 
             </>
           )}
         />
@@ -210,10 +195,10 @@ export default function App() {
 
       {/* Fixed Bottom Action */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.9}>
+        <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.9} onPress={() => router.push('/(shop)/checkout')}>
           <Text style={styles.checkoutText}>Checkout</Text>
           <View style={styles.checkoutRight}>
-            <Text style={styles.checkoutPrice}>${subtotal.toFixed(2)}</Text>
+            <Text style={styles.checkoutPrice}>${total.toFixed(2)}</Text>
             <View style={styles.arrowCircle}>
               <ArrowRight size={20} color={COLORS.primary} />
             </View>
@@ -440,6 +425,7 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 34 : 24, // Safe area for iPhone X+
     borderTopWidth: 1,
     borderTopColor: '#f5f5f5',
+    zIndex: 1000, // Đảm bảo luôn nằm trên cùng
   },
   checkoutButton: {
     backgroundColor: COLORS.primary,

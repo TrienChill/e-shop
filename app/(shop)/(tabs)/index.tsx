@@ -1,4 +1,5 @@
-import React from 'react';
+// 1. Thêm useEffect, useState vào dòng import React
+import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -14,6 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+
+
+// 2. Thêm import supabase (chỉnh đường dẫn cho đúng với dự án của bạn)
+import { supabase } from '@/src/lib/supabase';
+import { router } from 'expo-router';
 
 // --- Types & Interfaces ---
 interface Category {
@@ -31,51 +37,9 @@ interface Product {
   isNew?: boolean;
 }
 
-// --- Data Mocking (URLs from HTML source) ---
+// // --- Data Mocking (URLs from HTML source) ---
 const HERO_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCeWBrILvGP3jf6iTmVsvweEvK6S3iyTxCc8u8Unu9JgXuEbB15FVa2wTdy5fWb-DRbumplRCyW5lAAhYiBjnHyZDHPZhyqvAduHQFWWegDsdpB6DDWetLyAAknGlwfQ1DeDFO6yefK3udUjD17Gtm0G1Z-BvSA4hsmYkpRvvlYYGPnoTWNpJzrqUQ3duxo3PvPNoAsvHXvKaP_UBjKJ5EE4qRYF7sx0x5Dpjdwq0vYWqOaZMb2hYUzm-LYUam_300Cm3GYkUkbGqM';
 
-const CATEGORIES: Category[] = [
-  { id: '1', name: 'Just In', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC4SX-C5ugHUpcbZRuQSZckLTEIlmipO_Ytrpya-8NjXkB5lSB6s9tWHYqFFP2n2E9WHqwSdeMKnrbb6jc0AWfvAr4bHLALogqGYI34nw47s3d3QLbSzJk3Kjbc8ziWjDJ3ZeNeP4u9_ajRVX-ETZVMU_6vsgFS_cb_D7REkh1Yoba5DuTTjPDn1at3qGnTE_EPPQqE7Oav2ANEDpLKMsEyRdz4yBTlE1W4Lspxp7eFPXqEUPwtZAp9UwszSu4Ox4LjIKE5YmTiDng' },
-  { id: '2', name: 'Men', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAsJxTHDYdYQ1Y0lU1vnTyOsArooXLMqyxBGkuBKr-YqJdprmosaGsBe1fD1oupDn8HcJEouFNKQdTyfPrzXDOlXDcc33yGfbaUf0y65XJrcNKgY7IBhppEc5g7nx76qn42DLnoHslIHKMl0jctesSaLmYhBnlDjW4T3nIl_kHysnfLeLxoH9QsQYkLUihzemwBqmIcLMoznwf5OJkU9JwwzZyWvjY1ljX_cno0d-I_O-e0NImhXwKGkcWC44njht-XubSIJEaAVuI' },
-  { id: '3', name: 'Women', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAE6CaiuTCmg8QxI56-EMLQ0e3s3hADg-vxEvsDc2Jzfk5sCTt2MPqOxAtJXy95AKO0IYQaFzvc91LNLpqAcwJfDOtsne8F3WYN5ksumnesj0vwDHMcejG6cGtYeo_xe5NmSAFNzLAJSvFKMlOup2jmE5Jz6VHs4ylH_p9wXL-pTKk_YCbsNaBVTpODL3hjvTmmq_KSuCdeobRyDqjTiaSG1BGzk5grFOjXYoQQ1Gknoqp8liY-GXeX85MeEa8RXsSLPub6ssni1y0' },
-  { id: '4', name: 'Accessories', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDIoW9kQCS6E9fQyKOlgYinHvVDefHbnfhTelObEKoJ1EFWZpRtoDzxTn12upRuFJAF22DtTr3vouOGL4X5CZ30khmP0TNlOaHMfJrM9MaRLBVDmN7fIwKVnmpJdf5Xdf5JJMlfnA0OkG227EKOwaByorJDNr9bfdG1zRImHPYpAgorENUcYdAs8YDBJDV04NTAYognIFyFys4PCTDEV2q9Xea9H6COmUB8BuHwduDlXzG_xzUnDfL7wDdsrjQqtFupcazwE85Pulg' },
-  { id: '5', name: 'Shoes', image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOIwMA2betjms5mknKBb7u2kkCWnmXDfa1F6NWpd4R18vcRMaFz2W1HUkmlJXzWv5jtdB3u7ga5cbFrKkLyzuytu79lhRfcWuNBhMgB2baITC_oKctS9mZsOlR4nXq5AznD3TpYext203VtuXGSD-R1fRTrqSN7MtjNcDgKgUUALS-ToCOkruGuQzERSoeUADuHA7AZurf8t8hjDNdyPreNTyb0j8Lo-PhyH0XJ_AnGlQeEuQ9-SDs7Mx6dhlRccioS612D6POmvw' },
-];
-
-const PRODUCTS_COL_1: Product[] = [
-  {
-    id: 'p1',
-    category: 'Essential',
-    name: 'Oversized Hoodie',
-    price: '$120',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAXVMfTsdi1TeMob0b2JwrL5p0H8yw6f5nxdn9-SuLAtkWdpsGsgaqDNN6LMD2GvCPSu71DfaBmq_iE1onLSHCDQJuchPU1z3nOPAgWZYlx6erO2fQaGhWAMSgs7NNnB4QpdvOjZAI3LNz0Wlu6Nys127DXY8-U0Kx0uaPYXYDFfZp3wNhy9c0e4Fuboh0e0O7lhzP8DUs2lI7ryluib_uG0_cx2Ps3s3XrazHC_Sf1P5duXHpabRQrDC-W9Y5pTCVItB2ssqWD64c',
-  },
-  {
-    id: 'p2',
-    category: 'Accessories',
-    name: 'Leather Mini Bag',
-    price: '$350',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7MGzMMwUkjvExK7hixjTcHvM0iBt-AcNr4bS48hHqGjPDukDblBm9PxlcCTKCNOCyNy8dt4psBEighlP4Om9_HLeSSeVEO7Uu2Q1KOM0GztiItdnsG0G5ZEwoxqyIb4yBHkCom9dQVhYH0iZ_8n2UUDduvLNAB4nSlplM1TKRTbn3qYFabRKvlpif2ti3aOTqdTvf_DyM2U4K3gFTTpGM1PxZECs5kzVsa_RTPtaWBcJxqwwkpiLnsJ95pYUXAPQcGJeBUqntVVs',
-  },
-];
-
-const PRODUCTS_COL_2: Product[] = [
-  {
-    id: 'p3',
-    category: 'Studio',
-    name: 'Wide Leg Trousers',
-    price: '$180',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDMUIQ100EQoAycdRIEB76hD-BBVHq1chuGhonoNWpDlaAZ9MkRNtdJOboaqqkgxeqY7IUczIFlnQYjHkzHq4RNbyJut_WJT22Zufz_9kkHFUb20goyuKbkraoyAFwgofT-U3bPVrdzbyLppwpEfill1wu3aTL7MGKJ62IDsRQW9uXtpAhHtelXZHie0ppC-U0wsgXHcV6k1qXg03D47PD0Us1xmsckIozpHLEEbrcb4EMRb8E8_uAJvwm8KqAvvBhcQBJBTxtvffk',
-    isNew: true,
-  },
-  {
-    id: 'p4',
-    category: 'Footwear',
-    name: 'Runner Sneakers',
-    price: '$210',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCYBhSrbfeoM7E3NXKH8KuKYJrSnGM4YMKBEcrNgBfBbzHi8W1r_9ItCDqWbs3ySNtJjfqDi352629LAos4EfTBqgYv6hFtgQ-P1EBUqjF8eTjVU7ZMa-SueBZqtOaNHyz5uu0dhJXykwQav0w3yJtKfq3dpmBWWqFB0IKqZj70EU16a-mhTAr3EVrot1wVdkjg2tUNDSMepuMYFlZigCwV-XUxCtN_v_oLS2g4VmKlmtj4OOXZtadklVHoS9BvR1nE-0s7I3xmCd8',
-  },
-];
 
 
 // --- Components ---
@@ -86,7 +50,10 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ item, heightRatio = 1.3 }) => (
-  <View style={styles.productCard}>
+  <TouchableOpacity style={styles.productCard}
+  activeOpacity={0.7}  
+  onPress={() => router.push(`/product/${item.id}`)}
+  >
     <View style={[styles.productImageContainer, { aspectRatio: 1 / heightRatio }]}>
       <Image source={{ uri: item.image }} style={styles.productImage} resizeMode="cover" />
       {item.isNew && (
@@ -105,10 +72,76 @@ const ProductCard: React.FC<ProductCardProps> = ({ item, heightRatio = 1.3 }) =>
       </Text>
       <Text style={styles.productPrice}>{item.price}</Text>
     </View>
-  </View>
+  </TouchableOpacity>
 );
 
 const App = () => {
+
+
+  // --- A. Khai báo biến chứa dữ liệu thật ---
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // THÊM DÒNG NÀY: Lấy sản phẩm mới nhất để hiển thị lên Banner
+const [heroCollection, setHeroCollection] = useState<any>(null);
+  // --- B. Hàm lấy dữ liệu từ Supabase ---
+  useEffect(() => {
+    const fetchData = async () => {
+      // 1. Lấy danh mục
+      const { data: cateData } = await supabase.from('categories').select('*');
+      if (cateData) {
+        // Map dữ liệu từ DB sang chuẩn giao diện
+        setCategories(cateData.map((c: any) => ({
+          id: c.id.toString(),
+          name: c.name,
+          image: c.image_url // DB là image_url, UI là image
+        })));
+      }
+
+      // 2. Lấy sản phẩm (Kèm tên danh mục)
+      const { data: prodData } = await supabase
+        .from('products')
+        .select('*, categories(name)') // Join bảng để lấy tên danh mục
+        .order('created_at', { ascending: false });
+
+      if (prodData) {
+        setProducts(prodData.map((p: any) => ({
+          id: p.id.toString(),
+          category: p.categories?.name || 'Collection',
+          name: p.name,
+          price: `${p.price.toLocaleString()} đ`, // Format giá tiền
+          image: p.images ? p.images[0] : '', // Lấy ảnh đầu tiên trong mảng
+          isNew: true // Hoặc logic check ngày tạo mới
+        })));
+      }
+
+      // 3. Lấy collection mới nhất cho Hero Section
+      const { data: heroCatData } = await supabase
+        .from('categories')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (heroCatData) {
+        setHeroCollection({
+          id: heroCatData.id.toString(),
+          name: heroCatData.name,
+          image: heroCatData.image_url || HERO_IMAGE,
+        });
+      }
+
+
+    };
+
+    fetchData();
+  }, []);
+
+  // --- C. Chia sản phẩm thành 2 cột cho giao diện Masonry ---
+  const productsCol1 = products.filter((_, i) => i % 2 === 0);
+  const productsCol2 = products.filter((_, i) => i % 2 !== 0);
+
+  // ... Phần return giữ nguyên ...
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -131,27 +164,35 @@ const App = () => {
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
-          <ImageBackground
-            source={{ uri: HERO_IMAGE }}
+          <TouchableOpacity activeOpacity={0.9} 
             style={styles.heroImage}
-            imageStyle={{ borderRadius: 20 }}
+            onPress={() => heroCollection && router.push(`/collection/${heroCollection.id}`)}
           >
+            <ImageBackground
+              // Logic: Nếu có sản phẩm thì lấy ảnh đó, chưa có thì dùng ảnh mặc định
+              source={{ uri: heroCollection?.image || HERO_IMAGE }}
+              style={styles.heroImage}
+              imageStyle={{ borderRadius: 20 }}
+            >
             <View style={styles.heroOverlay} />
             <View style={styles.heroContent}>
-              <Text style={styles.heroSubtitle}>SUMMER DROP 24</Text>
-              <Text style={styles.heroTitle}>New{'\n'}Collection</Text>
-              <TouchableOpacity style={styles.shopNowButton}>
+              <Text style={styles.heroSubtitle}>LASTEST DROP</Text>
+              {/* {Hiển thị tên Collection lấy từ DB} */}
+              <Text style={styles.heroTitle}>{
+                heroCollection ? heroCollection.name : 'New\nCollection'}</Text>
+              <View style={styles.shopNowButton}>
                 <Text style={styles.shopNowText}>SHOP NOW</Text>
-              </TouchableOpacity>
+              </View>
             </View>
-          </ImageBackground>
+            </ImageBackground>
+          </TouchableOpacity>
         </View>
 
         {/* Categories Carousel */}
         <View style={styles.categoriesSection}>
           <Text style={styles.sectionTitle}>Categories</Text>
           <FlatList
-            data={CATEGORIES}
+            data={categories}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.categoriesList}
@@ -179,13 +220,13 @@ const App = () => {
           <View style={styles.masonryContainer}>
             {/* Column 1 */}
             <View style={styles.column}>
-              {PRODUCTS_COL_1.map((item, index) => (
+              {productsCol1.map((item, index) => (
                 <ProductCard key={item.id} item={item} heightRatio={index === 0 ? 1.33 : 1} />
               ))}
             </View>
             {/* Column 2 (Staggered top margin) */}
             <View style={[styles.column, styles.columnStaggered]}>
-              {PRODUCTS_COL_2.map((item, index) => (
+              {productsCol2.map((item, index) => (
                 <ProductCard key={item.id} item={item} heightRatio={index === 0 ? 1.33 : 1.25} />
               ))}
             </View>
