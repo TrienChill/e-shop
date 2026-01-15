@@ -1,11 +1,8 @@
-//1. Thêm import router và useLocalSearchParams 
-import { router, useLocalSearchParams } from 'expo-router';
-
-//2. Thêm ActivityIndicator để hiển thị khi đang load dữ liệu
-//3. Import supabase client
-import { supabase } from '@/src/lib/supabase';
+// app/(shop)/product/[id].tsx
 
 import { useCart } from '@/src/context/CartContext';
+import { supabase } from '@/src/lib/supabase';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft,
   Check,
@@ -13,13 +10,16 @@ import {
   Heart,
   ShoppingBag,
   Sparkles,
-  Star,
+  Star
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  FlatList, // 1. Thêm FlatList
   Image,
+  NativeScrollEvent, // 2. Thêm Type cho sự kiện scroll
+  NativeSyntheticEvent, // 3. Thêm Type cho sự kiện scroll
   Platform,
   SafeAreaView,
   ScrollView,
@@ -29,29 +29,24 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-// import { ColorOption, SizeOption } from '../../../src/types/types';
 
-const {  height } = Dimensions.get('window');
+// 4. Lấy thêm width để tính toán kích thước ảnh
+const { width, height } = Dimensions.get('window');
 
-// // --- Constants & Data ---
-// const IMAGE_URL =
-//   'https://lh3.googleusercontent.com/aida-public/AB6AXuAo-hALrVqlJt-f4pJmbjoRQGIqR7Hvn-6VQTYbc5VM_EoBVaw1xacsCNryH832RaeKO0VC0ymkjs9uJ9Adn-oVaKVTek6pm_HncG5kLG_I0O_0977tJdRkcI24KinUVdU8iWlImRI-bB4GCxKfBy6Jqxh54AXUdNBpIL90phTpVIaADhC0XQ7vtcR5SrU7oblt2njZWmMZPB_teV3kAW9quQcRQtlUtLLSSR9yXB9Bwt7Sz4mp7gvEVgdkDvdcun18HUl1mg-tuKA';
-
-// const COLORS: ColorOption[] = [
-//   { id: '1', name: 'Beige', hex: '#D2B48C' },
-//   { id: '2', name: 'Black', hex: '#1a1a1a' },
-//   { id: '3', name: 'Charcoal', hex: '#52525b' },
-// ];
-
-// const SIZES: SizeOption[] = [
-//   { label: 'XS', available: true },
-//   { label: 'S', available: true },
-//   { label: 'M', available: true },
-//   { label: 'L', available: true },
-//   { label: 'XL', available: false },
-// ];
+const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const BUCKET_NAME = 'product-imagess';
 
 // --- Components ---
+
+const getProductImage = (images: string[] | null | undefined): string[] => {
+  if (!images || !Array.isArray(images) || images.length === 0) {
+    return ['https://via.placeholder.com/400'];
+  }
+  return images.map(img => {
+    if (img.startsWith('http')) return img;
+    return `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`;
+  });
+}
 
 const Header = () => (
   <View style={styles.headerContainer}>
@@ -64,14 +59,23 @@ const Header = () => (
   </View>
 );
 
-const PaginationDots = () => (
-  <View style={styles.paginationContainer}>
-    <View style={[styles.dot, styles.activeDot]} />
-    <View style={styles.dot} />
-    <View style={styles.dot} />
-    <View style={styles.dot} />
-  </View>
-);
+// 5. Cập nhật PaginationDots để nhận props động
+const PaginationDots = ({ total, activeIndex }: { total: number; activeIndex: number }) => {
+  if (total <= 1) return null; // Ẩn nếu chỉ có 1 ảnh
+  return (
+    <View style={styles.paginationContainer}>
+      {Array.from({ length: total }).map((_, index) => (
+        <View
+          key={index}
+          style={[
+            styles.dot,
+            index === activeIndex && styles.activeDot // Highlight dot đang active
+          ]}
+        />
+      ))}
+    </View>
+  );
+};
 
 const SectionTitle = ({ label, rightLabel }: { label: string; rightLabel?: string }) => (
   <View style={styles.sectionHeader}>
@@ -85,12 +89,14 @@ const SectionTitle = ({ label, rightLabel }: { label: string; rightLabel?: strin
 );
 
 export default function App() {
-  const { id } = useLocalSearchParams(); //Lấy id từ Url
+  const { id } = useLocalSearchParams();
   const { addItem } = useCart();
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // 6. State theo dõi ảnh đang xem
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
-  // State cho lựa chọn (giữ nguyên logic)
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
 
@@ -100,13 +106,11 @@ export default function App() {
         .from('products')
         .select('*')
         .eq('id', id)
-        .single(); // Lấy 1 sản phẩm duy nhất
+        .single();
 
       if (error) throw error;
       setProduct(data);
-    
-      // Tự động chọn size và màu sắc đầu tiên nếu có
-
+      
       if (data?.variants?.colors?.length > 0) setSelectedColor(data.variants.colors[0]);
       if (data?.variants?.sizes?.length > 0) setSelectedSize(data.variants.sizes[0]);
     } catch (error) {
@@ -120,13 +124,20 @@ export default function App() {
     fetchProductDetail();
   }, [fetchProductDetail]);
 
+  // 7. Hàm xử lý khi lướt xong 1 ảnh để cập nhật dot
+  const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    // Tính index hiện tại dựa trên vị trí cuộn chia cho chiều rộng màn hình
+    const currentIndex = Math.round(contentOffsetX / width);
+    setActiveImageIndex(currentIndex);
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
     addItem(product, selectedSize);
     router.push('/(shop)/(tabs)/cart');
   };
 
-  // Nếu đang tải, hiện vòng xoay xoay
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -135,51 +146,60 @@ export default function App() {
     );
   }
 
-  // Nếu không có sản phẩm, hiện thông báo
   if (!product) return <View><Text>Không có sản phẩm</Text></View>
 
-
-
-
-
-
+  // Chuẩn bị list ảnh
+  const productImages = getProductImage(product.images);
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Main Scrollable Content */}
+      <SafeAreaView style={styles.safeAreaHeader}>
+        <Header />
+      </SafeAreaView>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Hero Image Section */}
+        {/* Hero Image Section - Đã thay đổi thành FlatList */}
         <View style={styles.heroSection}>
-          <Image source={{ uri: product.image ? product.image[0] : 'https://via.placeholder.com/400'  }} style={styles.heroImage} resizeMode="cover" />
+          <FlatList
+            data={productImages}
+            horizontal
+            pagingEnabled // Quan trọng: Giúp lướt từng trang một
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(_, index) => index.toString()}
+            onMomentumScrollEnd={onMomentumScrollEnd} // Bắt sự kiện dừng cuộn
+            renderItem={({ item }) => (
+              <Image 
+                source={{ uri: item }} 
+                // Ảnh phải rộng bằng màn hình để lướt đúng 1 trang
+                style={{ width: width, height: '100%' }} 
+                resizeMode="cover" 
+              />
+            )}
+          />
+          
           <View style={styles.overlayGradient} />
           
-          <SafeAreaView style={styles.safeAreaHeader}>
-            <Header />
-          </SafeAreaView>
-
-          <PaginationDots />
+          {/* PaginationDots nhận props động */}
+          <PaginationDots total={productImages.length} activeIndex={activeImageIndex} />
         </View>
 
         {/* Product Details Sheet */}
         <View style={styles.detailsSheet}>
-          {/* Drag Handle */}
           <View style={styles.dragHandleContainer}>
             <View style={styles.dragHandle} />
           </View>
 
-          {/* Title & Price */}
           <View style={styles.titleRow}>
             <Text style={styles.productTitle}>{product.name}</Text>
             <Text style={styles.priceText}>${product.price?.toLocaleString()} đ</Text>
           </View>
 
-          {/* Ratings */}
           <View style={styles.ratingRow}>
             <Star fill="#EAB308" color="#EAB308" size={18} />
             <Text style={styles.ratingValue}>4.8</Text>
@@ -187,12 +207,10 @@ export default function App() {
             <Text style={styles.ratingCount}>124 Reviews</Text>
           </View>
 
-          {/* Description */}
           <Text style={styles.description}>
             {product.description || 'Chưa có mô tả cho sản phẩm này.'}
           </Text>
 
-          {/* Colors */}
           <View style={styles.section}>
             <SectionTitle label="Color" />
             <View style={styles.optionsRow}>
@@ -204,7 +222,7 @@ export default function App() {
                     onPress={() => setSelectedColor(colorName)}
                     style={[
                       styles.colorCircle, 
-                      { backgroundColor: colorName.toLowerCase() }, // Lưu ý: Tên màu phải chuẩn tiếng Anh hoặc mã Hex thì mới hiện màu
+                      { backgroundColor: colorName.toLowerCase() },
                       isSelected && styles.colorCircleSelected,
                     ]}
                   >
@@ -215,7 +233,6 @@ export default function App() {
             </View>
           </View>
 
-          {/* Sizes */}
           <View style={styles.section}>
             <SectionTitle label="Size" rightLabel="Size Guide" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sizeList}>
@@ -237,7 +254,6 @@ export default function App() {
             </ScrollView>
           </View>
 
-          {/* AI Stylist Banner */}
           <TouchableOpacity style={styles.aiCard} activeOpacity={0.9}>
             <View style={styles.aiCardContent}>
               <View style={styles.aiIconContainer}>
@@ -251,12 +267,10 @@ export default function App() {
             </View>
           </TouchableOpacity>
 
-          {/* Padding for bottom scroll */}
           <View style={{ height: 100 }} />
         </View>
       </ScrollView>
 
-      {/* Sticky Footer */}
       <View style={styles.footer}>
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Total</Text>
@@ -271,7 +285,7 @@ export default function App() {
   );
 }
 
-// --- Styles ---
+// Giữ nguyên phần styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -293,14 +307,14 @@ const styles = StyleSheet.create({
   },
   overlayGradient: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.05)', // Very subtle overlay
+    backgroundColor: 'rgba(0,0,0,0.05)', 
   },
   safeAreaHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 10,
+    zIndex: 99,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -315,11 +329,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
-    backdropFilter: 'blur(10px)', // Note: This is web only, RN requires BlurView for real blur
   },
   paginationContainer: {
     position: 'absolute',
-    bottom: 48, // Lifted up to be visible above the sheet overlap
+    bottom: 48, 
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -340,7 +353,7 @@ const styles = StyleSheet.create({
   // Details Sheet
   detailsSheet: {
     flex: 1,
-    marginTop: -32, // Negative margin for overlap
+    marginTop: -32, 
     backgroundColor: '#fff',
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
@@ -448,7 +461,7 @@ const styles = StyleSheet.create({
   },
   colorCircleSelected: {
     borderWidth: 2,
-    borderColor: '#1a1a1a', // Outer ring simulated by gap or padding in real app, simplified here
+    borderColor: '#1a1a1a', 
   },
 
   // Size Selectors
@@ -492,7 +505,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#F3E8FF', // Light purple bg
+    backgroundColor: '#F3E8FF', 
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E9D5FF',
@@ -541,7 +554,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F3F4F6',
     paddingHorizontal: 24,
     paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24, // Safe area for iPhone X+
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24, 
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
