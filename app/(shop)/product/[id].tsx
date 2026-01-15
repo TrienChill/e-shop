@@ -125,6 +125,7 @@ export default function App() {
   }, [fetchProductDetail]);
 
   // 7. Hàm xử lý khi lướt xong 1 ảnh để cập nhật dot
+  // Logic này đảm bảo khi hết hết 1 trang (width), index sẽ được cập nhật +1 hoặc -1
   const onMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     // Tính index hiện tại dựa trên vị trí cuộn chia cho chiều rộng màn hình
@@ -183,7 +184,8 @@ export default function App() {
             )}
           />
           
-          <View style={styles.overlayGradient} />
+          {/* FIX: Thêm pointerEvents="none" để view này KHÔNG chặn thao tác vuốt của người dùng*/}
+          <View style={styles.overlayGradient} pointerEvents="none" />
           
           {/* PaginationDots nhận props động */}
           <PaginationDots total={productImages.length} activeIndex={activeImageIndex} />
