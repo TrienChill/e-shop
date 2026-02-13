@@ -20,17 +20,6 @@ const { width } = Dimensions.get("window");
 const CATEGORY_GRID = [
   {
     id: "1",
-    name: "Watch",
-    count: 212,
-    images: [
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=200",
-      "https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=200",
-      "https://images.unsplash.com/photo-1542496658-e33a6d0d50f6?w=200",
-      "https://images.unsplash.com/photo-1533139502658-0198f920d8e8?w=200",
-    ],
-  },
-  {
-    id: "2",
     name: "Hoodies",
     count: 148,
     images: [
@@ -41,18 +30,7 @@ const CATEGORY_GRID = [
     ],
   },
   {
-    id: "3",
-    name: "Bags",
-    count: 92,
-    images: [
-      "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=200",
-      "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=200",
-      "https://images.unsplash.com/photo-1564422170194-896b89110ef8?w=200",
-      "https://images.unsplash.com/photo-1591561954557-26941169b49e?w=200",
-    ],
-  },
-  {
-    id: "4",
+    id: "2",
     name: "Lingerie",
     count: 67,
     images: [
