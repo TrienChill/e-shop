@@ -2,6 +2,8 @@
 
 import { supabase } from "../lib/supabase";
 
+// Lấy top 10 sản phẩm bán chạy trong 30 ngày qua
+
 export const getTopSellingProducts = async () => {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -35,4 +37,20 @@ export const getTopSellingProducts = async () => {
   return Object.values(productSales)
     .sort((a: any, b: any) => b.total_sold - a.total_sold)
     .slice(0, 10);
+};
+
+// Lấy 10 sản phẩm mới nhất
+
+export const getLatestProducts = async () => {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .order("created_at", { ascending: false }) // Mới nhất lên đầu
+    .limit(10);
+
+  if (error) {
+    console.error("Lỗi lấy sản phẩm mới:", error);
+    return [];
+  }
+  return data;
 };

@@ -11,8 +11,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
-import { getTopSellingProducts } from "@/src/services/product";
-import { router } from "expo-router";
+import {
+  getLatestProducts,
+  getTopSellingProducts,
+} from "@/src/services/product";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 
 const { width } = Dimensions.get("window");
@@ -42,28 +45,6 @@ const CATEGORY_GRID = [
       "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=200",
       "https://images.unsplash.com/photo-1519696282848-b5fe1175b1e3?w=200",
     ],
-  },
-];
-
-// New Items
-const NEW_ITEMS = [
-  {
-    id: "1",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$24.00",
-    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400",
-  },
-  {
-    id: "2",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$34.00",
-    image: "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400",
-  },
-  {
-    id: "3",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$42.00",
-    image: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400",
   },
 ];
 
@@ -150,6 +131,9 @@ const JUST_FOR_YOU = [
 // ==================== COMPONENTS ====================
 
 const HomeScreen = () => {
+  {
+    /* ========== TOP PRODUCTS SECTION ========== */
+  }
   const [topProducts, setTopProducts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -162,6 +146,21 @@ const HomeScreen = () => {
       }
     };
     fetchTopProducts();
+  }, []);
+
+  {
+    /* ========== NEW ITEMS SECTION  ========== */
+  }
+
+  const [newItems, setNewItems] = useState<any[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchNewItems = async () => {
+      const data = await getLatestProducts();
+      setNewItems(data);
+    };
+    fetchNewItems();
   }, []);
 
   return (
@@ -268,7 +267,10 @@ const HomeScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Sản phẩm mới</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
+            <TouchableOpacity
+              style={styles.seeAllButton}
+              onPress={() => router.push("/(shop)/(tabs)/search")} // Chuyển sang trang tìm kiếm/lọc
+            >
               <Text style={styles.seeAllText}>Chi tiết</Text>
               <MaterialIcons name="arrow-forward" size={16} color="#2563eb" />
             </TouchableOpacity>
@@ -279,18 +281,31 @@ const HomeScreen = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalList}
           >
-            {NEW_ITEMS.map((item) => (
-              <View key={item.id} style={styles.productCard}>
+            {newItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.productCard}
+                onPress={() => router.push(`/(shop)/product/${item.id}`)}
+              >
                 <Image
-                  source={{ uri: item.image }}
+                  source={{
+                    // Ưu tiên lấy ảnh đầu tiên trong mảng images, nếu không có thì dùng ảnh mặc định
+                    uri:
+                      item.images && item.images.length > 0
+                        ? item.images[0]
+                        : "https://via.placeholder.com/150",
+                  }}
                   style={styles.productImage}
                   resizeMode="cover"
                 />
                 <Text style={styles.productName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.productPrice}>{item.price}</Text>
-              </View>
+                <Text style={styles.productPrice}>
+                  {/* Định dạng tiền tệ nếu cần, ví dụ: item.price.toLocaleString() */}
+                  ${item.price}
+                </Text>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
