@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Dimensions,
   Image,
@@ -11,6 +10,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+
+import { getTopSellingProducts } from "@/src/services/product";
+import { router } from "expo-router";
+import React, { useEffect, useState } from "react";
 
 const { width } = Dimensions.get("window");
 
@@ -39,30 +42,6 @@ const CATEGORY_GRID = [
       "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=200",
       "https://images.unsplash.com/photo-1519696282848-b5fe1175b1e3?w=200",
     ],
-  },
-];
-
-// Top Products (circular avatars)
-const TOP_PRODUCTS = [
-  {
-    id: "1",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=200",
-  },
-  {
-    id: "2",
-    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=200",
-  },
-  {
-    id: "3",
-    image: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=200",
-  },
-  {
-    id: "4",
-    image: "https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=200",
-  },
-  {
-    id: "5",
-    image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=200",
   },
 ];
 
@@ -171,6 +150,20 @@ const JUST_FOR_YOU = [
 // ==================== COMPONENTS ====================
 
 const HomeScreen = () => {
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTopProducts = async () => {
+      try {
+        const data = await getTopSellingProducts();
+        setTopProducts(data);
+      } catch (error) {
+        console.error("Lỗi lấy sản phẩm bán chạy:", error);
+      }
+    };
+    fetchTopProducts();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -241,17 +234,27 @@ const HomeScreen = () => {
 
         {/* ========== TOP PRODUCTS SECTION ========== */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Sản phẩm bán chạy</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top sản phẩm bán chạy</Text>
+          </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.topProductsList}
           >
-            {TOP_PRODUCTS.map((product) => (
-              <TouchableOpacity key={product.id} style={styles.topProductItem}>
+            {topProducts.map((product) => (
+              <TouchableOpacity
+                key={product.id}
+                style={styles.topProductItem}
+                onPress={() => router.push(`/(shop)/product/${product.id}`)} // Chuyển đến chi tiết
+              >
                 <View style={styles.topProductBorder}>
                   <Image
-                    source={{ uri: product.image }}
+                    source={{
+                      uri: Array.isArray(product.images)
+                        ? product.images[0]
+                        : product.image,
+                    }}
                     style={styles.topProductImage}
                     resizeMode="cover"
                   />
