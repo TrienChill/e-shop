@@ -13,6 +13,7 @@ import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 import {
   getLatestProducts,
+  getMostPopularProducts,
   getTopSellingProducts,
 } from "@/src/services/product";
 import { useRouter } from "expo-router";
@@ -69,34 +70,6 @@ const FLASH_SALE_PRODUCTS = [
     id: "4",
     image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400",
     discount: "-25%",
-  },
-];
-
-// Most Popular
-const MOST_POPULAR = [
-  {
-    id: "1",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$26.00",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400",
-  },
-  {
-    id: "2",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$29.00",
-    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400",
-  },
-  {
-    id: "3",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$32.00",
-    image: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400",
-  },
-  {
-    id: "4",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$38.00",
-    image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=400",
   },
 ];
 
@@ -161,6 +134,19 @@ const HomeScreen = () => {
       setNewItems(data);
     };
     fetchNewItems();
+  }, []);
+
+  {
+    /* ========== MOST POPULAR SECTION  ========== */
+  }
+  const [popularItems, setPopularItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const data = await getMostPopularProducts();
+      setPopularItems(data);
+    };
+    loadData();
   }, []);
 
   return (
@@ -342,25 +328,55 @@ const HomeScreen = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Nổi tiếng nhất</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
+            <TouchableOpacity
+              style={styles.seeAllButton}
+              onPress={() => router.push("/(shop)/(tabs)/search")} // Link tới trang lọc hoặc xem tất cả
+            >
               <Text style={styles.seeAllText}>Chi tiết</Text>
               <MaterialIcons name="arrow-forward" size={16} color="#2563eb" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.popularGrid}>
-            {MOST_POPULAR.map((item) => (
-              <View key={item.id} style={styles.popularCard}>
+            {/* Thêm .slice(0, 4) để chỉ lấy 4 phần tử đầu tiên */}
+            {popularItems.slice(0, 4).map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.popularCard}
+                onPress={() => router.push(`/(shop)/product/${item.id}`)}
+              >
                 <Image
-                  source={{ uri: item.image }}
+                  source={{ uri: item.images?.[0] || item.image }}
                   style={styles.popularImage}
                   resizeMode="cover"
                 />
+
+                {/* Hiển thị Rating & Lượt xem nhỏ bên dưới ảnh */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    paddingHorizontal: 4,
+                    marginTop: 4,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <MaterialIcons name="star" size={12} color="#f59e0b" />
+                    <Text style={{ fontSize: 11, color: "#666" }}>
+                      {" "}
+                      {item.average_rating || 0}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: "#999" }}>
+                    {item.view_count || 0} lượt xem
+                  </Text>
+                </View>
+
                 <Text style={styles.popularName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.popularPrice}>{item.price}</Text>
-              </View>
+                <Text style={styles.popularPrice}>${item.price}</Text>
+              </TouchableOpacity>
             ))}
           </View>
         </View>

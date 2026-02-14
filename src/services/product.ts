@@ -54,3 +54,17 @@ export const getLatestProducts = async () => {
   }
   return data;
 };
+
+// Lấy 10 sản phẩm nổi tiếng nhất (dựa trên số lượt xem, đánh giá và bán hàng)
+
+// src/services/product.ts
+
+export const getMostPopularProducts = async () => {
+  const { data, error } = await supabase.rpc("get_most_popular_products");
+
+  if (error) {
+    console.error("Lỗi fetch sản phẩm phổ biến:", error);
+    return [];
+  }
+  return data;
+};
