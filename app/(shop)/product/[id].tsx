@@ -25,14 +25,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 
-// ─────────────────────────── Mock Data ───────────────────────────
+// ─────────────────────────── Dữ liệu giả ───────────────────────────
 
 const PRODUCT = {
   id: "1",
-  name: "Elegant Summer Blouse",
+  name: "Áo Sơ Mi Mùa Hè Thanh Lịch",
   price: 17.0,
   description:
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Etiam ac mauris, adipiscing eu mauris id, pretium pulvinar sapien. Crafted from premium fabric for all-day comfort.",
+    "Sản phẩm được làm từ chất liệu cao cấp, mang lại cảm giác thoải mái suốt cả ngày. Thiết kế hiện đại, trẻ trung, phù hợp cho đi làm, đi chơi hoặc dạo phố mùa hè. Đường may tinh tế, form dáng chuẩn đẹp.",
   image:
     "https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=600&q=80",
 };
@@ -46,33 +46,33 @@ const VARIANTS: {
 }[] = [
   {
     id: "v1",
-    color: "PINK",
+    color: "HỒNG",
     size: "S",
-    label: "Pink / S",
+    label: "Hồng / S",
     image:
       "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=120&q=80",
   },
   {
     id: "v2",
-    color: "RED",
+    color: "ĐỎ",
     size: "M",
-    label: "Red / M",
+    label: "Đỏ / M",
     image:
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=120&q=80",
   },
   {
     id: "v3",
-    color: "BEIGE",
+    color: "KEM",
     size: "L",
-    label: "Beige / L",
+    label: "Kem / L",
     image:
       "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=120&q=80",
   },
   {
     id: "v4",
-    color: "WHITE",
+    color: "TRẮNG",
     size: "XL",
-    label: "White / XL",
+    label: "Trắng / XL",
     image:
       "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=120&q=80",
   },
@@ -81,66 +81,66 @@ const VARIANTS: {
 const REVIEWS = [
   {
     id: "r1",
-    user: "Jessica Lee",
+    user: "Trần Thu Hà",
     avatar: "https://i.pravatar.cc/100?img=5",
     rating: 4,
-    date: "2025-12-15",
+    date: "15/12/2025",
     score: "4/5",
     comment:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed vam nonummy nibh euismod tincidunt ut laoreet et dolore magna aliquyam erat.",
+      "Áo đẹp, chất vải mát mẻ rất hợp mặc mùa hè. Giao hàng nhanh và đóng gói cẩn thận. Sẽ ủng hộ shop tiếp!",
   },
   {
     id: "r2",
-    user: "Anna Torres",
+    user: "Nguyễn Minh Anh",
     avatar: "https://i.pravatar.cc/100?img=9",
     rating: 5,
-    date: "2025-11-20",
+    date: "20/11/2025",
     score: "5/5",
     comment:
-      "Absolutely love this piece! The fabric quality is amazing and fits perfectly. Will definitely order again.",
+      "Rất hài lòng với sản phẩm này! Màu sắc y hình, mặc lên tôn dáng. Shop tư vấn rất nhiệt tình.",
   },
 ];
 
 const POPULAR_PRODUCTS = [
   {
     id: "p1",
-    name: "Floral Wrap Dress",
+    name: "Váy Hoa Dáng Xòe",
     price: 17.0,
-    badge: "New",
+    badge: "Mới",
     badgeColor: "#22C55E",
     image:
       "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=300&q=80",
   },
   {
     id: "p2",
-    name: "Pink Mini Skirt",
+    name: "Chân Váy Ngắn Hồng",
     price: 17.0,
-    badge: "Sale",
+    badge: "Giảm giá",
     badgeColor: "#3B82F6",
     image:
       "https://images.unsplash.com/photo-1554412933-514a83d2f3c8?w=300&q=80",
   },
   {
     id: "p3",
-    name: "Red Party Dress",
+    name: "Đầm Dự Tiệc Đỏ",
     price: 17.0,
-    badge: "Hot",
+    badge: "Nổi bật",
     badgeColor: "#EF4444",
     image:
       "https://images.unsplash.com/photo-1566206091558-7f218b696731?w=300&q=80",
   },
   {
     id: "p4",
-    name: "Casual Linen Set",
+    name: "Bộ Lanh Phối Đồ",
     price: 17.0,
-    badge: "New",
+    badge: "Mới",
     badgeColor: "#22C55E",
     image:
       "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=300&q=80",
   },
 ];
 
-// ──────────────────────── Sub-components ─────────────────────────
+// ──────────────────────── Component phụ ─────────────────────────
 
 function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
   return (
@@ -207,7 +207,7 @@ function PopularCard({ item }: { item: (typeof POPULAR_PRODUCTS)[0] }) {
   );
 }
 
-// ──────────────────────── Main Screen ────────────────────────────
+// ──────────────────────── Màn hình chính ────────────────────────────
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -220,7 +220,7 @@ export default function ProductDetailScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* ── Floating back button ── */}
+      {/* ── Nút quay lại ── */}
       <TouchableOpacity
         style={styles.backBtn}
         activeOpacity={0.8}
@@ -234,18 +234,18 @@ export default function ProductDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ══════════════ 1. Hero Image ══════════════ */}
+        {/* ══════════════ 1. Ảnh sản phẩm ══════════════ */}
         <View style={styles.heroContainer}>
           <Image
             source={{ uri: PRODUCT.image }}
             style={styles.heroImage}
             resizeMode="cover"
           />
-          {/* Gradient overlay at bottom for style */}
+          {/* Lớp phủ gradient ở dưới để tạo kiểu */}
           <View style={styles.heroGradient} />
         </View>
 
-        {/* ══════════════ 2. Product Info ══════════════ */}
+        {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
           <View style={styles.priceRow}>
             <Text style={styles.price}>${PRODUCT.price.toFixed(2)}</Text>
@@ -257,13 +257,14 @@ export default function ProductDetailScreen() {
           <Text style={styles.productDescription}>{PRODUCT.description}</Text>
         </View>
 
-        {/* Divider */}
+        {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 3. Variations ══════════════ */}
+        {/* ══════════════ 3. Biến thể ══════════════ */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Variations</Text>
+            <Text style={styles.sectionTitle}>Biến thể</Text>
+            <View style={{ flex: 1 }} />
             <View style={styles.variantInfo}>
               <Text style={styles.variantInfoText}>
                 {selectedVariant.color}
@@ -300,18 +301,18 @@ export default function ProductDetailScreen() {
           </ScrollView>
         </View>
 
-        {/* Divider */}
+        {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 4. Specifications ══════════════ */}
+        {/* ══════════════ 4. Thông số kỹ thuật ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Specifications</Text>
+          <Text style={styles.sectionTitle}>Thông số kỹ thuật</Text>
 
           <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Material</Text>
+            <Text style={styles.specLabel}>Chất liệu</Text>
             <View style={styles.specChips}>
               <View style={styles.chip}>
-                <Text style={styles.chipText}>Cotton 95%</Text>
+                <Text style={styles.chipText}>Vải bông 95%</Text>
               </View>
               <View style={styles.chip}>
                 <Text style={styles.chipText}>Nylon 5%</Text>
@@ -320,30 +321,30 @@ export default function ProductDetailScreen() {
           </View>
 
           <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Origin</Text>
+            <Text style={styles.specLabel}>Xuất xứ</Text>
             <View style={styles.specChips}>
               <View style={styles.chip}>
-                <Text style={styles.chipText}>EU</Text>
+                <Text style={styles.chipText}>Châu Âu</Text>
               </View>
             </View>
           </View>
 
           <TouchableOpacity style={styles.specRowLink} activeOpacity={0.7}>
-            <Text style={styles.specLabel}>Size guide</Text>
+            <Text style={styles.specLabel}>Bảng quy đổi kích cỡ</Text>
             <ChevronRight size={18} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
-        {/* Divider */}
+        {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 5. Delivery ══════════════ */}
+        {/* ══════════════ 5. Giao hàng ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery</Text>
+          <Text style={styles.sectionTitle}>Giao hàng</Text>
 
           {[
-            { type: "Standard", time: "5-7 days", price: "$3.00" },
-            { type: "Express", time: "1-2 days", price: "$12.00" },
+            { type: "Tiêu chuẩn", time: "5-7 ngày", price: "$3.00" },
+            { type: "Hỏa tốc", time: "1-2 ngày", price: "$12.00" },
           ].map((d) => (
             <View key={d.type} style={styles.deliveryRow}>
               <Text style={styles.deliveryType}>{d.type}</Text>
@@ -357,39 +358,39 @@ export default function ProductDetailScreen() {
           ))}
         </View>
 
-        {/* Divider */}
+        {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 6. Rating & Reviews ══════════════ */}
+        {/* ══════════════ 6. Đánh giá & Nhận xét ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rating &amp; Reviews</Text>
+          <Text style={styles.sectionTitle}>Đánh giá &amp; Nhận xét</Text>
 
-          {/* Overall stars */}
+          {/* Tổng số sao */}
           <View style={styles.overallRating}>
             <StarRow rating={4} size={20} />
             <Text style={styles.overallScore}>4/5</Text>
           </View>
 
-          {/* Individual reviews */}
+          {/* Nhận xét cá nhân */}
           {REVIEWS.map((r) => (
             <ReviewCard key={r.id} review={r} />
           ))}
 
-          {/* View All */}
+          {/* Xem tất cả */}
           <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.8}>
-            <Text style={styles.viewAllText}>View All Reviews</Text>
+            <Text style={styles.viewAllText}>Xem tất cả nhận xét</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Divider */}
+        {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 7. Most Popular ══════════════ */}
+        {/* ══════════════ 7. Sản phẩm phổ biến ══════════════ */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Most Popular</Text>
+            <Text style={styles.sectionTitle}>Sản phẩm phổ biến</Text>
             <TouchableOpacity style={styles.seeAllBtn} activeOpacity={0.7}>
-              <Text style={styles.seeAllText}>See All</Text>
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
               <ChevronRight size={14} color="#3B82F6" />
             </TouchableOpacity>
           </View>
@@ -401,13 +402,13 @@ export default function ProductDetailScreen() {
           </View>
         </View>
 
-        {/* Bottom spacer so content isn't hidden behind action bar */}
+        {/* Khoảng trống dưới để không bị thanh công cụ che khuất */}
         <View style={{ height: 90 }} />
       </ScrollView>
 
-      {/* ══════════════ 8. Bottom Action Bar (Sticky) ══════════════ */}
+      {/* ══════════════ 8. Thanh công cụ dưới (Cố định) ══════════════ */}
       <View style={styles.actionBar}>
-        {/* Left icons */}
+        {/* Các biểu tượng bên trái */}
         <View style={styles.actionIcons}>
           <TouchableOpacity
             style={styles.actionIcon}
@@ -427,13 +428,13 @@ export default function ProductDetailScreen() {
 
           <TouchableOpacity style={styles.discountBadge} activeOpacity={0.7}>
             <Tag size={14} color="#FBBF24" />
-            <Text style={styles.discountText}>10% OFF</Text>
+            <Text style={styles.discountText}>GIẢM 10%</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Add to Bag CTA */}
+        {/* Nút Thêm vào giỏ */}
         <TouchableOpacity style={styles.addBagBtn} activeOpacity={0.85}>
-          <Text style={styles.addBagText}>Add To Bag</Text>
+          <Text style={styles.addBagText}>Thêm vào giỏ</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -456,7 +457,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
-  // Back button (floating)
+  // Nút quay lại
   backBtn: {
     position: "absolute",
     top: 14,
