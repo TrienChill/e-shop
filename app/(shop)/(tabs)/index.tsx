@@ -23,32 +23,6 @@ const { width } = Dimensions.get("window");
 
 // ==================== MOCK DATA ====================
 
-// Category Grid Data (2x2 images per category)
-const CATEGORY_GRID = [
-  {
-    id: "1",
-    name: "Hoodies",
-    count: 148,
-    images: [
-      "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200",
-      "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=200",
-      "https://images.unsplash.com/photo-1578587018452-892bacefd3f2?w=200",
-      "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=200",
-    ],
-  },
-  {
-    id: "2",
-    name: "Lingerie",
-    count: 67,
-    images: [
-      "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=200",
-      "https://images.unsplash.com/photo-1519696282848-b5fe1175b1e3?w=200",
-      "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=200",
-      "https://images.unsplash.com/photo-1519696282848-b5fe1175b1e3?w=200",
-    ],
-  },
-];
-
 // Flash Sale Products
 const FLASH_SALE_PRODUCTS = [
   {
@@ -180,40 +154,6 @@ const HomeScreen = () => {
               style={styles.bannerImage}
               resizeMode="cover"
             />
-          </View>
-        </View>
-
-        {/* ========== CATEGORIES SECTION ========== */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Phân loại</Text>
-            <TouchableOpacity style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>Chi tiết</Text>
-              <MaterialIcons name="arrow-forward" size={16} color="#2563eb" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.categoryGrid}>
-            {CATEGORY_GRID.map((category) => (
-              <View key={category.id} style={styles.categoryCard}>
-                <View style={styles.categoryImageGrid}>
-                  {category.images.map((img, idx) => (
-                    <Image
-                      key={idx}
-                      source={{ uri: img }}
-                      style={styles.categoryGridImage}
-                      resizeMode="cover"
-                    />
-                  ))}
-                </View>
-                <View style={styles.categoryInfo}>
-                  <Text style={styles.categoryName}>{category.name}</Text>
-                  <View style={styles.categoryBadge}>
-                    <Text style={styles.categoryCount}>{category.count}</Text>
-                  </View>
-                </View>
-              </View>
-            ))}
           </View>
         </View>
 
