@@ -8,8 +8,9 @@ import {
   Star,
   Tag,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ScrollView,
@@ -20,22 +21,16 @@ import {
   View,
 } from "react-native";
 
+import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const BUCKET_NAME = "product-imagess"; // Tên bucket chứa ảnh của bạn
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
-
-const PRODUCT = {
-  id: "1",
-  name: "Áo Sơ Mi Mùa Hè Thanh Lịch",
-  price: 17.0,
-  description:
-    "Sản phẩm được làm từ chất liệu cao cấp, mang lại cảm giác thoải mái suốt cả ngày. Thiết kế hiện đại, trẻ trung, phù hợp cho đi làm, đi chơi hoặc dạo phố mùa hè. Đường may tinh tế, form dáng chuẩn đẹp.",
-  image:
-    "https://images.unsplash.com/photo-1586790170083-2f9ceadc732d?w=600&q=80",
-};
 
 const VARIANTS: {
   id: string;
@@ -213,8 +208,72 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
 
+  // 1. Khai báo state lưu dữ liệu sản phẩm thật
+  const [product, setProduct] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
   const [selectedVariant, setSelectedVariant] = useState(VARIANTS[0]);
   const [wishlist, setWishlist] = useState(false);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  // Hàm xử lý khi người dùng vuốt ảnh
+  const handleScroll = (event: any) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    // Tính toán index của ảnh dựa trên vị trí cuộn và chiều rộng màn hình
+    const index = Math.round(scrollPosition / SCREEN_WIDTH);
+    setActiveIndex(index);
+  };
+
+  // 2. Fetch dữ liệu từ Supabase
+  useEffect(() => {
+    const fetchProductDetail = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("products") // Thay bằng tên bảng của bạn nếu khác
+          .select("*")
+          .eq("id", id)
+          .single();
+
+        if (error) throw error;
+        setProduct(data);
+      } catch (error) {
+        console.error("Lỗi lấy chi tiết sản phẩm:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) fetchProductDetail();
+  }, [id]);
+
+  // 3. Hiển thị loading trong lúc đợi dữ liệu
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+      </View>
+    );
+  }
+
+  // Nếu không có sản phẩm
+  if (!product) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Không tìm thấy sản phẩm!</Text>
+      </View>
+    );
+  }
+
+  // 4. Xử lý mảng hình ảnh từ Supabase
+  const productImages =
+    product.images && product.images.length > 0
+      ? product.images.map((img: string) =>
+          img.startsWith("http")
+            ? img
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`,
+        )
+      : ["https://via.placeholder.com/600"];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -236,25 +295,68 @@ export default function ProductDetailScreen() {
       >
         {/* ══════════════ 1. Ảnh sản phẩm ══════════════ */}
         <View style={styles.heroContainer}>
-          <Image
-            source={{ uri: PRODUCT.image }}
-            style={styles.heroImage}
-            resizeMode="cover"
-          />
+          <ScrollView
+            horizontal
+            pagingEnabled // Bật chế độ lướt từng trang (từng ảnh)
+            showsHorizontalScrollIndicator={false} // Ẩn thanh cuộn ngang
+            onScroll={handleScroll}
+            scrollEventThrottle={16} // Giúp bắt sự kiện cuộn mượt mà hơn
+          >
+            {productImages && productImages.length > 0 ? (
+              productImages.map((imageUrl: string, index: number) => (
+                <Image
+                  key={index}
+                  source={{ uri: imageUrl }}
+                  // Ép chiều rộng của mỗi ảnh bằng đúng chiều rộng màn hình (SCREEN_WIDTH)
+                  style={[styles.heroImage, { width: SCREEN_WIDTH }]}
+                  resizeMode="contain"
+                />
+              ))
+            ) : (
+              <Image
+                source={{ uri: "https://via.placeholder.com/600" }}
+                style={[styles.heroImage, { width: SCREEN_WIDTH }]}
+                resizeMode="contain"
+              />
+            )}
+          </ScrollView>
+
           {/* Lớp phủ gradient ở dưới để tạo kiểu */}
           <View style={styles.heroGradient} />
+
+          {/* Dấu chấm chuyển trang (Pagination Dots) */}
+          {productImages && productImages.length > 1 && (
+            <View style={styles.pagination}>
+              {productImages.map((_: string, index: number) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.dot,
+                    activeIndex === index
+                      ? styles.activeDot
+                      : styles.inactiveDot,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>${PRODUCT.price.toFixed(2)}</Text>
+            {/* Lấy giá từ state product */}
+            <Text style={styles.price}>
+              ${product.price ? product.price.toFixed(2) : "0.00"}
+            </Text>
             <TouchableOpacity style={styles.shareBtn} activeOpacity={0.7}>
               <Share2 size={16} color="#3B82F6" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.productName}>{PRODUCT.name}</Text>
-          <Text style={styles.productDescription}>{PRODUCT.description}</Text>
+          {/* Lấy tên từ state product */}
+          <Text style={styles.productName}>{product.name}</Text>
+          {/* Lấy mô tả từ state product */}
+          <Text style={styles.productDescription}>{product.description}</Text>
         </View>
 
         {/* Đường kẻ chia */}
@@ -446,6 +548,29 @@ export default function ProductDetailScreen() {
 const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
 const styles = StyleSheet.create({
+  // ── Pagination Dots ──
+  pagination: {
+    position: "absolute",
+    bottom: 20, // Nằm cách đáy khung ảnh 20px
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  dot: {
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDot: {
+    backgroundColor: "#3B82F6", // Màu xanh dương nổi bật (theo theme của bạn)
+    width: 20, // Chấm active dài ra một chút cho hiện đại
+  },
+  inactiveDot: {
+    backgroundColor: "rgba(0, 0, 0, 0.2)", // Chấm mờ cho ảnh chưa xem
+    width: 8,
+  },
+
   safeArea: {
     flex: 1,
     backgroundColor: "#fff",
