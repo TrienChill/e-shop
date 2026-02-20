@@ -5,38 +5,64 @@ import { supabase } from "../lib/supabase";
 // Lấy top 10 sản phẩm bán chạy trong 30 ngày qua
 
 export const getTopSellingProducts = async () => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const { data, error } = await supabase
-    .from("order_items")
-    .select(
-      `
-      product_id,
-      quantity,
-      orders!inner(status, created_at),
-      products:product_id(*)
-    `,
-    )
-    .eq("orders.status", "completed") // Chỉ tính đơn hàng thành công
-    .gte("orders.created_at", thirtyDaysAgo.toISOString());
+    // 1. Lấy dữ liệu bán hàng từ order_items
+    const { data: salesData, error: salesError } = await supabase
+      .from("order_items")
+      .select(
+        `
+        product_id,
+        quantity,
+        orders!inner(status, created_at)
+      `,
+      )
+      .eq("orders.status", "completed")
+      .gte("orders.created_at", thirtyDaysAgo.toISOString());
 
-  if (error) throw error;
+    if (salesError) throw salesError;
 
-  // Group và tính tổng số lượng theo product_id
-  const productSales = data.reduce((acc: any, item: any) => {
-    const id = item.product_id;
-    if (!acc[id]) {
-      acc[id] = { ...item.products, total_sold: 0 };
-    }
-    acc[id].total_sold += item.quantity;
-    return acc;
-  }, {});
+    // 2. Lấy tất cả sản phẩm (để làm fallback nếu không có lượt bán)
+    const { data: allProducts, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true);
 
-  // Chuyển thành mảng, sắp xếp giảm dần và lấy 10 cái đầu tiên
-  return Object.values(productSales)
-    .sort((a: any, b: any) => b.total_sold - a.total_sold)
-    .slice(0, 10);
+    if (productsError) throw productsError;
+
+    // 3. Tính toán tổng số lượng bán (Sales Map)
+    const salesMap: Record<string, number> = {};
+    salesData?.forEach((item: any) => {
+      salesMap[item.product_id] =
+        (salesMap[item.product_id] || 0) + item.quantity;
+    });
+
+    // 4. Kết hợp dữ liệu: Gán total_sold vào danh sách sản phẩm
+    const processedProducts = allProducts.map((product: any) => ({
+      ...product,
+      total_sold: salesMap[product.id] || 0,
+    }));
+
+    // 5. Sắp xếp:
+    // - Ưu tiên sản phẩm có lượt bán (total_sold giảm dần)
+    // - Nếu lượt bán bằng nhau (đều là 0), sắp xếp theo ngày tạo (mới nhất lên đầu)
+    const sortedProducts = processedProducts.sort((a, b) => {
+      if (b.total_sold !== a.total_sold) {
+        return b.total_sold - a.total_sold;
+      }
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
+
+    // Trả về 10 sản phẩm đầu tiên
+    return sortedProducts.slice(0, 10);
+  } catch (error) {
+    console.error("Lỗi lấy sản phẩm bán chạy:", error);
+    return [];
+  }
 };
 
 // Lấy 10 sản phẩm mới nhất
