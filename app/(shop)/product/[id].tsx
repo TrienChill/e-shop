@@ -475,35 +475,27 @@ export default function ProductDetailScreen() {
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
+        {/* ══════════════ 4. Thông số & Mô tả ══════════════ */}
         {/* ══════════════ 4. Thông số kỹ thuật ══════════════ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông số kỹ thuật</Text>
 
-          <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Chất liệu</Text>
-            <View style={styles.specChips}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Vải bông 95%</Text>
+          {product.specifications && product.specifications.length > 0 ? (
+            product.specifications.map((spec: any, index: number) => (
+              <View key={index} style={styles.specRow}>
+                <Text style={styles.specLabel}>{spec.label}</Text>
+                <View style={styles.specChips}>
+                  <View style={styles.chip}>
+                    <Text style={styles.chipText}>{spec.value}</Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Nylon 5%</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.specRow}>
-            <Text style={styles.specLabel}>Xuất xứ</Text>
-            <View style={styles.specChips}>
-              <View style={styles.chip}>
-                <Text style={styles.chipText}>Châu Âu</Text>
-              </View>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.specRowLink} activeOpacity={0.7}>
-            <Text style={styles.specLabel}>Bảng quy đổi kích cỡ</Text>
-            <ChevronRight size={18} color="#9CA3AF" />
-          </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
+              Đang cập nhật thông số...
+            </Text>
+          )}
         </View>
 
         {/* Đường kẻ chia */}
