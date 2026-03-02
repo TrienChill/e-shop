@@ -8,7 +8,7 @@ import {
   Star,
   Tag,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -31,47 +31,6 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
-
-const VARIANTS: {
-  id: string;
-  color: string;
-  size: string;
-  image: string;
-  label: string;
-}[] = [
-  {
-    id: "v1",
-    color: "HỒNG",
-    size: "S",
-    label: "Hồng / S",
-    image:
-      "https://images.unsplash.com/photo-1567401893414-76b7b1e5a7a5?w=120&q=80",
-  },
-  {
-    id: "v2",
-    color: "ĐỎ",
-    size: "M",
-    label: "Đỏ / M",
-    image:
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=120&q=80",
-  },
-  {
-    id: "v3",
-    color: "KEM",
-    size: "L",
-    label: "Kem / L",
-    image:
-      "https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=120&q=80",
-  },
-  {
-    id: "v4",
-    color: "TRẮNG",
-    size: "XL",
-    label: "Trắng / XL",
-    image:
-      "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=120&q=80",
-  },
-];
 
 const REVIEWS = [
   {
@@ -134,6 +93,22 @@ const POPULAR_PRODUCTS = [
       "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=300&q=80",
   },
 ];
+
+//Màu sắc tiếng Việt
+const colorTranslations: Record<string, string> = {
+  Black: "Đen",
+  White: "Trắng",
+  Red: "Đỏ",
+  Blue: "Xanh dương",
+  Yellow: "Vàng",
+  Green: "Xanh lá",
+  Pink: "Hồng",
+  Gray: "Xám",
+  Orange: "Cam",
+  Brown: "Nâu",
+  Purple: "Tím",
+  // Thêm các màu khác nếu database của bạn có
+};
 
 // ──────────────────────── Component phụ ─────────────────────────
 
@@ -212,8 +187,14 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const [selectedVariant, setSelectedVariant] = useState(VARIANTS[0]);
   const [wishlist, setWishlist] = useState(false);
+
+  // Lưu trữ màu đang được chọn
+  const [selectedColor, setSelectedColor] = useState<any>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+
+  // 1. Tạo ref cho ScrollView ảnh
+  const imageScrollRef = useRef<ScrollView>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -230,13 +211,23 @@ export default function ProductDetailScreen() {
     const fetchProductDetail = async () => {
       try {
         const { data, error } = await supabase
-          .from("products") // Thay bằng tên bảng của bạn nếu khác
+          .from("products")
           .select("*")
           .eq("id", id)
           .single();
 
         if (error) throw error;
         setProduct(data);
+
+        // Thiết lập giá trị mặc định cho Size và Color từ JSON 'variants'
+        if (data?.variants) {
+          if (data.variants.sizes?.length > 0) {
+            setSelectedSize(data.variants.sizes[0]);
+          }
+          if (data.variants.options?.length > 0) {
+            setSelectedColor(data.variants.options[0]);
+          }
+        }
       } catch (error) {
         console.error("Lỗi lấy chi tiết sản phẩm:", error);
       } finally {
@@ -275,6 +266,19 @@ export default function ProductDetailScreen() {
         )
       : ["https://via.placeholder.com/600"];
 
+  // 3. Hàm xử lý cuộn ảnh khi chọn màu
+  const handleSelectColor = (option: any) => {
+    setSelectedColor(option);
+
+    // Nếu có ref và có image_index hợp lệ, cuộn tới ảnh đó
+    if (imageScrollRef.current && option.image_index !== undefined) {
+      // Tính toán vị trí x cần cuộn đến (chiều rộng màn hình * index của ảnh)
+      const offset_x = option.image_index * SCREEN_WIDTH;
+      imageScrollRef.current.scrollTo({ x: offset_x, y: 0, animated: true });
+      setActiveIndex(option.image_index); // Cập nhật lại dấu chấm
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -301,6 +305,7 @@ export default function ProductDetailScreen() {
             showsHorizontalScrollIndicator={false} // Ẩn thanh cuộn ngang
             onScroll={handleScroll}
             scrollEventThrottle={16} // Giúp bắt sự kiện cuộn mượt mà hơn
+            ref={imageScrollRef} // <--- Gắn ref vào đây
           >
             {productImages && productImages.length > 0 ? (
               productImages.map((imageUrl: string, index: number) => (
@@ -362,45 +367,100 @@ export default function ProductDetailScreen() {
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 3. Màu sắc ══════════════ */}
+        {/* ══════════════ 3. Kích cỡ & Màu sắc ══════════════ */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Màu sắc</Text>
-            <View style={{ flex: 1 }} />
-            <View style={styles.variantInfo}>
-              <Text style={styles.variantInfoText}>
-                {selectedVariant.color}
-              </Text>
-              <Text style={styles.variantInfoSep}> · </Text>
-              <Text style={styles.variantInfoText}>{selectedVariant.size}</Text>
+          {/* ---- Chọn Kích Cỡ (Sizes) ---- */}
+          {product.variants?.sizes && product.variants.sizes.length > 0 && (
+            <View style={{ marginBottom: 20 }}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Kích cỡ</Text>
+                <Text style={styles.variantInfoText}>{selectedSize}</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.variantList}
+              >
+                {product.variants.sizes.map((size: string, index: number) => {
+                  const isSelected = selectedSize === size;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedSize(size)}
+                      style={[
+                        styles.chip, // Dùng lại style chip có sẵn
+                        {
+                          borderWidth: 1,
+                          borderColor: isSelected ? "#3B82F6" : "#E5E7EB",
+                          backgroundColor: isSelected ? "#EFF6FF" : "#F9FAFB",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: isSelected ? "#3B82F6" : "#374151",
+                            fontWeight: isSelected ? "700" : "500",
+                          },
+                        ]}
+                      >
+                        {size}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
-          </View>
+          )}
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.variantList}
-          >
-            {VARIANTS.map((v) => {
-              const selected = v.id === selectedVariant.id;
-              return (
-                <TouchableOpacity
-                  key={v.id}
-                  activeOpacity={0.8}
-                  onPress={() => setSelectedVariant(v)}
-                  style={[
-                    styles.variantThumb,
-                    selected && styles.variantThumbSelected,
-                  ]}
-                >
-                  <Image
-                    source={{ uri: v.image }}
-                    style={styles.variantImage}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {/* ---- Chọn Màu Sắc (Colors/Options) ---- */}
+          {product.variants?.options && product.variants.options.length > 0 && (
+            <View>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Màu sắc</Text>
+                <Text style={styles.variantInfoText}>
+                  {/* Kiểm tra và dịch tên màu */}
+                  {selectedColor?.color
+                    ? colorTranslations[selectedColor.color] ||
+                      selectedColor.color
+                    : ""}
+                </Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.variantList}
+              >
+                {product.variants.options.map((option: any, index: number) => {
+                  const isSelected = selectedColor?.color === option.color;
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      activeOpacity={0.8}
+                      onPress={() => handleSelectColor(option)}
+                      // Trả về một hình tròn nhỏ hiển thị mã màu HEX
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: option.hex,
+                        marginRight: 12,
+                        borderWidth: isSelected ? 3 : 1,
+                        borderColor: isSelected ? "#3B82F6" : "#D1D5DB", // Viền xanh nếu đang chọn
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 3,
+                        elevation: 2,
+                      }}
+                    />
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
         </View>
 
         {/* Đường kẻ chia */}
