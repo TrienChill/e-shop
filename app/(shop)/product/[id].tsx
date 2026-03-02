@@ -37,29 +37,6 @@ const formatVND = (price: number) => {
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
 
-const REVIEWS = [
-  {
-    id: "r1",
-    user: "Trần Thu Hà",
-    avatar: "https://i.pravatar.cc/100?img=5",
-    rating: 4,
-    date: "15/12/2025",
-    score: "4/5",
-    comment:
-      "Áo đẹp, chất vải mát mẻ rất hợp mặc mùa hè. Giao hàng nhanh và đóng gói cẩn thận. Sẽ ủng hộ shop tiếp!",
-  },
-  {
-    id: "r2",
-    user: "Nguyễn Minh Anh",
-    avatar: "https://i.pravatar.cc/100?img=9",
-    rating: 5,
-    date: "20/11/2025",
-    score: "5/5",
-    comment:
-      "Rất hài lòng với sản phẩm này! Màu sắc y hình, mặc lên tôn dáng. Shop tư vấn rất nhiệt tình.",
-  },
-];
-
 const POPULAR_PRODUCTS = [
   {
     id: "p1",
@@ -132,25 +109,6 @@ function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
   );
 }
 
-function ReviewCard({ review }: { review: (typeof REVIEWS)[0] }) {
-  return (
-    <View style={styles.reviewCard}>
-      <View style={styles.reviewHeader}>
-        <Image source={{ uri: review.avatar }} style={styles.avatar} />
-        <View style={styles.reviewMeta}>
-          <Text style={styles.reviewerName}>{review.user}</Text>
-          <StarRow rating={review.rating} />
-        </View>
-        <View style={styles.reviewScore}>
-          <Text style={styles.reviewDate}>{review.date}</Text>
-          <Text style={styles.scoreText}>{review.score}</Text>
-        </View>
-      </View>
-      <Text style={styles.reviewComment}>{review.comment}</Text>
-    </View>
-  );
-}
-
 function PopularCard({ item }: { item: (typeof POPULAR_PRODUCTS)[0] }) {
   const [liked, setLiked] = useState(false);
   return (
@@ -214,6 +172,10 @@ export default function ProductDetailScreen() {
     setActiveIndex(index);
   };
 
+  // State lưu trữ đánh giá và điểm trung bình của sản phẩm
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+
   // 2. Fetch dữ liệu từ Supabase
   useEffect(() => {
     const fetchProductDetail = async () => {
@@ -244,6 +206,38 @@ export default function ProductDetailScreen() {
     };
 
     if (id) fetchProductDetail();
+  }, [id]);
+
+  // Fetch review
+  useEffect(() => {
+    const fetchReviews = async () => {
+      try {
+        // Lấy review và join với bảng profiles để lấy tên/avatar
+        const { data, error } = await supabase
+          .from("reviews")
+          .select(
+            `
+    *,
+    profiles (full_name, avatar_url)
+  `,
+          )
+          .eq("product_id", id);
+
+        if (error) throw error;
+
+        setReviews(data || []);
+
+        // Tính điểm trung bình
+        if (data && data.length > 0) {
+          const total = data.reduce((acc, curr) => acc + curr.rating, 0);
+          setAverageRating(parseFloat((total / data.length).toFixed(1)));
+        }
+      } catch (error) {
+        console.error("Lỗi lấy đánh giá:", error);
+      }
+    };
+
+    if (id) fetchReviews();
   }, [id]);
 
   // 3. Hiển thị loading trong lúc đợi dữ liệu
@@ -286,6 +280,35 @@ export default function ProductDetailScreen() {
       setActiveIndex(option.image_index); // Cập nhật lại dấu chấm
     }
   };
+
+  // Component con để hiển thị từng đánh giá
+  function ReviewCard({ review }: { review: any }) {
+    return (
+      <View style={styles.reviewCard}>
+        <View style={styles.reviewHeader}>
+          <Image
+            source={{
+              uri: review.profiles?.avatar_url || "https://i.pravatar.cc/100",
+            }}
+            style={styles.avatar}
+          />
+          <View style={styles.reviewMeta}>
+            <Text style={styles.reviewerName}>
+              {review.profiles?.full_name || "Người dùng"}
+            </Text>
+            <StarRow rating={review.rating} />
+          </View>
+          <View style={styles.reviewScore}>
+            <Text style={styles.reviewDate}>
+              {new Date(review.created_at).toLocaleDateString("vi-VN")}
+            </Text>
+            <Text style={styles.scoreText}>{review.rating}/5</Text>
+          </View>
+        </View>
+        <Text style={styles.reviewComment}>{review.comment}</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -476,7 +499,6 @@ export default function ProductDetailScreen() {
         <View style={styles.divider} />
 
         {/* ══════════════ 4. Thông số & Mô tả ══════════════ */}
-        {/* ══════════════ 4. Thông số kỹ thuật ══════════════ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Thông số kỹ thuật</Text>
 
@@ -538,23 +560,48 @@ export default function ProductDetailScreen() {
 
         {/* ══════════════ 6. Đánh giá & Nhận xét ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Đánh giá &amp; Nhận xét</Text>
-
-          {/* Tổng số sao */}
-          <View style={styles.overallRating}>
-            <StarRow rating={4} size={20} />
-            <Text style={styles.overallScore}>4/5</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              Đánh giá &amp; Nhận xét ({reviews.length})
+            </Text>
           </View>
 
-          {/* Nhận xét cá nhân */}
-          {REVIEWS.map((r) => (
-            <ReviewCard key={r.id} review={r} />
-          ))}
+          {/* Tổng số sao động */}
+          <View style={styles.overallRating}>
+            <StarRow rating={Math.round(averageRating)} size={20} />
+            <Text style={styles.overallScore}>{averageRating}/5</Text>
+          </View>
 
-          {/* Xem tất cả */}
-          <TouchableOpacity style={styles.viewAllBtn} activeOpacity={0.8}>
-            <Text style={styles.viewAllText}>Xem tất cả nhận xét</Text>
-          </TouchableOpacity>
+          {/* Nhận xét từ database (chỉ hiện 2 cái đầu tiên ở trang chính) */}
+          {reviews.length > 0 ? (
+            reviews.slice(0, 2).map((r) => <ReviewCard key={r.id} review={r} />)
+          ) : (
+            <Text style={{ color: "#9CA3AF", marginVertical: 10 }}>
+              Chưa có đánh giá nào cho sản phẩm này.
+            </Text>
+          )}
+
+          {/* Nút Xem tất cả (chỉ hiện nếu có nhiều hơn 2 review) */}
+          {reviews.length > 2 && (
+            <TouchableOpacity
+              style={styles.viewAllBtn}
+              activeOpacity={0.8}
+              onPress={() =>
+                // Điều hướng chuẩn theo Typed Routes
+                router.push({
+                  pathname: "/product/reviews" as any,
+                  params: {
+                    productId: id, // Tên key phải là 'productId'
+                    productName: product.name,
+                  },
+                })
+              }
+            >
+              <Text style={styles.viewAllText}>
+                Xem tất cả {reviews.length} nhận xét
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Đường kẻ chia */}
