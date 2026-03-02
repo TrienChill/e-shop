@@ -362,10 +362,10 @@ export default function ProductDetailScreen() {
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 3. Biến thể ══════════════ */}
+        {/* ══════════════ 3. Màu sắc ══════════════ */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Biến thể</Text>
+            <Text style={styles.sectionTitle}>Màu sắc</Text>
             <View style={{ flex: 1 }} />
             <View style={styles.variantInfo}>
               <Text style={styles.variantInfoText}>
