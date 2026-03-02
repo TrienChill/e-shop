@@ -30,6 +30,11 @@ const BUCKET_NAME = "product-imagess"; // Tên bucket chứa ảnh của bạn
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 
+// Hàm định dạng tiền tệ VNĐ (chỉ trả về chuỗi số)
+const formatVND = (price: number) => {
+  return price.toLocaleString("vi-VN");
+};
+
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
 
 const REVIEWS = [
@@ -59,7 +64,7 @@ const POPULAR_PRODUCTS = [
   {
     id: "p1",
     name: "Váy Hoa Dáng Xòe",
-    price: 17.0,
+    price: 450000,
     badge: "Mới",
     badgeColor: "#22C55E",
     image:
@@ -68,7 +73,7 @@ const POPULAR_PRODUCTS = [
   {
     id: "p2",
     name: "Chân Váy Ngắn Hồng",
-    price: 17.0,
+    price: 380000,
     badge: "Giảm giá",
     badgeColor: "#3B82F6",
     image:
@@ -77,7 +82,7 @@ const POPULAR_PRODUCTS = [
   {
     id: "p3",
     name: "Đầm Dự Tiệc Đỏ",
-    price: 17.0,
+    price: 650000,
     badge: "Nổi bật",
     badgeColor: "#EF4444",
     image:
@@ -86,7 +91,7 @@ const POPULAR_PRODUCTS = [
   {
     id: "p4",
     name: "Bộ Lanh Phối Đồ",
-    price: 17.0,
+    price: 320000,
     badge: "Mới",
     badgeColor: "#22C55E",
     image:
@@ -169,7 +174,10 @@ function PopularCard({ item }: { item: (typeof POPULAR_PRODUCTS)[0] }) {
           />
         </TouchableOpacity>
       </View>
-      <Text style={styles.popularPrice}>${item.price.toFixed(2)}</Text>
+      <Text style={styles.popularPrice}>
+        {formatVND(item.price)}
+        <Text style={{ fontSize: 11 }}> đ</Text>
+      </Text>
       <Text style={styles.popularName} numberOfLines={1}>
         {item.name}
       </Text>
@@ -352,7 +360,8 @@ export default function ProductDetailScreen() {
           <View style={styles.priceRow}>
             {/* Lấy giá từ state product */}
             <Text style={styles.price}>
-              ${product.price ? product.price.toFixed(2) : "0.00"}
+              {product.price ? formatVND(product.price) : "0"}
+              <Text style={{ fontSize: 19 }}> đ</Text>
             </Text>
             <TouchableOpacity style={styles.shareBtn} activeOpacity={0.7}>
               <Share2 size={16} color="#3B82F6" />
@@ -505,8 +514,8 @@ export default function ProductDetailScreen() {
           <Text style={styles.sectionTitle}>Giao hàng</Text>
 
           {[
-            { type: "Tiêu chuẩn", time: "5-7 ngày", price: "$3.00" },
-            { type: "Hỏa tốc", time: "1-2 ngày", price: "$12.00" },
+            { type: "Tiêu chuẩn", time: "5-7 ngày", price: 30000 },
+            { type: "Hỏa tốc", time: "1-2 ngày", price: 50000 },
           ].map((d) => (
             <View key={d.type} style={styles.deliveryRow}>
               <Text style={styles.deliveryType}>{d.type}</Text>
@@ -514,7 +523,10 @@ export default function ProductDetailScreen() {
                 <View style={styles.deliveryTimeBadge}>
                   <Text style={styles.deliveryTimeText}>{d.time}</Text>
                 </View>
-                <Text style={styles.deliveryPrice}>{d.price}</Text>
+                <Text style={styles.deliveryPrice}>
+                  {formatVND(d.price)}
+                  <Text style={{ fontSize: 11 }}> đ</Text>
+                </Text>
               </View>
             </View>
           ))}
