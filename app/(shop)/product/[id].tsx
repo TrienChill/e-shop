@@ -505,19 +505,28 @@ export default function ProductDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Giao hàng</Text>
 
-          {[
-            { type: "Tiêu chuẩn", time: "5-7 ngày", price: 30000 },
-            { type: "Hỏa tốc", time: "1-2 ngày", price: 50000 },
-          ].map((d) => (
+          {(
+            product.shipping_info || [
+              { type: "Tiêu chuẩn", time: "5-7 ngày", price: 30000 },
+              { type: "Hỏa tốc", time: "1-2 ngày", price: 50000 },
+            ]
+          ).map((d: any) => (
             <View key={d.type} style={styles.deliveryRow}>
               <Text style={styles.deliveryType}>{d.type}</Text>
               <View style={styles.deliveryMeta}>
                 <View style={styles.deliveryTimeBadge}>
                   <Text style={styles.deliveryTimeText}>{d.time}</Text>
                 </View>
+
+                {/* Phần hiển thị giá VNĐ */}
                 <Text style={styles.deliveryPrice}>
-                  {formatVND(d.price)}
-                  <Text style={{ fontSize: 11 }}> đ</Text>
+                  {(d.price || 0).toLocaleString("vi-VN")}
+                  <Text
+                    style={{ fontSize: styles.deliveryPrice.fontSize * 0.75 }}
+                  >
+                    {" "}
+                    đ
+                  </Text>
                 </Text>
               </View>
             </View>
