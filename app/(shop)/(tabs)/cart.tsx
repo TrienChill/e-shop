@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import {
   ChevronLeft,
+  X as CloseIcon,
   Minus,
   Pencil,
   Plus,
@@ -11,10 +12,15 @@ import React, { useState } from "react";
 import {
   FlatList,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -269,13 +275,13 @@ const EmptyCartState = () => (
 );
 
 // ─── Shipping Address Card ─────────────────────────────────────────────────────
-const ShippingCard = () => (
+const ShippingCard = ({ onEdit }: { onEdit: () => void }) => (
   <View style={styles.shippingCard}>
     <View style={styles.shippingTextWrap}>
       <Text style={styles.shippingTitle}>Địa chỉ giao hàng</Text>
       <Text style={styles.shippingAddr}>{SHIPPING_ADDRESS}</Text>
     </View>
-    <TouchableOpacity style={styles.editBtn}>
+    <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
       <Pencil size={16} color={C.white} />
     </TouchableOpacity>
   </View>
@@ -285,6 +291,31 @@ const ShippingCard = () => (
 export default function CartScreen() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>(INITIAL_CART);
+
+  // Address Modal States
+  const [addressModalVisible, setAddressModalVisible] = useState(false);
+  const [addressData, setAddressData] = useState({
+    name: "Triền Chill",
+    phone: "0345678910",
+    city: "TP. Hồ Chí Minh",
+    district: "Quận 2",
+    street: "26, Đường số 2, Phường Thảo Điền",
+    isDefault: true,
+  });
+
+  const handleSaveAddress = () => {
+    if (!addressData.name.trim()) {
+      alert("Vui lòng nhập họ tên");
+      return;
+    }
+    if (!/^\d+$/.test(addressData.phone)) {
+      alert("Số điện thoại không hợp lệ");
+      return;
+    }
+    // Logic lưu địa chỉ ở đây
+    setAddressModalVisible(false);
+    alert("Đã cập nhật địa chỉ!");
+  };
 
   const increase = (id: string) =>
     setCartItems((prev) =>
@@ -340,7 +371,7 @@ export default function CartScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Shipping Address */}
-        <ShippingCard />
+        <ShippingCard onEdit={() => setAddressModalVisible(true)} />
 
         {/* ── Cart Items ── */}
         {isEmpty ? (
@@ -423,6 +454,116 @@ export default function CartScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* ── Address Edit Modal ── */}
+      <Modal
+        visible={addressModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddressModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setAddressModalVisible(false)}
+          />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={styles.modalContent}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Cập nhật địa chỉ</Text>
+              <TouchableOpacity onPress={() => setAddressModalVisible(false)}>
+                <CloseIcon size={24} color={C.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Họ tên</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressData.name}
+                  onChangeText={(t) =>
+                    setAddressData({ ...addressData, name: t })
+                  }
+                  placeholder="Nhập họ tên"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Số điện thoại</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressData.phone}
+                  onChangeText={(t) =>
+                    setAddressData({ ...addressData, phone: t })
+                  }
+                  placeholder="Nhập số điện thoại"
+                  keyboardType="phone-pad"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tỉnh / Thành phố</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressData.city}
+                  onChangeText={(t) =>
+                    setAddressData({ ...addressData, city: t })
+                  }
+                  placeholder="Nhập tỉnh/thành phố"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Quận / Huyện</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressData.district}
+                  onChangeText={(t) =>
+                    setAddressData({ ...addressData, district: t })
+                  }
+                  placeholder="Nhập quận/huyện"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Tên đường / Số nhà</Text>
+                <TextInput
+                  style={styles.input}
+                  value={addressData.street}
+                  onChangeText={(t) =>
+                    setAddressData({ ...addressData, street: t })
+                  }
+                  placeholder="Nhập tên đường, số nhà"
+                />
+              </View>
+
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Đặt làm địa chỉ mặc định</Text>
+                <Switch
+                  value={addressData.isDefault}
+                  onValueChange={(v) =>
+                    setAddressData({ ...addressData, isDefault: v })
+                  }
+                  trackColor={{ false: "#D1D5DB", true: C.blue }}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleSaveAddress}
+              >
+                <Text style={styles.saveBtnText}>Lưu địa chỉ</Text>
+              </TouchableOpacity>
+
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -634,4 +775,80 @@ const styles = StyleSheet.create({
   checkoutBtnDisabled: { backgroundColor: C.bg2 },
   checkoutText: { fontSize: 16, fontWeight: "700", color: C.white },
   checkoutTextDisabled: { color: C.sub },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalContent: {
+    backgroundColor: C.white,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 20,
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: C.text,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.sub,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: C.bg2,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: C.text,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  switchRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+    paddingVertical: 8,
+  },
+  switchLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.text,
+  },
+  saveBtn: {
+    backgroundColor: C.text,
+    borderRadius: 15,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  saveBtnText: {
+    color: C.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });
