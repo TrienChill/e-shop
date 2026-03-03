@@ -94,3 +94,32 @@ export const getMostPopularProducts = async () => {
   }
   return data;
 };
+
+// Lấy 20 sản phẩm có lượt bán cao hoặc mới nhất, sau đó dùng hàm sort(() => Math.random() - 0.5) để chọn ra 4 cái ngẫu nhiên hiển thị.
+export const getPopularProducts = async (currentProductId?: string) => {
+  try {
+    // 1. Lấy danh sách sản phẩm đang hoạt động
+    let query = supabase
+      .from("products")
+      .select("*")
+      .eq("is_active", true)
+      .limit(20); // Lấy ứng viên từ 20 sản phẩm mới/hot nhất
+
+    // 2. Loại bỏ sản phẩm hiện tại (nếu đang ở trang chi tiết)
+    if (currentProductId) {
+      query = query.neq("id", currentProductId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    // 3. Xáo trộn ngẫu nhiên để tạo sự mới mẻ mỗi lần load
+    const shuffled = (data || []).sort(() => Math.random() - 0.5);
+
+    // 4. Trả về 4 sản phẩm
+    return shuffled.slice(0, 4);
+  } catch (error) {
+    console.error("Lỗi lấy sản phẩm phổ biến:", error);
+    return [];
+  }
+};

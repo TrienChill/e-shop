@@ -24,11 +24,15 @@ import {
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { PopularCard } from "@/src/components/card/PopularCard";
+import { getPopularProducts } from "@/src/services/product";
+
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const BUCKET_NAME = "product-imagess"; // Tên bucket chứa ảnh của bạn
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
+const CARD_WIDTH = (SCREEN_WIDTH - 46) / 2; // Adjusted for gap
 
 // Hàm định dạng tiền tệ VNĐ (chỉ trả về chuỗi số)
 const formatVND = (price: number) => {
@@ -36,45 +40,6 @@ const formatVND = (price: number) => {
 };
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
-
-const POPULAR_PRODUCTS = [
-  {
-    id: "p1",
-    name: "Váy Hoa Dáng Xòe",
-    price: 450000,
-    badge: "Mới",
-    badgeColor: "#22C55E",
-    image:
-      "https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=300&q=80",
-  },
-  {
-    id: "p2",
-    name: "Chân Váy Ngắn Hồng",
-    price: 380000,
-    badge: "Giảm giá",
-    badgeColor: "#3B82F6",
-    image:
-      "https://images.unsplash.com/photo-1554412933-514a83d2f3c8?w=300&q=80",
-  },
-  {
-    id: "p3",
-    name: "Đầm Dự Tiệc Đỏ",
-    price: 650000,
-    badge: "Nổi bật",
-    badgeColor: "#EF4444",
-    image:
-      "https://images.unsplash.com/photo-1566206091558-7f218b696731?w=300&q=80",
-  },
-  {
-    id: "p4",
-    name: "Bộ Lanh Phối Đồ",
-    price: 320000,
-    badge: "Mới",
-    badgeColor: "#22C55E",
-    image:
-      "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=300&q=80",
-  },
-];
 
 //Màu sắc tiếng Việt
 const colorTranslations: Record<string, string> = {
@@ -105,40 +70,6 @@ function StarRow({ rating, size = 16 }: { rating: number; size?: number }) {
           fill={i <= rating ? "#FBBF24" : "transparent"}
         />
       ))}
-    </View>
-  );
-}
-
-function PopularCard({ item }: { item: (typeof POPULAR_PRODUCTS)[0] }) {
-  const [liked, setLiked] = useState(false);
-  return (
-    <View style={styles.popularCard}>
-      <View style={styles.popularImageWrapper}>
-        <Image source={{ uri: item.image }} style={styles.popularImage} />
-        {/* Badge */}
-        <View style={[styles.badge, { backgroundColor: item.badgeColor }]}>
-          <Text style={styles.badgeText}>{item.badge}</Text>
-        </View>
-        {/* Heart */}
-        <TouchableOpacity
-          style={styles.heartBtn}
-          activeOpacity={0.7}
-          onPress={() => setLiked((p) => !p)}
-        >
-          <Heart
-            size={14}
-            color={liked ? "#EF4444" : "#6B7280"}
-            fill={liked ? "#EF4444" : "transparent"}
-          />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.popularPrice}>
-        {formatVND(item.price)}
-        <Text style={{ fontSize: 11 }}> đ</Text>
-      </Text>
-      <Text style={styles.popularName} numberOfLines={1}>
-        {item.name}
-      </Text>
     </View>
   );
 }
@@ -175,6 +106,8 @@ export default function ProductDetailScreen() {
   // State lưu trữ đánh giá và điểm trung bình của sản phẩm
   const [reviews, setReviews] = useState<any[]>([]);
   const [averageRating, setAverageRating] = useState(0);
+
+  const [popularProducts, setPopularProducts] = useState<any[]>([]);
 
   // 2. Fetch dữ liệu từ Supabase
   useEffect(() => {
@@ -238,6 +171,14 @@ export default function ProductDetailScreen() {
     };
 
     if (id) fetchReviews();
+  }, [id]);
+
+  useEffect(() => {
+    const fetchPopular = async () => {
+      const data = await getPopularProducts(id as string); // Truyền ID để tránh gợi ý trùng sản phẩm đang xem
+      setPopularProducts(data);
+    };
+    fetchPopular();
   }, [id]);
 
   // 3. Hiển thị loading trong lúc đợi dữ liệu
@@ -611,16 +552,37 @@ export default function ProductDetailScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Sản phẩm phổ biến</Text>
-            <TouchableOpacity style={styles.seeAllBtn} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.seeAllBtn}
+              activeOpacity={0.7}
+              onPress={() => router.push("/product/popular-products" as any)} // Điều hướng đến trang tìm kiếm chung, có thể lọc theo sản phẩm phổ biến ở đó
+            >
               <Text style={styles.seeAllText}>Xem tất cả</Text>
               <ChevronRight size={14} color="#3B82F6" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.popularGrid}>
-            {POPULAR_PRODUCTS.map((item) => (
-              <PopularCard key={item.id} item={item} />
-            ))}
+            {popularProducts.length > 0 ? (
+              popularProducts.map((item) => (
+                <PopularCard
+                  key={item.id}
+                  style={{ width: CARD_WIDTH }}
+                  item={{
+                    ...item,
+                    image:
+                      item.images?.[0] || "https://via.placeholder.com/300",
+                    badge: item.stock < 5 ? "Sắp hết" : "Hot",
+                    badgeColor: item.stock < 5 ? "#FBBF24" : "#EF4444",
+                  }}
+                />
+              ))
+            ) : (
+              // Hiển thị skeleton hoặc placeholder khi đang load
+              <Text style={{ color: "#9CA3AF", padding: 10 }}>
+                Đang tải gợi ý...
+              </Text>
+            )}
           </View>
         </View>
 
@@ -664,8 +626,6 @@ export default function ProductDetailScreen() {
 }
 
 // ──────────────────────── Styles ─────────────────────────────────
-
-const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
 const styles = StyleSheet.create({
   // ── Pagination Dots ──
@@ -1005,71 +965,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 14,
-  },
-  popularCard: {
-    width: CARD_WIDTH,
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  popularImageWrapper: {
-    position: "relative",
-    width: "100%",
-    height: CARD_WIDTH * 1.1,
-  },
-  popularImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  badge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#fff",
-    letterSpacing: 0.5,
-  },
-  heartBtn: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  popularPrice: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111827",
-    paddingHorizontal: 10,
-    paddingTop: 8,
-  },
-  popularName: {
-    fontSize: 12,
-    color: "#6B7280",
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-    marginTop: 2,
   },
 
   // ── Bottom Action Bar ──
