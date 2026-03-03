@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -90,10 +91,20 @@ export default function ProductDetailScreen() {
   const [selectedColor, setSelectedColor] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
+  // Thêm State cho Pop-up và Số lượng
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
   // 1. Tạo ref cho ScrollView ảnh
   const imageScrollRef = useRef<ScrollView>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
+
+  // State lưu trữ đánh giá và điểm trung bình của sản phẩm
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+
+  const [popularProducts, setPopularProducts] = useState<any[]>([]);
 
   // Hàm xử lý khi người dùng vuốt ảnh
   const handleScroll = (event: any) => {
@@ -103,11 +114,28 @@ export default function ProductDetailScreen() {
     setActiveIndex(index);
   };
 
-  // State lưu trữ đánh giá và điểm trung bình của sản phẩm
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [averageRating, setAverageRating] = useState(0);
+  // Hàm xử lý Thêm vào giỏ
+  const handleAddToBag = () => {
+    if (!selectedSize || !selectedColor) {
+      // Nếu thiếu màu hoặc size -> Bật Pop-up lên
+      setModalVisible(true);
+      return;
+    }
 
-  const [popularProducts, setPopularProducts] = useState<any[]>([]);
+    // Nếu đã đủ -> Thêm vào giỏ và báo thành công
+    alert("Đã thêm vào giỏ hàng!");
+    // Ở đây sau này bạn sẽ gọi API để lưu vào database giỏ hàng
+  };
+
+  // Hàm xử lý xác nhận bên trong Pop-up
+  const handleConfirmModal = () => {
+    if (!selectedSize || !selectedColor) {
+      alert("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
+      return;
+    }
+    setModalVisible(false);
+    alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+  };
 
   // 2. Fetch dữ liệu từ Supabase
   useEffect(() => {
@@ -121,16 +149,6 @@ export default function ProductDetailScreen() {
 
         if (error) throw error;
         setProduct(data);
-
-        // Thiết lập giá trị mặc định cho Size và Color từ JSON 'variants'
-        // if (data?.variants) {
-        //   if (data.variants.sizes?.length > 0) {
-        //     setSelectedSize(data.variants.sizes[0]);
-        //   }
-        //   if (data.variants.options?.length > 0) {
-        //     setSelectedColor(data.variants.options[0]);
-        //   }
-        // }
 
         // Đảm bảo ban đầu là null
         setSelectedSize(null);
@@ -631,10 +649,175 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* Nút Thêm vào giỏ */}
-        <TouchableOpacity style={styles.addBagBtn} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={styles.addBagBtn}
+          activeOpacity={0.85}
+          onPress={handleAddToBag}
+        >
           <Text style={styles.addBagText}>Thêm vào giỏ</Text>
         </TouchableOpacity>
       </View>
+      {/* ══════════════ 9. Pop-up Product Variations (Modal) ══════════════ */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          />
+          <View style={styles.modalContent}>
+            {/* 1. Header Pop-up: Ảnh, Giá, Lựa chọn hiện tại */}
+            <View style={styles.modalHeader}>
+              <Image
+                source={{ uri: productImages[0] }}
+                style={styles.modalThumbnail}
+              />
+              <View style={styles.modalProductInfo}>
+                <Text style={styles.modalPrice}>
+                  {product?.price ? formatVND(product.price) : "0"}
+                  <Text style={{ fontSize: 16 }}> đ</Text>
+                </Text>
+                <View style={styles.modalSelectedChips}>
+                  <Text style={styles.modalChipText}>
+                    {selectedColor?.color
+                      ? colorTranslations[selectedColor.color] ||
+                        selectedColor.color
+                      : "Chưa chọn màu"}
+                  </Text>
+                  <Text style={styles.modalChipText}>
+                    {selectedSize ? selectedSize : "Chưa chọn size"}
+                  </Text>
+                </View>
+              </View>
+              {/* Nút tắt Pop-up */}
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={{ padding: 4 }}
+              >
+                <Text
+                  style={{ fontSize: 20, color: "#9CA3AF", fontWeight: "bold" }}
+                >
+                  ✕
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* 2. Color Options */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Color Options</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {product?.variants?.options?.map(
+                    (option: any, index: number) => {
+                      const isSelected = selectedColor?.color === option.color;
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          activeOpacity={0.8}
+                          onPress={() => handleSelectColor(option)}
+                          style={[
+                            styles.modalColorOption,
+                            { backgroundColor: option.hex },
+                            isSelected && styles.modalColorOptionSelected,
+                          ]}
+                        >
+                          {isSelected && (
+                            <View style={styles.checkMarkBadge}>
+                              <Text
+                                style={{
+                                  color: "#fff",
+                                  fontSize: 10,
+                                  fontWeight: "bold",
+                                }}
+                              >
+                                ✓
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    },
+                  )}
+                </ScrollView>
+              </View>
+
+              {/* 3. Size Options */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Size</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {product?.variants?.sizes?.map(
+                    (size: string, index: number) => {
+                      const isSelected = selectedSize === size;
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          activeOpacity={0.8}
+                          onPress={() =>
+                            setSelectedSize((prev) =>
+                              prev === size ? null : size,
+                            )
+                          }
+                          style={[
+                            styles.modalSizeChip,
+                            isSelected && styles.modalSizeChipSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.modalSizeText,
+                              isSelected && styles.modalSizeTextSelected,
+                            ]}
+                          >
+                            {size}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    },
+                  )}
+                </ScrollView>
+              </View>
+
+              {/* 4. Quantity Options */}
+              <View style={[styles.modalSection, styles.quantityRow]}>
+                <Text style={styles.modalSectionTitle}>Quantity</Text>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity
+                    style={styles.quantityBtn}
+                    onPress={() => setQuantity((q) => (q > 1 ? q - 1 : 1))}
+                  >
+                    <Text style={styles.quantityBtnText}>-</Text>
+                  </TouchableOpacity>
+                  <View style={styles.quantityDisplay}>
+                    <Text style={styles.quantityText}>{quantity}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.quantityBtn}
+                    onPress={() => setQuantity((q) => q + 1)}
+                  >
+                    <Text style={styles.quantityBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Nút Xác Nhận Cuối Cùng */}
+            <TouchableOpacity
+              style={styles.confirmModalBtn}
+              activeOpacity={0.85}
+              onPress={handleConfirmModal}
+            >
+              <Text style={styles.confirmModalText}>
+                Xác nhận & Thêm vào giỏ
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1046,5 +1229,164 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     letterSpacing: 0.3,
+  },
+  // ──────────────── Pop-up (Modal) Styles ────────────────
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: SCREEN_HEIGHT * 0.8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  modalThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6",
+  },
+  modalProductInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  modalPrice: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 8,
+  },
+  modalSelectedChips: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  modalChipText: {
+    backgroundColor: "#EEF2FF",
+    color: "#3B82F6",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalSection: {
+    marginBottom: 24,
+  },
+  modalSectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 12,
+  },
+  modalColorOption: {
+    width: 60,
+    height: 60,
+    borderRadius: 8, // Hình vuông bo góc giống ảnh
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "transparent",
+    justifyContent: "flex-end",
+    alignItems: "flex-start",
+  },
+  modalColorOptionSelected: {
+    borderColor: "#3B82F6",
+  },
+  checkMarkBadge: {
+    backgroundColor: "#3B82F6",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: -6,
+    marginBottom: -6,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  modalSizeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    marginRight: 10,
+    minWidth: 50,
+    alignItems: "center",
+  },
+  modalSizeChipSelected: {
+    borderColor: "#3B82F6",
+    backgroundColor: "#EFF6FF",
+  },
+  modalSizeText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#4B5563",
+  },
+  modalSizeTextSelected: {
+    color: "#3B82F6",
+    fontWeight: "700",
+  },
+  quantityRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  quantityControls: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  quantityBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#fff",
+  },
+  quantityBtnText: {
+    fontSize: 20,
+    color: "#3B82F6",
+    fontWeight: "600",
+  },
+  quantityDisplay: {
+    width: 50,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    marginHorizontal: 12,
+    borderRadius: 8,
+  },
+  quantityText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111",
+  },
+  confirmModalBtn: {
+    backgroundColor: "#3B82F6",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 20, // Thêm margin bottom cho an toàn trên iOS
+  },
+  confirmModalText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
