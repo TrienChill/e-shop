@@ -1,20 +1,27 @@
 import { useRouter } from "expo-router";
-import { Minus, Pencil, Plus, ShoppingBag, Trash2 } from "lucide-react-native";
+import {
+  ChevronLeft,
+  Minus,
+  Pencil,
+  Plus,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react-native";
 import React, { useState } from "react";
 import {
-    FlatList,
-    Image,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-    PopularCard,
-    PopularProductItem,
+  PopularCard,
+  PopularProductItem,
 } from "../../../src/components/card/PopularCard";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -41,20 +48,20 @@ interface WishlistItem {
 const INITIAL_CART: CartItem[] = [
   {
     id: "1",
-    name: "Lorem ipsum dolor sit amet consectetur.",
+    name: "Sản phẩm thời trang cao cấp",
     size: "M",
-    color: "Pink",
-    price: 17.0,
+    color: "Hồng",
+    price: 170000,
     image:
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80",
     quantity: 1,
   },
   {
     id: "2",
-    name: "Lorem ipsum dolor sit amet consectetur.",
+    name: "Sản phẩm thời trang cao cấp",
     size: "M",
-    color: "Pink",
-    price: 17.0,
+    color: "Hồng",
+    price: 170000,
     image:
       "https://images.unsplash.com/photo-1529139574466-a303027614a4?w=400&q=80",
     quantity: 1,
@@ -64,18 +71,18 @@ const INITIAL_CART: CartItem[] = [
 const WISHLIST_ITEMS: WishlistItem[] = [
   {
     id: "w1",
-    name: "Lorem ipsum dolor sit amet consectetur.",
-    price: 17.0,
-    color: "Pink",
+    name: "Sản phẩm thời trang cao cấp",
+    price: 170000,
+    color: "Hồng",
     size: "M",
     image:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
   },
   {
     id: "w2",
-    name: "Lorem ipsum dolor sit amet consectetur.",
-    price: 17.0,
-    color: "White",
+    name: "Sản phẩm thời trang cao cấp",
+    price: 170000,
+    color: "Trắng",
     size: "S",
     image:
       "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
@@ -86,7 +93,7 @@ const POPULAR_ITEMS: PopularProductItem[] = [
   {
     id: "p1",
     name: "Áo Kiểu Nữ",
-    price: 1780,
+    price: 178000,
     image:
       "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
     badge: "New",
@@ -95,7 +102,7 @@ const POPULAR_ITEMS: PopularProductItem[] = [
   {
     id: "p2",
     name: "Váy Hoa Nhí",
-    price: 1780,
+    price: 178000,
     image:
       "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
     badge: "Sale",
@@ -104,7 +111,7 @@ const POPULAR_ITEMS: PopularProductItem[] = [
   {
     id: "p3",
     name: "Đầm Đỏ Đẹp",
-    price: 1780,
+    price: 178000,
     image:
       "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=400&q=80",
     badge: "Hot",
@@ -113,14 +120,14 @@ const POPULAR_ITEMS: PopularProductItem[] = [
   {
     id: "p4",
     name: "Sơ Mi Trắng",
-    price: 1780,
+    price: 178000,
     image:
       "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=400&q=80",
   },
 ];
 
 const SHIPPING_ADDRESS =
-  "26, Duong So 2, Thao Dien Ward, An Phu, District 2,\nHo Chi Minh city";
+  "26, Đường số 2, Phường Thảo Điền, Quận 2,\nTP. Hồ Chí Minh";
 
 // ─── Colors ────────────────────────────────────────────────────────────────────
 const C = {
@@ -166,7 +173,9 @@ const CartItemRow = ({
       <Text style={styles.cartName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.cartMeta}>${item.price.toFixed(2)}</Text>
+      <Text style={styles.cartMeta}>
+        {item.price.toLocaleString("vi-VN")} đ
+      </Text>
 
       {/* Color + Size tags */}
       <View style={styles.tagsRow}>
@@ -225,7 +234,9 @@ const WishlistRow = ({
       <Text style={styles.cartName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.cartMeta}>${item.price.toFixed(2)}</Text>
+      <Text style={styles.cartMeta}>
+        {item.price.toLocaleString("vi-VN")} đ
+      </Text>
 
       {/* Color + Size tags + Add to cart */}
       <View style={styles.wishlistBottom}>
@@ -261,7 +272,7 @@ const EmptyCartState = () => (
 const ShippingCard = () => (
   <View style={styles.shippingCard}>
     <View style={styles.shippingTextWrap}>
-      <Text style={styles.shippingTitle}>Shipping Address</Text>
+      <Text style={styles.shippingTitle}>Địa chỉ giao hàng</Text>
       <Text style={styles.shippingAddr}>{SHIPPING_ADDRESS}</Text>
     </View>
     <TouchableOpacity style={styles.editBtn}>
@@ -311,7 +322,13 @@ export default function CartScreen() {
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cart</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtnHeader}
+        >
+          <ChevronLeft size={28} color={C.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Giỏ hàng</Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{cartCount}</Text>
         </View>
@@ -344,7 +361,7 @@ export default function CartScreen() {
 
         {/* ── From Your Wishlist ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>From Your Wishlist</Text>
+          <Text style={styles.sectionTitle}>Từ danh sách yêu thích</Text>
           {WISHLIST_ITEMS.map((item) => (
             <WishlistRow
               key={item.id}
@@ -358,9 +375,9 @@ export default function CartScreen() {
         {isEmpty && (
           <View style={styles.section}>
             <View style={styles.popularHeader}>
-              <Text style={styles.sectionTitle}>Most Popular</Text>
+              <Text style={styles.sectionTitle}>Phổ biến nhất</Text>
               <TouchableOpacity style={styles.seeAllBtn}>
-                <Text style={styles.seeAllText}>See All</Text>
+                <Text style={styles.seeAllText}>Xem tất cả</Text>
                 <View style={styles.seeAllCircle}>
                   <Plus size={14} color={C.white} />
                 </View>
@@ -386,8 +403,10 @@ export default function CartScreen() {
       {/* ── Fixed Footer ── */}
       <View style={styles.footer}>
         <View style={styles.totalWrap}>
-          <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+          <Text style={styles.totalLabel}>Tổng cộng</Text>
+          <Text style={styles.totalValue}>
+            {total.toLocaleString("vi-VN")} đ
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.checkoutBtn, isEmpty && styles.checkoutBtnDisabled]}
@@ -400,7 +419,7 @@ export default function CartScreen() {
               isEmpty && styles.checkoutTextDisabled,
             ]}
           >
-            Checkout
+            Thanh toán
           </Text>
         </TouchableOpacity>
       </View>
@@ -420,7 +439,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     gap: 10,
   },
-  headerTitle: { fontSize: 28, fontWeight: "800", color: C.text },
+  headerTitle: { fontSize: 24, fontWeight: "800", color: C.text, flex: 1 },
+  backBtnHeader: { paddingRight: 4 },
   badge: {
     backgroundColor: C.bg2,
     borderRadius: 20,
