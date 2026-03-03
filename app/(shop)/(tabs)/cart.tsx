@@ -1,29 +1,24 @@
-
+import { useRouter } from "expo-router";
+import { Minus, Pencil, Plus, ShoppingBag, Trash2 } from "lucide-react-native";
+import React, { useState } from "react";
 import {
-  ArrowLeft,
-  ArrowRight,
-  Minus,
-  Plus,
-  Sparkles,
-  Trash2,
-} from 'lucide-react-native';
-import React, { useState } from 'react';
+    FlatList,
+    Image,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+    PopularCard,
+    PopularProductItem,
+} from "../../../src/components/card/PopularCard";
 
-// --- Types ---
-interface Product {
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface CartItem {
   id: string;
   name: string;
   size: string;
@@ -31,447 +26,592 @@ interface Product {
   price: number;
   image: string;
   quantity: number;
-  hasBadge?: boolean;
 }
 
-// --- Mock Data ---
-const INITIAL_DATA: Product[] = [
+interface WishlistItem {
+  id: string;
+  name: string;
+  price: number;
+  color: string;
+  size: string;
+  image: string;
+}
+
+// ─── Mock Data ─────────────────────────────────────────────────────────────────
+const INITIAL_CART: CartItem[] = [
   {
-    id: '1',
-    name: 'Oversized Wool Blazer',
-    size: 'M',
-    color: 'Beige',
-    price: 120.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBXOpQBIDi-leFeAIhLUomXo5zTlpAZzzeA0I8kdvOMwG5tOg4HSpjIzKQ73HtYOGH62DtIdZHTJX0op7EcunBoQTSkyNnvPdANxDP-eS6wusMy2S5SAH8Tn8oBmYe48im02qwfGwG1lozi97q9UMGIBL-twD_pGeUf7Hjq07y-7Q1SLVoDRsMNR3finCpXUpofqk-zFMpu5AYd61gbzPoD7luAMqV8m9yu7OXBDKRXH92-anmS5OGTBgFmSY6lEA0u2FvGJTjnRuE',
+    id: "1",
+    name: "Lorem ipsum dolor sit amet consectetur.",
+    size: "M",
+    color: "Pink",
+    price: 17.0,
+    image:
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80",
     quantity: 1,
-    hasBadge: true,
   },
   {
-    id: '2',
-    name: 'Pleated Trousers',
-    size: '32',
-    color: 'Charcoal',
-    price: 85.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCBMa_KMlDH9gNOrn2RRbpx9tp0DzwUWvKvIuHjK6wnWRZQEylKiNxQ0AzcfNuJJPgFUobNvRGY6NwNLz7ntOpddAKGRxC89plVqjZXnsFbWYs-UZ0uSOaNY2nVYfpZGce-hy7XXiDF0zVsfBm6YeLFAsyqNnud9U1ykFCbkyYBsTpI8RkXxCjdD0IflYk5i14LAIefhQIAriCgj3DAcTTWHhpy7MKXMAzQvxMcTtqsBiv6OOg9ySmUNCmFcmJXF9bpfLpKjnGOfTY',
-    quantity: 1,
-  },
-  {
-    id: '3',
-    name: 'Minimalist Sneakers',
-    size: '42',
-    color: 'White',
-    price: 145.00,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBZkpgdiIr19CF1u0Kh2WgVRbftc5X11zl1RC8mdIuCNHuyYojeOSWmgMQ8FsMMiOpF_0OcMoFxq-Sprtwty13psJIsERx9VxAuNhfOK041V5s5CZOLdX8jS7G76S9cxlJpSombQcfwmjPbas6P4HslzWr42ZQS_nVzcd5EaNOmUr4rqXwuVCxnU7idUlEAI7QkNWIJIqv8fx5mQUd7z-mOoJ2ni8hHr5wH1D3rIAu8ePN_9ki84nFdP7QRSULYTtcOW5SNhQTyIWE',
+    id: "2",
+    name: "Lorem ipsum dolor sit amet consectetur.",
+    size: "M",
+    color: "Pink",
+    price: 17.0,
+    image:
+      "https://images.unsplash.com/photo-1529139574466-a303027614a4?w=400&q=80",
     quantity: 1,
   },
 ];
 
-// --- Colors & Theme ---
-const COLORS = {
-  background: '#FFFFFF',
-  backgroundLight: '#f7f7f7', // Slightly off-white for body
-  primary: '#1a1a1a',
-  textSecondary: '#737373',
-  border: '#e5e5e5',
-  purpleLight: '#faf5ff',
-  purpleText: '#9333ea',
-  green: '#16a34a',
-  white: '#FFFFFF',
+const WISHLIST_ITEMS: WishlistItem[] = [
+  {
+    id: "w1",
+    name: "Lorem ipsum dolor sit amet consectetur.",
+    price: 17.0,
+    color: "Pink",
+    size: "M",
+    image:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
+  },
+  {
+    id: "w2",
+    name: "Lorem ipsum dolor sit amet consectetur.",
+    price: 17.0,
+    color: "White",
+    size: "S",
+    image:
+      "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
+  },
+];
+
+const POPULAR_ITEMS: PopularProductItem[] = [
+  {
+    id: "p1",
+    name: "Áo Kiểu Nữ",
+    price: 1780,
+    image:
+      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
+    badge: "New",
+    badgeColor: "#3B82F6",
+  },
+  {
+    id: "p2",
+    name: "Váy Hoa Nhí",
+    price: 1780,
+    image:
+      "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
+    badge: "Sale",
+    badgeColor: "#EF4444",
+  },
+  {
+    id: "p3",
+    name: "Đầm Đỏ Đẹp",
+    price: 1780,
+    image:
+      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=400&q=80",
+    badge: "Hot",
+    badgeColor: "#F97316",
+  },
+  {
+    id: "p4",
+    name: "Sơ Mi Trắng",
+    price: 1780,
+    image:
+      "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=400&q=80",
+  },
+];
+
+const SHIPPING_ADDRESS =
+  "26, Duong So 2, Thao Dien Ward, An Phu, District 2,\nHo Chi Minh city";
+
+// ─── Colors ────────────────────────────────────────────────────────────────────
+const C = {
+  bg: "#FFFFFF",
+  text: "#111827",
+  sub: "#6B7280",
+  border: "#E5E7EB",
+  bg2: "#F3F4F6",
+  blue: "#2563EB",
+  white: "#FFFFFF",
 };
 
-// --- Components ---
-
-const CartItem = ({ item }: { item: Product }) => {
-  return (
-    <View style={styles.itemContainer}>
-      {/* Image Section */}
-      <View style={styles.imageWrapper}>
-        <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
-      </View>
-
-      {/* Details Section */}
-      <View style={styles.itemDetails}>
-        <View>
-          <View style={styles.itemHeader}>
-            <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-            <TouchableOpacity style={styles.deleteButton}>
-              <Trash2 size={20} color="#a3a3a3" />
-            </TouchableOpacity>
-          </View>
-          
-          <Text style={styles.itemMeta}>
-            Size: {item.size} • Color: {item.color}
-          </Text>
-
-          {/* AI Badge */}
-          {item.hasBadge && (
-            <View style={styles.aiBadge}>
-              <Sparkles size={14} color={COLORS.purpleText} style={{ marginRight: 4 }} />
-              <Text style={styles.aiBadgeText}>Matches your style</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Price & Quantity Stepper */}
-        <View style={styles.priceRow}>
-          <Text style={styles.priceText}>${item.price.toFixed(2)}</Text>
-          
-          <View style={styles.stepperContainer}>
-            <TouchableOpacity style={styles.stepperBtn}>
-              <Minus size={16} color={COLORS.textSecondary} />
-            </TouchableOpacity>
-            <Text style={styles.quantityText}>{item.quantity}</Text>
-            <TouchableOpacity style={styles.stepperBtn}>
-              <Plus size={16} color={COLORS.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-const PromoCodeSection = () => (
-  <View style={styles.promoContainer}>
-    <Text style={styles.sectionTitle}>PROMO CODE</Text>
-    <View style={styles.promoInputWrapper}>
-      <TextInput 
-        placeholder="Enter voucher code" 
-        placeholderTextColor="#a3a3a3"
-        style={styles.promoInput}
+// ─── Cart Item Row ─────────────────────────────────────────────────────────────
+const CartItemRow = ({
+  item,
+  onIncrease,
+  onDecrease,
+  onDelete,
+}: {
+  item: CartItem;
+  onIncrease: (id: string) => void;
+  onDecrease: (id: string) => void;
+  onDelete: (id: string) => void;
+}) => (
+  <View style={styles.cartRow}>
+    {/* Image + delete */}
+    <View style={styles.cartImageWrap}>
+      <Image
+        source={{ uri: item.image }}
+        style={styles.cartImage}
+        resizeMode="cover"
       />
-      <TouchableOpacity style={styles.applyButton}>
-        <Text style={styles.applyButtonText}>Apply</Text>
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={() => onDelete(item.id)}
+      >
+        <Trash2 size={16} color={C.sub} />
       </TouchableOpacity>
     </View>
-  </View>
-);
 
-const OrderSummary = ({ subtotal }: { subtotal: number }) => (
-  <View style={styles.summaryContainer}>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Subtotal</Text>
-      <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-    </View>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Shipping</Text>
-      <Text style={[styles.summaryValue, { color: COLORS.green }]}>Free</Text>
-    </View>
-    <View style={styles.summaryRow}>
-      <Text style={styles.summaryLabel}>Discount</Text>
-      <Text style={styles.summaryValue}>-$0.00</Text>
-    </View>
-  </View>
-);
+    {/* Details */}
+    <View style={styles.cartDetails}>
+      <Text style={styles.cartName} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={styles.cartMeta}>${item.price.toFixed(2)}</Text>
 
-// --- Main App Component ---
-export default function App() {
-  const [items] = useState<Product[]>(INITIAL_DATA);
-
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton}>
-          <ArrowLeft size={24} color={COLORS.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Bag ({items.length})</Text>
-        <TouchableOpacity style={[styles.iconButton, styles.iconButtonLight]}>
-          <Sparkles size={20} color={COLORS.primary} />
-        </TouchableOpacity>
+      {/* Color + Size tags */}
+      <View style={styles.tagsRow}>
+        <View style={styles.tag}>
+          <Text style={styles.tagText}>{item.color}</Text>
+        </View>
+        <View style={styles.tag}>
+          <Text style={styles.tagText}>{item.size}</Text>
+        </View>
       </View>
 
-      {/* Main Content */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
-      >
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <CartItem item={item} />}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListFooterComponent={() => (
-            <>
-              <View style={styles.divider} />
-              <PromoCodeSection />
-              <OrderSummary subtotal={subtotal} />
-              {/* Padding for bottom fixed button */}
-              <View style={{ height: 100 }} /> 
-            </>
-          )}
-        />
-      </KeyboardAvoidingView>
+      {/* Stepper */}
+      <View style={styles.stepperRow}>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => onDecrease(item.id)}
+          disabled={item.quantity <= 1}
+        >
+          <Minus size={16} color={item.quantity <= 1 ? "#D1D5DB" : C.blue} />
+        </TouchableOpacity>
+        <Text style={styles.qty}>{item.quantity}</Text>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => onIncrease(item.id)}
+        >
+          <Plus size={16} color={C.blue} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+);
 
-      {/* Fixed Bottom Action */}
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.checkoutButton} activeOpacity={0.9}>
-          <Text style={styles.checkoutText}>Checkout</Text>
-          <View style={styles.checkoutRight}>
-            <Text style={styles.checkoutPrice}>${subtotal.toFixed(2)}</Text>
-            <View style={styles.arrowCircle}>
-              <ArrowRight size={20} color={COLORS.primary} />
-            </View>
+// ─── Wishlist Row ──────────────────────────────────────────────────────────────
+const WishlistRow = ({
+  item,
+  onAddToCart,
+}: {
+  item: WishlistItem;
+  onAddToCart: (item: WishlistItem) => void;
+}) => (
+  <View style={styles.cartRow}>
+    {/* Image + delete */}
+    <View style={styles.cartImageWrap}>
+      <Image
+        source={{ uri: item.image }}
+        style={styles.cartImage}
+        resizeMode="cover"
+      />
+      <TouchableOpacity style={styles.deleteBtn}>
+        <Trash2 size={16} color={C.sub} />
+      </TouchableOpacity>
+    </View>
+
+    {/* Details */}
+    <View style={styles.cartDetails}>
+      <Text style={styles.cartName} numberOfLines={2}>
+        {item.name}
+      </Text>
+      <Text style={styles.cartMeta}>${item.price.toFixed(2)}</Text>
+
+      {/* Color + Size tags + Add to cart */}
+      <View style={styles.wishlistBottom}>
+        <View style={styles.tagsRow}>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>{item.color}</Text>
           </View>
+          <View style={styles.tag}>
+            <Text style={styles.tagText}>{item.size}</Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          style={styles.addCartBtn}
+          onPress={() => onAddToCart(item)}
+        >
+          <ShoppingBag size={18} color={C.blue} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+);
+
+// ─── Empty State ───────────────────────────────────────────────────────────────
+const EmptyCartState = () => (
+  <View style={styles.emptyWrap}>
+    <View style={styles.emptyIconCircle}>
+      <ShoppingBag size={52} color={C.blue} />
+    </View>
+  </View>
+);
+
+// ─── Shipping Address Card ─────────────────────────────────────────────────────
+const ShippingCard = () => (
+  <View style={styles.shippingCard}>
+    <View style={styles.shippingTextWrap}>
+      <Text style={styles.shippingTitle}>Shipping Address</Text>
+      <Text style={styles.shippingAddr}>{SHIPPING_ADDRESS}</Text>
+    </View>
+    <TouchableOpacity style={styles.editBtn}>
+      <Pencil size={16} color={C.white} />
+    </TouchableOpacity>
+  </View>
+);
+
+// ─── Main Screen ───────────────────────────────────────────────────────────────
+export default function CartScreen() {
+  const router = useRouter();
+  const [cartItems, setCartItems] = useState<CartItem[]>(INITIAL_CART);
+
+  const increase = (id: string) =>
+    setCartItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity: i.quantity + 1 } : i)),
+    );
+
+  const decrease = (id: string) =>
+    setCartItems((prev) =>
+      prev.map((i) =>
+        i.id === id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i,
+      ),
+    );
+
+  const deleteItem = (id: string) =>
+    setCartItems((prev) => prev.filter((i) => i.id !== id));
+
+  const addWishlistToCart = (item: WishlistItem) => {
+    setCartItems((prev) => {
+      const exists = prev.find((i) => i.id === item.id);
+      if (exists)
+        return prev.map((i) =>
+          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
+        );
+      return [...prev, { ...item, quantity: 1 }];
+    });
+  };
+
+  const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  const isEmpty = cartItems.length === 0;
+  const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
+
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Cart</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{cartCount}</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Shipping Address */}
+        <ShippingCard />
+
+        {/* ── Cart Items ── */}
+        {isEmpty ? (
+          <EmptyCartState />
+        ) : (
+          <View style={styles.section}>
+            {cartItems.map((item) => (
+              <CartItemRow
+                key={item.id}
+                item={item}
+                onIncrease={increase}
+                onDecrease={decrease}
+                onDelete={deleteItem}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* ── From Your Wishlist ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>From Your Wishlist</Text>
+          {WISHLIST_ITEMS.map((item) => (
+            <WishlistRow
+              key={item.id}
+              item={item}
+              onAddToCart={addWishlistToCart}
+            />
+          ))}
+        </View>
+
+        {/* ── Most Popular (only shown when cart is empty) ── */}
+        {isEmpty && (
+          <View style={styles.section}>
+            <View style={styles.popularHeader}>
+              <Text style={styles.sectionTitle}>Most Popular</Text>
+              <TouchableOpacity style={styles.seeAllBtn}>
+                <Text style={styles.seeAllText}>See All</Text>
+                <View style={styles.seeAllCircle}>
+                  <Plus size={14} color={C.white} />
+                </View>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={POPULAR_ITEMS}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={{ gap: 12 }}
+              renderItem={({ item }) => (
+                <PopularCard item={item} style={styles.popularCard} />
+              )}
+            />
+          </View>
+        )}
+
+        {/* Bottom padding for footer */}
+        <View style={{ height: 90 }} />
+      </ScrollView>
+
+      {/* ── Fixed Footer ── */}
+      <View style={styles.footer}>
+        <View style={styles.totalWrap}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.checkoutBtn, isEmpty && styles.checkoutBtnDisabled]}
+          activeOpacity={0.85}
+          onPress={() => !isEmpty && router.push("/(shop)/checkout")}
+        >
+          <Text
+            style={[
+              styles.checkoutText,
+              isEmpty && styles.checkoutTextDisabled,
+            ]}
+          >
+            Checkout
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-// --- Styles ---
+// ─── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
+  safe: { flex: 1, backgroundColor: C.bg },
+
   // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    backgroundColor: COLORS.white,
-    zIndex: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 10,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primary,
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
+  headerTitle: { fontSize: 28, fontWeight: "800", color: C.text },
+  badge: {
+    backgroundColor: C.bg2,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconButtonLight: {
-    backgroundColor: '#f5f5f5',
-  },
-
-  // List
-  listContent: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    backgroundColor: COLORS.white,
-  },
-
-  // Cart Item
-  itemContainer: {
-    flexDirection: 'row',
-    marginBottom: 24,
-    gap: 16,
-  },
-  imageWrapper: {
-    width: 90,
-    height: 120,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
-  },
-  itemDetails: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  itemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  itemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.primary,
-    flex: 1,
-    marginRight: 8,
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  itemMeta: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginTop: 4,
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.purpleLight,
-    alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 8,
+    minWidth: 32,
+    alignItems: "center",
   },
-  aiBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.purpleText,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    marginTop: 8,
-  },
-  priceText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  
-  // Stepper
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-    borderRadius: 20,
-    height: 36,
-    paddingHorizontal: 4,
-  },
-  stepperBtn: {
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-  },
-  quantityText: {
-    width: 24,
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
+  badgeText: { fontSize: 14, fontWeight: "700", color: C.text },
 
-  // Divider
-  divider: {
-    height: 1,
-    backgroundColor: '#f5f5f5',
-    marginVertical: 32,
-    width: '100%',
-  },
+  scrollContent: { paddingBottom: 16 },
 
-  // Promo Code
-  promoContainer: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: 16,
-    letterSpacing: 0.5,
-  },
-  promoInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    borderRadius: 30, // Full rounded
-    paddingLeft: 20,
-    paddingRight: 6,
-    paddingVertical: 6,
-    height: 56,
-  },
-  promoInput: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.primary,
-    height: '100%',
-  },
-  applyButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 24,
-    height: 44,
-    justifyContent: 'center',
-  },
-  applyButtonText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-
-  // Summary
-  summaryContainer: {
+  // Shipping Card
+  shippingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.bg2,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    padding: 16,
     gap: 12,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  shippingTextWrap: { flex: 1 },
+  shippingTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.text,
+    marginBottom: 4,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
+  shippingAddr: { fontSize: 13, color: C.sub, lineHeight: 20 },
+  editBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.primary,
+
+  // Sections
+  section: { paddingHorizontal: 16, marginBottom: 8 },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: C.text,
+    marginBottom: 16,
   },
+
+  // Cart Row
+  cartRow: {
+    flexDirection: "row",
+    marginBottom: 20,
+    gap: 14,
+  },
+  cartImageWrap: {
+    width: 110,
+    height: 130,
+    borderRadius: 14,
+    overflow: "hidden",
+    backgroundColor: C.bg2,
+    position: "relative",
+  },
+  cartImage: { width: "100%", height: "100%" },
+  deleteBtn: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cartDetails: { flex: 1, paddingVertical: 4, justifyContent: "space-between" },
+  cartName: { fontSize: 14, fontWeight: "500", color: C.text, lineHeight: 20 },
+  cartMeta: { fontSize: 16, fontWeight: "700", color: C.text },
+
+  // Tags
+  tagsRow: { flexDirection: "row", gap: 8, marginTop: 4 },
+  tag: {
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  tagText: { fontSize: 13, color: C.text, fontWeight: "500" },
+
+  // Stepper
+  stepperRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 6,
+  },
+  stepBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  qty: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.text,
+    minWidth: 20,
+    textAlign: "center",
+  },
+
+  // Wishlist extra
+  wishlistBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  addCartBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Empty state
+  emptyWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+  },
+  emptyIconCircle: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: C.bg2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Popular section
+  popularHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 8 },
+  seeAllText: { fontSize: 15, fontWeight: "600", color: C.text },
+  seeAllCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  popularCard: { width: 130 },
 
   // Footer
   footer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255,255,255,0.9)', // Slight transparency
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24, // Safe area for iPhone X+
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: C.bg,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingBottom: 24,
     borderTopWidth: 1,
-    borderTopColor: '#f5f5f5',
+    borderTopColor: C.border,
   },
-  checkoutButton: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 8,
-    paddingLeft: 24,
-    borderRadius: 100, // Full rounded
-    height: 64,
+  totalWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  totalLabel: { fontSize: 18, fontWeight: "800", color: C.text },
+  totalValue: { fontSize: 18, fontWeight: "700", color: C.text },
+  checkoutBtn: {
+    backgroundColor: C.blue,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 30,
   },
-  checkoutText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  checkoutRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  checkoutPrice: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  arrowCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  checkoutBtnDisabled: { backgroundColor: C.bg2 },
+  checkoutText: { fontSize: 16, fontWeight: "700", color: C.white },
+  checkoutTextDisabled: { color: C.sub },
 });

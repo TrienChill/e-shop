@@ -133,7 +133,10 @@ const HomeScreen = () => {
           <MaterialIcons name="menu" size={28} color="#1a1a1a" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>E-Shop</Text>
-        <TouchableOpacity style={styles.iconButton}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => router.push("/(shop)/(tabs)/cart")}
+        >
           <MaterialIcons name="shopping-bag" size={28} color="#1a1a1a" />
           <View style={styles.cartBadge} />
         </TouchableOpacity>
