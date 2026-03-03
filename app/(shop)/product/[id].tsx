@@ -123,14 +123,18 @@ export default function ProductDetailScreen() {
         setProduct(data);
 
         // Thiết lập giá trị mặc định cho Size và Color từ JSON 'variants'
-        if (data?.variants) {
-          if (data.variants.sizes?.length > 0) {
-            setSelectedSize(data.variants.sizes[0]);
-          }
-          if (data.variants.options?.length > 0) {
-            setSelectedColor(data.variants.options[0]);
-          }
-        }
+        // if (data?.variants) {
+        //   if (data.variants.sizes?.length > 0) {
+        //     setSelectedSize(data.variants.sizes[0]);
+        //   }
+        //   if (data.variants.options?.length > 0) {
+        //     setSelectedColor(data.variants.options[0]);
+        //   }
+        // }
+
+        // Đảm bảo ban đầu là null
+        setSelectedSize(null);
+        setSelectedColor(null);
       } catch (error) {
         console.error("Lỗi lấy chi tiết sản phẩm:", error);
       } finally {
@@ -211,14 +215,18 @@ export default function ProductDetailScreen() {
 
   // 3. Hàm xử lý cuộn ảnh khi chọn màu
   const handleSelectColor = (option: any) => {
-    setSelectedColor(option);
+    if (selectedColor?.color === option.color) {
+      setSelectedColor(null);
+    } else {
+      setSelectedColor(option);
 
-    // Nếu có ref và có image_index hợp lệ, cuộn tới ảnh đó
-    if (imageScrollRef.current && option.image_index !== undefined) {
-      // Tính toán vị trí x cần cuộn đến (chiều rộng màn hình * index của ảnh)
-      const offset_x = option.image_index * SCREEN_WIDTH;
-      imageScrollRef.current.scrollTo({ x: offset_x, y: 0, animated: true });
-      setActiveIndex(option.image_index); // Cập nhật lại dấu chấm
+      // Nếu có ref và có image_index hợp lệ, cuộn tới ảnh đó
+      if (imageScrollRef.current && option.image_index !== undefined) {
+        // Tính toán vị trí x cần cuộn đến (chiều rộng màn hình * index của ảnh)
+        const offset_x = option.image_index * SCREEN_WIDTH;
+        imageScrollRef.current.scrollTo({ x: offset_x, y: 0, animated: true });
+        setActiveIndex(option.image_index); // Cập nhật lại dấu chấm
+      }
     }
   };
 
@@ -360,7 +368,13 @@ export default function ProductDetailScreen() {
                     <TouchableOpacity
                       key={index}
                       activeOpacity={0.8}
-                      onPress={() => setSelectedSize(size)}
+                      onPress={() => {
+                        // Nếu size đang nhấn trùng với size đã chọn -> gán về null (hủy)
+                        // Nếu khác -> gán size mới
+                        setSelectedSize((prev) =>
+                          prev === size ? null : size,
+                        );
+                      }}
                       style={[
                         styles.chip, // Dùng lại style chip có sẵn
                         {
