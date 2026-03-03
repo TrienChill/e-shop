@@ -8,7 +8,7 @@ import {
   ShoppingBag,
   Trash2,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FlatList,
   Image,
@@ -29,6 +29,7 @@ import {
   PopularCard,
   PopularProductItem,
 } from "../../../src/components/card/PopularCard";
+import { supabase } from "../../../src/lib/supabase";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -131,9 +132,6 @@ const POPULAR_ITEMS: PopularProductItem[] = [
       "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=400&q=80",
   },
 ];
-
-const SHIPPING_ADDRESS =
-  "26, Đường số 2, Phường Thảo Điền, Quận 2,\nTP. Hồ Chí Minh";
 
 // ─── Colors ────────────────────────────────────────────────────────────────────
 const C = {
@@ -275,11 +273,31 @@ const EmptyCartState = () => (
 );
 
 // ─── Shipping Address Card ─────────────────────────────────────────────────────
-const ShippingCard = ({ onEdit }: { onEdit: () => void }) => (
+const ShippingCard = ({
+  address,
+  onEdit,
+  loading,
+}: {
+  address: any;
+  onEdit: () => void;
+  loading: boolean;
+}) => (
   <View style={styles.shippingCard}>
     <View style={styles.shippingTextWrap}>
       <Text style={styles.shippingTitle}>Địa chỉ giao hàng</Text>
-      <Text style={styles.shippingAddr}>{SHIPPING_ADDRESS}</Text>
+      {loading ? (
+        <Text style={styles.shippingAddr}>Đang tải địa chỉ...</Text>
+      ) : address ? (
+        <Text style={styles.shippingAddr}>
+          {address.receiver_name} | {address.phone_number}
+          {"\n"}
+          {address.street_address}, {address.district}, {address.province_city}
+        </Text>
+      ) : (
+        <Text style={[styles.shippingAddr, { color: "#EF4444" }]}>
+          Chưa có địa chỉ mặc định. Vui lòng thiết lập!
+        </Text>
+      )}
     </View>
     <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
       <Pencil size={16} color={C.white} />
@@ -303,18 +321,57 @@ export default function CartScreen() {
     isDefault: true,
   });
 
-  const handleSaveAddress = () => {
-    if (!addressData.name.trim()) {
-      alert("Vui lòng nhập họ tên");
+  const handleSaveAddress = async () => {
+    // 1. Kiểm tra nhanh đầu vào
+    if (!addressData.name.trim() || !addressData.phone.trim()) {
+      alert("Vui lòng điền đủ Họ tên và Số điện thoại");
       return;
     }
-    if (!/^\d+$/.test(addressData.phone)) {
-      alert("Số điện thoại không hợp lệ");
-      return;
+
+    try {
+      // 2. Lấy User ID hiện tại
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để lưu địa chỉ");
+        return;
+      }
+
+      // 3. Chuẩn bị dữ liệu gửi lên Database (mapping đúng tên cột)
+      const payload = {
+        user_id: user.id,
+        receiver_name: addressData.name,
+        phone_number: addressData.phone,
+        province_city: addressData.city,
+        district: addressData.district,
+        street_address: addressData.street,
+        is_default: addressData.isDefault,
+        updated_at: new Date(),
+      };
+
+      // 4. Nếu đang sửa địa chỉ cũ (đã có id trong defaultAddress), ta thêm ID vào payload
+      const finalPayload = defaultAddress?.id
+        ? { ...payload, id: defaultAddress.id }
+        : payload;
+
+      // 5. Thực hiện UPSERT vào Supabase
+      const { data, error } = await supabase
+        .from("user_addresses")
+        .upsert(finalPayload)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 6. Cập nhật lại State hiển thị trên màn hình
+      setDefaultAddress(data);
+      setAddressModalVisible(false);
+      alert("Lưu địa chỉ thành công!");
+    } catch (error: any) {
+      console.error("Lỗi lưu địa chỉ:", error.message);
+      alert("Không thể lưu địa chỉ: " + error.message);
     }
-    // Logic lưu địa chỉ ở đây
-    setAddressModalVisible(false);
-    alert("Đã cập nhật địa chỉ!");
   };
 
   const increase = (id: string) =>
@@ -347,6 +404,47 @@ export default function CartScreen() {
   const isEmpty = cartItems.length === 0;
   const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
+  // Thêm vào trong CartScreen
+  const [defaultAddress, setDefaultAddress] = useState<any>(null);
+  const [loadingAddress, setLoadingAddress] = useState(true);
+
+  useEffect(() => {
+    const fetchDefaultAddress = async () => {
+      try {
+        // Lấy địa chỉ được đánh dấu là mặc định của user hiện tại
+        const { data, error } = await supabase
+          .from("user_addresses")
+          .select("*")
+          .eq("is_default", true)
+          .single(); // Chỉ lấy 1 bản ghi mặc định
+
+        if (error && error.code !== "PGRST116") {
+          // PGRST116 là lỗi không tìm thấy bản ghi
+          console.error("Lỗi lấy địa chỉ:", error.message);
+        } else {
+          setDefaultAddress(data);
+          // Nếu tìm thấy, cập nhật luôn dữ liệu vào modal edit để đồng bộ
+          if (data) {
+            setAddressData({
+              name: data.receiver_name,
+              phone: data.phone_number,
+              city: data.province_city,
+              district: data.district,
+              street: data.street_address,
+              isDefault: data.is_default,
+            });
+          }
+        }
+      } catch (err) {
+        console.log("System error:", err);
+      } finally {
+        setLoadingAddress(false);
+      }
+    };
+
+    fetchDefaultAddress();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
@@ -371,7 +469,11 @@ export default function CartScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Shipping Address */}
-        <ShippingCard onEdit={() => setAddressModalVisible(true)} />
+        <ShippingCard
+          address={defaultAddress}
+          onEdit={() => setAddressModalVisible(true)}
+          loading={loadingAddress}
+        />
 
         {/* ── Cart Items ── */}
         {isEmpty ? (
