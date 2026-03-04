@@ -114,27 +114,84 @@ export default function ProductDetailScreen() {
     setActiveIndex(index);
   };
 
-  // Hàm xử lý Thêm vào giỏ
+  // Hàm xử lý Thêm vào giỏ từ màn hình chính
   const handleAddToBag = () => {
     if (!selectedSize || !selectedColor) {
-      // Nếu thiếu màu hoặc size -> Bật Pop-up lên
       setModalVisible(true);
       return;
     }
-
-    // Nếu đã đủ -> Thêm vào giỏ và báo thành công
-    alert("Đã thêm vào giỏ hàng!");
-    // Ở đây sau này bạn sẽ gọi API để lưu vào database giỏ hàng
+    // Đã chọn đủ ở ngoài -> Thêm vào với số lượng là 1 (hoặc quantity hiện tại)
+    addToCartService(1);
   };
 
-  // Hàm xử lý xác nhận bên trong Pop-up
+  // Hàm xử lý xác nhận bên trong Pop-up Modal
   const handleConfirmModal = () => {
     if (!selectedSize || !selectedColor) {
       alert("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
       return;
     }
-    setModalVisible(false);
-    alert(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    // Thực hiện thêm vào giỏ với số lượng 'quantity' từ Modal
+    addToCartService(quantity);
+  };
+
+  const addToCartService = async (selectedQty: number) => {
+    try {
+      // 1. Lấy thông tin User hiện tại
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để thực hiện thao tác này!");
+        return;
+      }
+
+      // 2. Tìm sản phẩm cùng loại trong giỏ (khớp ID, Size và Color)
+      const { data: existingItem, error: fetchError } = await supabase
+        .from("cart_items")
+        .select("id, quantity")
+        .eq("user_id", user.id)
+        .eq("product_id", product.id)
+        .eq("size", selectedSize) // Khớp cột size
+        .eq("color", selectedColor?.color) // Khớp cột color
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      if (existingItem) {
+        // 3. Nếu đã tồn tại -> Cập nhật tăng số lượng
+        const { error: updateError } = await supabase
+          .from("cart_items")
+          .update({
+            quantity: existingItem.quantity + selectedQty,
+            updated_at: new Date(),
+          })
+          .eq("id", existingItem.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // 4. Nếu chưa có -> Thêm dòng mới
+        const { error: insertError } = await supabase
+          .from("cart_items")
+          .insert([
+            {
+              user_id: user.id,
+              product_id: product.id,
+              quantity: selectedQty,
+              size: selectedSize,
+              color: selectedColor?.color,
+              is_selected: true,
+            },
+          ]);
+
+        if (insertError) throw insertError;
+      }
+
+      alert("Đã thêm vào giỏ hàng thành công!");
+      setModalVisible(false); // Đóng Pop-up nếu đang mở
+    } catch (error: any) {
+      console.error("Lỗi giỏ hàng:", error.message);
+      alert("Lỗi: " + error.message);
+    }
   };
 
   // 2. Fetch dữ liệu từ Supabase
