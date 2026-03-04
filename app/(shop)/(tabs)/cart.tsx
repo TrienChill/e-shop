@@ -1,3 +1,4 @@
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
   ChevronLeft,
@@ -8,8 +9,9 @@ import {
   ShoppingBag,
   Trash2,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -142,6 +144,18 @@ const C = {
   bg2: "#F3F4F6",
   blue: "#2563EB",
   white: "#FFFFFF",
+};
+
+const colorTranslations: { [key: string]: string } = {
+  black: "Đen",
+  white: "Trắng",
+  red: "Đỏ",
+  blue: "Xanh dương",
+  green: "Xanh lá",
+  yellow: "Vàng",
+  pink: "Hồng",
+  gray: "Xám",
+  brown: "Nâu",
 };
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
@@ -313,7 +327,7 @@ export default function CartScreen() {
   // Address Modal States
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [addressData, setAddressData] = useState({
-    name: "Triền Chill",
+    name: "Triển Chill",
     phone: "0345678910",
     city: "TP. Hồ Chí Minh",
     district: "Quận 2",
@@ -374,20 +388,34 @@ export default function CartScreen() {
     }
   };
 
-  const increase = (id: string) =>
+  const increase = async (id: string) => {
+    const item = cartItems.find((i) => i.id === id);
+    if (!item) return;
+
+    const newQty = item.quantity + 1;
     setCartItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, quantity: i.quantity + 1 } : i)),
+      prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
 
-  const decrease = (id: string) =>
+    await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+  };
+
+  const decrease = async (id: string) => {
+    const item = cartItems.find((i) => i.id === id);
+    if (!item || item.quantity <= 1) return;
+
+    const newQty = item.quantity - 1;
     setCartItems((prev) =>
-      prev.map((i) =>
-        i.id === id ? { ...i, quantity: Math.max(1, i.quantity - 1) } : i,
-      ),
+      prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
 
-  const deleteItem = (id: string) =>
+    await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+  };
+
+  const deleteItem = async (id: string) => {
     setCartItems((prev) => prev.filter((i) => i.id !== id));
+    await supabase.from("cart_items").delete().eq("id", id);
+  };
 
   const addWishlistToCart = (item: WishlistItem) => {
     setCartItems((prev) => {
@@ -408,42 +436,128 @@ export default function CartScreen() {
   const [defaultAddress, setDefaultAddress] = useState<any>(null);
   const [loadingAddress, setLoadingAddress] = useState(true);
 
-  useEffect(() => {
-    const fetchDefaultAddress = async () => {
-      try {
-        // Lấy địa chỉ được đánh dấu là mặc định của user hiện tại
-        const { data, error } = await supabase
-          .from("user_addresses")
-          .select("*")
-          .eq("is_default", true)
-          .single(); // Chỉ lấy 1 bản ghi mặc định
+  // Thêm State để quản lý trạng thái tải giỏ hàng
+  const [loadingCart, setLoadingCart] = useState(true);
 
-        if (error && error.code !== "PGRST116") {
-          // PGRST116 là lỗi không tìm thấy bản ghi
-          console.error("Lỗi lấy địa chỉ:", error.message);
-        } else {
-          setDefaultAddress(data);
-          // Nếu tìm thấy, cập nhật luôn dữ liệu vào modal edit để đồng bộ
-          if (data) {
-            setAddressData({
-              name: data.receiver_name,
-              phone: data.phone_number,
-              city: data.province_city,
-              district: data.district,
-              street: data.street_address,
-              isDefault: data.is_default,
-            });
-          }
+  const fetchCartItems = async () => {
+    try {
+      setLoadingCart(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Fetch cart_items join với products
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select(
+          `
+        id,
+        quantity,
+        size,
+        color,
+        product_id,
+        products (
+          name,
+          price,
+          images,
+          variants
+        )
+      `,
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      // 2. Định dạng lại dữ liệu để lấy đúng ảnh theo màu
+      const formattedCart: CartItem[] = (data || []).map((item: any) => {
+        const productInfo = item.products;
+        const selectedColor = item.color; // Ví dụ: "White"
+
+        // Tìm image_index trong JSON variants.options dựa trên item.color
+        const colorOption = productInfo.variants?.options?.find(
+          (opt: any) => opt.color === selectedColor,
+        );
+
+        // Nếu tìm thấy màu thì lấy image_index, không thì mặc định là 0
+        const targetIndex =
+          colorOption?.image_index !== undefined ? colorOption.image_index : 0;
+
+        // Lấy tên file ảnh từ mảng images theo index
+        const imageName =
+          productInfo.images?.[targetIndex] || productInfo.images?.[0];
+
+        // Xử lý URL ảnh từ Supabase Storage
+        let imageUrl = "https://via.placeholder.com/400";
+        if (imageName) {
+          imageUrl = imageName.startsWith("http")
+            ? imageName
+            : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-imagess/${imageName}`;
         }
-      } catch (err) {
-        console.log("System error:", err);
-      } finally {
-        setLoadingAddress(false);
-      }
-    };
 
-    fetchDefaultAddress();
-  }, []);
+        return {
+          id: item.id,
+          name: productInfo.name,
+          size: item.size || "M",
+          color: colorTranslations[selectedColor] || selectedColor, // Dịch "White" thành "Trắng"
+          price: productInfo.price,
+          image: imageUrl,
+          quantity: item.quantity,
+        };
+      });
+
+      setCartItems(formattedCart);
+    } catch (error) {
+      console.error("Lỗi tải giỏ hàng:", error);
+    } finally {
+      setLoadingCart(false);
+    }
+  };
+
+  const fetchDefaultAddress = async () => {
+    try {
+      // Lấy địa chỉ được đánh dấu là mặc định của user hiện tại
+      const { data, error } = await supabase
+        .from("user_addresses")
+        .select("*")
+        .eq("is_default", true)
+        .single(); // Chỉ lấy 1 bản ghi mặc định
+
+      if (error && error.code !== "PGRST116") {
+        // PGRST116 là lỗi không tìm thấy bản ghi
+        console.error("Lỗi lấy địa chỉ:", error.message);
+      } else {
+        setDefaultAddress(data);
+        // Nếu tìm thấy, cập nhật luôn dữ liệu vào modal edit để đồng bộ
+        if (data) {
+          setAddressData({
+            name: data.receiver_name,
+            phone: data.phone_number,
+            city: data.province_city,
+            district: data.district,
+            street: data.street_address,
+            isDefault: data.is_default,
+          });
+        }
+      }
+    } catch (err) {
+      console.log("System error:", err);
+    } finally {
+      setLoadingAddress(false);
+    }
+  };
+
+  // Gọi hàm fetch khi màn hình được load
+
+  // Thay thế hoặc bổ sung thêm bên cạnh useEffect cũ
+  useFocusEffect(
+    useCallback(() => {
+      // Mỗi khi màn hình này được nhìn thấy, ta sẽ fetch lại dữ liệu mới nhất
+      fetchCartItems();
+      fetchDefaultAddress();
+    }, []),
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -476,7 +590,13 @@ export default function CartScreen() {
         />
 
         {/* ── Cart Items ── */}
-        {isEmpty ? (
+        {loadingCart ? (
+          <ActivityIndicator
+            size="large"
+            color={C.blue}
+            style={{ marginTop: 50 }}
+          />
+        ) : isEmpty ? (
           <EmptyCartState />
         ) : (
           <View style={styles.section}>
