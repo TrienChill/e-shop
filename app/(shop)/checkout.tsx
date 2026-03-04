@@ -1,9 +1,732 @@
-import { Text, View } from 'react-native';
+import { useRouter } from "expo-router";
+import {
+  Check,
+  ChevronLeft,
+  Gift,
+  Pencil,
+  ShoppingBag,
+  X,
+} from "lucide-react-native";
+import React, { useState } from "react";
+import {
+  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Bảng màu chủ đạo cho thiết kế
+const COLORS = {
+  primary: "#0055FF", // Xanh dương cho các nút chỉnh sửa và badge
+  secondary: "#1A1A1A", // Đen cho văn bản chính và nút thanh toán
+  background: "#FFFFFF",
+  surface: "#F9F9F9",
+  textSecondary: "#666666",
+  border: "#EEEEEE",
+  lightBlue: "#E6EFFF",
+  grayBadge: "#EAEBFF",
+  voucherBg: "#FFFFFF",
+  expiryBadge: "#FFE4E1",
+};
+
+// Dữ liệu mẫu cho giỏ hàng
+const CART_ITEMS = [
+  {
+    id: "1",
+    name: "Áo thun thời trang nam nữ phong cách hiện đại.",
+    price: "450.000₫",
+    quantity: 1,
+    image:
+      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop",
+  },
+  {
+    id: "2",
+    name: "Váy công sở thanh lịch dành cho phái đẹp.",
+    price: "890.000₫",
+    quantity: 1,
+    image:
+      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop",
+  },
+];
+
+// Dữ liệu mẫu cho mã giảm giá
+const VOUCHERS = [
+  {
+    id: "1",
+    title: "Đơn hàng đầu tiên",
+    description: "Giảm 5% cho đơn hàng tiếp theo của bạn",
+    validUntil: "15.06.24",
+    icon: ShoppingBag,
+  },
+  {
+    id: "2",
+    title: "Quà tặng từ CSKH",
+    description: "Giảm 15% cho lần mua sắm tiếp theo",
+    validUntil: "20.07.24",
+    icon: Gift,
+  },
+];
+
+// ─── Colors ────────────────────────────────────────────────────────────────────
+const C = {
+  bg: "#FFFFFF",
+  text: "#111827",
+  sub: "#6B7280",
+  border: "#E5E7EB",
+  bg2: "#F3F4F6",
+  blue: "#2563EB",
+  white: "#FFFFFF",
+};
 
 export default function CheckoutScreen() {
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Text>Checkout Screen</Text>
+  const router = useRouter();
+  const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
+    "standard",
+  );
+  const [showVouchers, setShowVouchers] = useState(false);
+
+  // Hàm hiển thị các thẻ thông tin (Địa chỉ, Liên hệ)
+  const renderInfoCard = (
+    title: string,
+    content: string,
+    subContent?: string,
+  ) => (
+    <View style={styles.infoCard}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Text style={styles.cardContent}>{content}</Text>
+        {subContent && <Text style={styles.cardSubContent}>{subContent}</Text>}
+      </View>
+      <TouchableOpacity style={styles.editButtonCircle} activeOpacity={0.8}>
+        <Pencil color="#FFFFFF" size={16} />
+      </TouchableOpacity>
     </View>
   );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backBtnHeader}
+        >
+          <ChevronLeft size={28} color={C.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Thanh toán</Text>
+      </View>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Khối thông tin người dùng */}
+        <View style={styles.section}>
+          {renderInfoCard(
+            "Địa chỉ giao hàng",
+            "Số 26, Đường Số 2, Thảo Điền, Quận 2, TP. Hồ Chí Minh",
+          )}
+          {renderInfoCard(
+            "Thông tin liên hệ",
+            "+84 932 000 000",
+            "amandamorgan@example.com",
+          )}
+        </View>
+
+        {/* Khối sản phẩm */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.titleWithBadge}>
+              <Text style={styles.sectionHeaderTitleText}>Sản phẩm</Text>
+              <View style={styles.badgeCount}>
+                <Text style={styles.badgeCountText}>2</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.addVoucherBtn}
+              onPress={() => setShowVouchers(true)}
+            >
+              <Text style={styles.addVoucherText}>Thêm mã giảm giá</Text>
+            </TouchableOpacity>
+          </View>
+
+          {CART_ITEMS.map((item) => (
+            <View key={item.id} style={styles.itemRow}>
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: item.image }} style={styles.itemImage} />
+                <View style={styles.itemQuantityBadge}>
+                  <Text style={styles.itemQuantityText}>{item.quantity}</Text>
+                </View>
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName} numberOfLines={2}>
+                  {item.name}
+                </Text>
+              </View>
+              <Text style={styles.itemPrice}>{item.price}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Khối tùy chọn giao hàng */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeaderTitleText}>Tùy chọn giao hàng</Text>
+
+          <TouchableOpacity
+            style={[
+              styles.shippingBtn,
+              shippingMethod === "standard" && styles.shippingBtnActive,
+            ]}
+            onPress={() => setShippingMethod("standard")}
+          >
+            <View style={styles.shippingLeft}>
+              <View
+                style={[
+                  styles.checkbox,
+                  shippingMethod === "standard" && styles.checkboxActive,
+                ]}
+              >
+                {shippingMethod === "standard" && (
+                  <Check color="#FFFFFF" size={14} />
+                )}
+              </View>
+              <Text style={styles.shippingTitle}>Tiêu chuẩn</Text>
+              <View style={styles.timeBadge}>
+                <Text style={styles.timeText}>5-7 ngày</Text>
+              </View>
+            </View>
+            <Text style={styles.shippingPrice}>Miễn phí</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.shippingBtn,
+              shippingMethod === "express" && styles.shippingBtnActive,
+            ]}
+            onPress={() => setShippingMethod("express")}
+          >
+            <View style={styles.shippingLeft}>
+              <View
+                style={[
+                  styles.checkbox,
+                  shippingMethod === "express" && styles.checkboxActive,
+                ]}
+              >
+                {shippingMethod === "express" && (
+                  <Check color="#FFFFFF" size={14} />
+                )}
+              </View>
+              <Text style={styles.shippingTitle}>Hỏa tốc</Text>
+              <View style={styles.timeBadge}>
+                <Text style={styles.timeText}>1-2 ngày</Text>
+              </View>
+            </View>
+            <Text style={styles.shippingPrice}>250.000₫</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.shippingFootnote}>
+            Dự kiến nhận hàng trước Thứ Năm, 23/04/2026
+          </Text>
+        </View>
+
+        {/* Phương thức thanh toán */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderTitleText}>
+              Phương thức thanh toán
+            </Text>
+            <TouchableOpacity
+              style={styles.editButtonCircle}
+              activeOpacity={0.8}
+            >
+              <Pencil color="#FFFFFF" size={16} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.paymentTag}>
+            <Text style={styles.paymentTagText}>Thẻ</Text>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Thanh tổng tiền và nút thanh toán cố định */}
+      <View style={styles.footer}>
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalLabel}>Tổng cộng </Text>
+          <Text style={styles.totalValue}>1.340.000₫</Text>
+        </View>
+        <TouchableOpacity style={styles.payButton} activeOpacity={0.9}>
+          <Text style={styles.payButtonText}>Thanh toán</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal hiển thị danh sách mã giảm giá */}
+      <Modal
+        visible={showVouchers}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowVouchers(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowVouchers(false)}
+        />
+        <View style={styles.bottomSheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Mã giảm giá khả dụng</Text>
+            <TouchableOpacity onPress={() => setShowVouchers(false)}>
+              <X color="#000" size={24} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.voucherList}
+            showsVerticalScrollIndicator={false}
+          >
+            {VOUCHERS.map((voucher) => {
+              const IconComp = voucher.icon;
+              return (
+                <View key={voucher.id} style={styles.voucherCard}>
+                  {/* Phần tiêu đề của voucher */}
+                  <View style={styles.voucherHeader}>
+                    <Text style={styles.voucherLabel}>Mã giảm giá</Text>
+                    <View style={styles.expiryBadge}>
+                      <Text style={styles.expiryLabel}>
+                        Hạn dùng: {voucher.validUntil}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Đường kẻ nét đứt */}
+                  <View style={styles.dashedLine} />
+
+                  {/* Vết cắt tròn hai bên cạnh thẻ */}
+                  <View style={[styles.cutout, styles.cutoutLeft]} />
+                  <View style={[styles.cutout, styles.cutoutRight]} />
+
+                  {/* Nội dung chi tiết của voucher */}
+                  <View style={styles.voucherContent}>
+                    <View style={styles.voucherInfoRow}>
+                      <IconComp color={COLORS.primary} size={20} />
+                      <Text style={styles.voucherTitle}>{voucher.title}</Text>
+                    </View>
+                    <Text style={styles.voucherDesc}>
+                      {voucher.description}
+                    </Text>
+
+                    <TouchableOpacity style={styles.applyBtn}>
+                      <Text style={styles.applyText}>Áp dụng</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+
+          {/* Chân của Bottom Sheet */}
+          <View style={styles.sheetFooter}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalLabel}>Tổng cộng </Text>
+              <Text style={styles.totalValue}>1.340.000₫</Text>
+            </View>
+            <TouchableOpacity style={styles.payButton} activeOpacity={0.9}>
+              <Text style={styles.payButtonText}>Thanh toán</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 120,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  headerTitle: { fontSize: 24, fontWeight: "800", color: C.text, flex: 1 },
+  backBtnHeader: { paddingRight: 4 },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  titleWithBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  sectionHeaderTitleText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+  },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAFBFB",
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.secondary,
+    marginBottom: 4,
+  },
+  cardContent: {
+    fontSize: 13,
+    color: "#555",
+  },
+  cardSubContent: {
+    fontSize: 13,
+    color: "#555",
+    marginTop: 2,
+  },
+  editButtonCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeCount: {
+    width: 34,
+    height: 34,
+    backgroundColor: COLORS.grayBadge,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeCountText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  addVoucherBtn: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  addVoucherText: {
+    color: COLORS.primary,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  imageContainer: {
+    position: "relative",
+    marginRight: 15,
+  },
+  itemImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#F0F0F0",
+  },
+  itemQuantityBadge: {
+    position: "absolute",
+    top: 0,
+    right: -4,
+    backgroundColor: COLORS.grayBadge,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFF",
+  },
+  itemQuantityText: {
+    fontSize: 10,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 14,
+    color: "#555",
+  },
+  itemPrice: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+    marginLeft: 10,
+  },
+  shippingBtn: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#FAFBFB",
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  shippingBtnActive: {
+    backgroundColor: "#EAEBFF",
+  },
+  shippingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkboxActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  shippingTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.secondary,
+  },
+  timeBadge: {
+    backgroundColor: "#FFF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  timeText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: "500",
+  },
+  shippingPrice: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+  },
+  shippingFootnote: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  paymentTag: {
+    backgroundColor: "#EAEBFF",
+    alignSelf: "flex-start",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  paymentTagText: {
+    color: COLORS.primary,
+    fontWeight: "bold",
+    fontSize: 15,
+  },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#F5F5F5",
+  },
+  totalContainer: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  totalLabel: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: COLORS.secondary,
+  },
+  totalValue: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.secondary,
+  },
+  payButton: {
+    backgroundColor: COLORS.secondary,
+    paddingHorizontal: 60,
+    paddingVertical: 16,
+    borderRadius: 14,
+  },
+  payButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  // Phong cách hiển thị của Bottom Sheet
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  bottomSheet: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: SCREEN_HEIGHT * 0.7,
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
+  },
+  sheetHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  sheetTitle: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  voucherList: {
+    paddingHorizontal: 24,
+  },
+  voucherCard: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
+    backgroundColor: COLORS.voucherBg,
+    marginBottom: 15,
+    position: "relative",
+    overflow: "hidden",
+  },
+  voucherHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    zIndex: 2,
+  },
+  voucherLabel: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.primary,
+  },
+  expiryBadge: {
+    backgroundColor: COLORS.expiryBadge,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  expiryLabel: {
+    fontSize: 12,
+    color: "#000",
+    fontWeight: "500",
+  },
+  dashedLine: {
+    height: 1,
+    borderWidth: 1,
+    borderColor: "#CCC",
+    borderStyle: "dashed",
+    marginHorizontal: 12,
+    zIndex: 2,
+  },
+  cutout: {
+    position: "absolute",
+    top: 50,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    zIndex: 10,
+  },
+  cutoutLeft: {
+    left: -9,
+  },
+  cutoutRight: {
+    right: -9,
+  },
+  voucherContent: {
+    padding: 16,
+  },
+  voucherInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  voucherTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  voucherDesc: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 16,
+  },
+  applyBtn: {
+    backgroundColor: COLORS.primary,
+    alignSelf: "flex-end",
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  applyText: {
+    color: "#FFF",
+    fontWeight: "bold",
+  },
+  sheetFooter: {
+    backgroundColor: "#F0F4FF",
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+});
