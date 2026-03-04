@@ -1,3 +1,4 @@
+import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
 import {
   Check,
@@ -7,7 +8,7 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -103,14 +104,76 @@ export default function CheckoutScreen() {
     <View style={styles.infoCard}>
       <View style={{ flex: 1 }}>
         <Text style={styles.cardTitle}>{title}</Text>
-        <Text style={styles.cardContent}>{content}</Text>
+        <Text
+          style={[
+            styles.cardContent,
+            content.includes("Chưa") && { color: "#EF4444" }, // Đỏ nếu chưa có dữ liệu
+          ]}
+        >
+          {content}
+        </Text>
         {subContent && <Text style={styles.cardSubContent}>{subContent}</Text>}
       </View>
-      <TouchableOpacity style={styles.editButtonCircle} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.editButtonCircle}
+        activeOpacity={0.8}
+        onPress={() => router.push("/(shop)/(tabs)/cart")} // Quay lại giỏ hàng để sửa địa chỉ
+      >
         <Pencil color="#FFFFFF" size={16} />
       </TouchableOpacity>
     </View>
   );
+
+  // Thêm vào trong component CheckoutScreen
+  const [userAddress, setUserAddress] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchCheckoutInfo = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // 1. Lấy thông tin từ địa chỉ mặc định trong bảng user_addresses
+        const { data: defaultAddr } = await supabase
+          .from("user_addresses")
+          .select(
+            "receiver_name, phone_number, province_city, district, street_address",
+          )
+          .eq("user_id", user.id) // Lọc theo ID người dùng
+          .eq("is_default", true) // Lấy địa chỉ đang được đặt làm mặc định
+          .maybeSingle();
+
+        if (defaultAddr) {
+          // Cập nhật thông tin liên hệ (Lấy tên và số điện thoại người nhận từ địa chỉ)
+          setUserProfile({
+            name: defaultAddr.receiver_name,
+            phone: defaultAddr.phone_number,
+            email: user.email, // Email vẫn lấy từ auth.user
+          });
+
+          // Cập nhật địa chỉ giao hàng
+          setUserAddress(defaultAddr);
+        }
+
+        // 2. Lấy địa chỉ mặc định
+        const { data: address } = await supabase
+          .from("user_addresses")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("is_default", true)
+          .maybeSingle();
+
+        setUserAddress(address);
+      } catch (err) {
+        console.error("Lỗi fetch checkout:", err);
+      }
+    };
+
+    fetchCheckoutInfo();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -131,14 +194,19 @@ export default function CheckoutScreen() {
       >
         {/* Khối thông tin người dùng */}
         <View style={styles.section}>
+          {/* Địa chỉ giao hàng */}
           {renderInfoCard(
             "Địa chỉ giao hàng",
-            "Số 26, Đường Số 2, Thảo Điền, Quận 2, TP. Hồ Chí Minh",
+            userAddress
+              ? `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`
+              : "Chưa có địa chỉ giao hàng",
           )}
+
+          {/* Thông tin liên hệ (Dữ liệu từ người nhận của địa chỉ đó) */}
           {renderInfoCard(
             "Thông tin liên hệ",
-            "+84 932 000 000",
-            "amandamorgan@example.com",
+            userProfile?.phone || "Chưa có số điện thoại",
+            userProfile?.name, // Hiển thị tên người nhận ở dòng dưới
           )}
         </View>
 
