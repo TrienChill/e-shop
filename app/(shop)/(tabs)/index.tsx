@@ -11,13 +11,14 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
+import { supabase } from "@/src/lib/supabase";
 import {
   getLatestProducts,
   getMostPopularProducts,
   getTopSellingProducts,
 } from "@/src/services/product";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 
 const { width } = Dimensions.get("window");
 
@@ -123,6 +124,41 @@ const HomeScreen = () => {
     loadData();
   }, []);
 
+  const [cartCount, setCartCount] = useState(0);
+
+  // Hàm lấy tổng số lượng sản phẩm trong giỏ
+  const fetchCartCount = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setCartCount(0);
+        return;
+      }
+
+      // Đếm tổng số lượng (quantity) thay vì đếm số dòng
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("quantity")
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      setCartCount(total);
+    } catch (error) {
+      console.error("Lỗi lấy số lượng giỏ hàng:", error);
+    }
+  };
+
+  // Cập nhật mỗi khi màn hình index được focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchCartCount();
+    }, []),
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -138,7 +174,15 @@ const HomeScreen = () => {
           onPress={() => router.push("/(shop)/(tabs)/cart")}
         >
           <MaterialIcons name="shopping-bag" size={28} color="#1a1a1a" />
-          <View style={styles.cartBadge} />
+
+          {/* Hiển thị Badge nếu số lượng > 0 */}
+          {cartCount > 0 && (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>
+                {cartCount > 99 ? "99+" : cartCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -419,16 +463,25 @@ const styles = StyleSheet.create({
     padding: 8,
     position: "relative",
   },
+  // ... các styles cũ
   cartBadge: {
     position: "absolute",
-    top: 8,
-    right: 6,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#ef4444",
-    borderWidth: 1.5,
-    borderColor: "#fff",
+    right: 2,
+    top: 2,
+    backgroundColor: "#EF4444", // Màu đỏ thông báo
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#FFFFFF", // Viền trắng để nổi bật trên icon
+  },
+  cartBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 
   // Section Common
