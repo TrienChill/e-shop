@@ -39,26 +39,6 @@ const COLORS = {
   expiryBadge: "#FFE4E1",
 };
 
-// Dữ liệu mẫu cho giỏ hàng
-const CART_ITEMS = [
-  {
-    id: "1",
-    name: "Áo thun thời trang nam nữ phong cách hiện đại.",
-    price: "450.000₫",
-    quantity: 1,
-    image:
-      "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop",
-  },
-  {
-    id: "2",
-    name: "Váy công sở thanh lịch dành cho phái đẹp.",
-    price: "890.000₫",
-    quantity: 1,
-    image:
-      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop",
-  },
-];
-
 // Dữ liệu mẫu cho mã giảm giá
 const VOUCHERS = [
   {
@@ -67,6 +47,7 @@ const VOUCHERS = [
     description: "Giảm 5% cho đơn hàng tiếp theo của bạn",
     validUntil: "15.06.24",
     icon: ShoppingBag,
+    discount: 5, // 5%
   },
   {
     id: "2",
@@ -74,6 +55,7 @@ const VOUCHERS = [
     description: "Giảm 15% cho lần mua sắm tiếp theo",
     validUntil: "20.07.24",
     icon: Gift,
+    discount: 15, // 15%
   },
 ];
 
@@ -94,6 +76,9 @@ export default function CheckoutScreen() {
     "standard",
   );
   const [showVouchers, setShowVouchers] = useState(false);
+  const [selectedVoucher, setSelectedVoucher] = useState<
+    (typeof VOUCHERS)[0] | null
+  >(null);
 
   // Hàm hiển thị các thẻ thông tin (Địa chỉ, Liên hệ)
   const renderInfoCard = (
@@ -128,47 +113,101 @@ export default function CheckoutScreen() {
   const [userAddress, setUserAddress] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // Thêm các state mới
+  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Tính tổng tiền dựa trên sản phẩm thực tế và phí ship
+  const productsTotal = cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0,
+  );
+  const shippingFee = shippingMethod === "express" ? 250000 : 0;
+
+  const discountAmount = selectedVoucher
+    ? (productsTotal * selectedVoucher.discount) / 100
+    : 0;
+
+  const finalTotal = productsTotal + shippingFee - discountAmount;
+
   useEffect(() => {
     const fetchCheckoutInfo = async () => {
       try {
+        setLoading(true);
         const {
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) return;
 
-        // 1. Lấy thông tin từ địa chỉ mặc định trong bảng user_addresses
+        // 1. Lấy thông tin địa chỉ & profile người nhận
         const { data: defaultAddr } = await supabase
           .from("user_addresses")
           .select(
             "receiver_name, phone_number, province_city, district, street_address",
           )
-          .eq("user_id", user.id) // Lọc theo ID người dùng
-          .eq("is_default", true) // Lấy địa chỉ đang được đặt làm mặc định
-          .maybeSingle();
-
-        if (defaultAddr) {
-          // Cập nhật thông tin liên hệ (Lấy tên và số điện thoại người nhận từ địa chỉ)
-          setUserProfile({
-            name: defaultAddr.receiver_name,
-            phone: defaultAddr.phone_number,
-            email: user.email, // Email vẫn lấy từ auth.user
-          });
-
-          // Cập nhật địa chỉ giao hàng
-          setUserAddress(defaultAddr);
-        }
-
-        // 2. Lấy địa chỉ mặc định
-        const { data: address } = await supabase
-          .from("user_addresses")
-          .select("*")
           .eq("user_id", user.id)
           .eq("is_default", true)
           .maybeSingle();
 
-        setUserAddress(address);
+        if (defaultAddr) {
+          setUserProfile({
+            name: defaultAddr.receiver_name,
+            phone: defaultAddr.phone_number,
+            email: user.email,
+          });
+          setUserAddress(defaultAddr);
+        }
+
+        // 2. Lấy danh sách sản phẩm ĐANG ĐƯỢC CHỌN trong giỏ hàng
+        const { data: cartData } = await supabase
+          .from("cart_items")
+          .select(
+            `
+            id,
+            quantity,
+            color,
+            size,
+            products (
+              name,
+              price,
+              images,
+              variants
+            )
+          `,
+          )
+          .eq("user_id", user.id)
+          .eq("is_selected", true); // Chỉ lấy những món người dùng tích chọn để thanh toán
+
+        if (cartData) {
+          const formattedItems = cartData.map((item: any) => {
+            const p = item.products;
+            // Logic lấy ảnh theo màu sắc tương tự màn hình Cart
+            const colorOpt = p.variants?.options?.find(
+              (o: any) => o.color === item.color,
+            );
+            const imgIdx = colorOpt?.image_index ?? 0;
+            const imageName = p.images?.[imgIdx] || p.images?.[0];
+
+            const imageUrl = imageName?.startsWith("http")
+              ? imageName
+              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-imagess/${imageName}`;
+
+            return {
+              id: item.id,
+              name: p.name,
+              price: p.price,
+              quantity: item.quantity,
+              image: imageUrl,
+              color: item.color,
+              size: item.size,
+            };
+          });
+          setCartItems(formattedItems);
+        }
       } catch (err) {
         console.error("Lỗi fetch checkout:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -216,35 +255,82 @@ export default function CheckoutScreen() {
             <View style={styles.titleWithBadge}>
               <Text style={styles.sectionHeaderTitleText}>Sản phẩm</Text>
               <View style={styles.badgeCount}>
-                <Text style={styles.badgeCountText}>2</Text>
+                <Text style={styles.badgeCountText}>{cartItems.length}</Text>
               </View>
             </View>
             <TouchableOpacity
               style={styles.addVoucherBtn}
               onPress={() => setShowVouchers(true)}
             >
-              <Text style={styles.addVoucherText}>Thêm mã giảm giá</Text>
+              <Text style={styles.addVoucherText}>
+                {selectedVoucher
+                  ? `Giảm ${selectedVoucher.discount}%`
+                  : "Mã giảm giá"}
+              </Text>
             </TouchableOpacity>
           </View>
 
-          {CART_ITEMS.map((item) => (
-            <View key={item.id} style={styles.itemRow}>
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: item.image }} style={styles.itemImage} />
-                <View style={styles.itemQuantityBadge}>
-                  <Text style={styles.itemQuantityText}>{item.quantity}</Text>
+          {loading ? (
+            <Text style={{ padding: 20, textAlign: "center", color: C.sub }}>
+              Đang tải sản phẩm...
+            </Text>
+          ) : cartItems.length > 0 ? (
+            cartItems.map((item) => (
+              <View key={item.id} style={styles.itemRow}>
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={{ uri: item.image }}
+                    style={styles.itemImage}
+                  />
+                  <View style={styles.itemQuantityBadge}>
+                    <Text style={styles.itemQuantityText}>{item.quantity}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={2}>
-                  {item.name}
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: C.sub, marginTop: 4 }}>
+                    Phân loại: {item.color}, {item.size}
+                  </Text>
+                </View>
+                <Text style={styles.itemPrice}>
+                  {(item.price * item.quantity).toLocaleString("vi-VN")}₫
                 </Text>
               </View>
-              <Text style={styles.itemPrice}>{item.price}</Text>
-            </View>
-          ))}
+            ))
+          ) : (
+            <Text style={{ padding: 20, textAlign: "center", color: C.sub }}>
+              Không có sản phẩm để thanh toán
+            </Text>
+          )}
         </View>
 
+        {/* Khối tổng kết chi phí */}
+        <View style={styles.section}>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tạm tính</Text>
+            <Text style={styles.summaryValue}>
+              {productsTotal.toLocaleString("vi-VN")}₫
+            </Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Phí vận chuyển</Text>
+            <Text style={styles.summaryValue}>
+              {shippingFee.toLocaleString("vi-VN")}₫
+            </Text>
+          </View>
+          {selectedVoucher && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                Giảm giá ({selectedVoucher.discount}%)
+              </Text>
+              <Text style={[styles.summaryValue, { color: "#EF4444" }]}>
+                -{discountAmount.toLocaleString("vi-VN")}₫
+              </Text>
+            </View>
+          )}
+        </View>
         {/* Khối tùy chọn giao hàng */}
         <View style={styles.section}>
           <Text style={styles.sectionHeaderTitleText}>Tùy chọn giao hàng</Text>
@@ -329,9 +415,18 @@ export default function CheckoutScreen() {
       <View style={styles.footer}>
         <View style={styles.totalContainer}>
           <Text style={styles.totalLabel}>Tổng cộng </Text>
-          <Text style={styles.totalValue}>1.340.000₫</Text>
+          <Text style={styles.totalValue}>
+            {finalTotal.toLocaleString("vi-VN")}₫
+          </Text>
         </View>
-        <TouchableOpacity style={styles.payButton} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={[
+            styles.payButton,
+            (loading || cartItems.length === 0) && { backgroundColor: C.sub },
+          ]}
+          activeOpacity={0.9}
+          disabled={loading || cartItems.length === 0}
+        >
           <Text style={styles.payButtonText}>Thanh toán</Text>
         </TouchableOpacity>
       </View>
@@ -390,8 +485,30 @@ export default function CheckoutScreen() {
                       {voucher.description}
                     </Text>
 
-                    <TouchableOpacity style={styles.applyBtn}>
-                      <Text style={styles.applyText}>Áp dụng</Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.applyBtn,
+                        selectedVoucher?.id === voucher.id && {
+                          backgroundColor: COLORS.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSelectedVoucher(voucher);
+                        setShowVouchers(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.applyText,
+                          selectedVoucher?.id === voucher.id && {
+                            color: "#FFF",
+                          },
+                        ]}
+                      >
+                        {selectedVoucher?.id === voucher.id
+                          ? "Đã áp dụng"
+                          : "Áp dụng"}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -403,10 +520,21 @@ export default function CheckoutScreen() {
           <View style={styles.sheetFooter}>
             <View style={styles.totalContainer}>
               <Text style={styles.totalLabel}>Tổng cộng </Text>
-              <Text style={styles.totalValue}>1.340.000₫</Text>
+              <Text style={styles.totalValue}>
+                {finalTotal.toLocaleString("vi-VN")}₫
+              </Text>
             </View>
-            <TouchableOpacity style={styles.payButton} activeOpacity={0.9}>
-              <Text style={styles.payButtonText}>Thanh toán</Text>
+            <TouchableOpacity
+              style={[
+                styles.payButton,
+                (loading || cartItems.length === 0) && {
+                  backgroundColor: C.sub,
+                },
+              ]}
+              activeOpacity={0.9}
+              onPress={() => setShowVouchers(false)}
+            >
+              <Text style={styles.payButtonText}>Xác nhận</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -660,7 +788,7 @@ const styles = StyleSheet.create({
   },
   payButton: {
     backgroundColor: COLORS.secondary,
-    paddingHorizontal: 60,
+    paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 14,
   },
@@ -796,5 +924,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+  },
+  summaryValue: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.secondary,
   },
 });
