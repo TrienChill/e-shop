@@ -39,26 +39,6 @@ const COLORS = {
   expiryBadge: "#FFE4E1",
 };
 
-// Dữ liệu mẫu cho mã giảm giá
-const VOUCHERS = [
-  {
-    id: "1",
-    title: "Đơn hàng đầu tiên",
-    description: "Giảm 5% cho đơn hàng tiếp theo của bạn",
-    validUntil: "15.06.24",
-    icon: ShoppingBag,
-    discount: 5, // 5%
-  },
-  {
-    id: "2",
-    title: "Quà tặng từ CSKH",
-    description: "Giảm 15% cho lần mua sắm tiếp theo",
-    validUntil: "20.07.24",
-    icon: Gift,
-    discount: 15, // 15%
-  },
-];
-
 // ─── Colors ────────────────────────────────────────────────────────────────────
 const C = {
   bg: "#FFFFFF",
@@ -76,9 +56,7 @@ export default function CheckoutScreen() {
     "standard",
   );
   const [showVouchers, setShowVouchers] = useState(false);
-  const [selectedVoucher, setSelectedVoucher] = useState<
-    (typeof VOUCHERS)[0] | null
-  >(null);
+  const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
 
   // Hàm hiển thị các thẻ thông tin (Địa chỉ, Liên hệ)
   const renderInfoCard = (
@@ -125,10 +103,16 @@ export default function CheckoutScreen() {
   const shippingFee = shippingMethod === "express" ? 250000 : 0;
 
   const discountAmount = selectedVoucher
-    ? (productsTotal * selectedVoucher.discount) / 100
+    ? selectedVoucher.type === "percentage"
+      ? (productsTotal * selectedVoucher.discount) / 100
+      : selectedVoucher.discount // Nếu là số tiền mặt thì trừ trực tiếp
     : 0;
+  // Đảm bảo số tiền giảm không vượt quá tổng đơn
+  const finalDiscount = Math.min(discountAmount, productsTotal);
+  const finalTotal = productsTotal + shippingFee - finalDiscount;
 
-  const finalTotal = productsTotal + shippingFee - discountAmount;
+  // Thêm State để lưu voucher từ database
+  const [dbVouchers, setDbVouchers] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchCheckoutInfo = async () => {
@@ -177,6 +161,46 @@ export default function CheckoutScreen() {
           )
           .eq("user_id", user.id)
           .eq("is_selected", true); // Chỉ lấy những món người dùng tích chọn để thanh toán
+
+        // 3. Fetch danh sách Voucher khả dụng
+        console.log("Voucher Debug: Bắt đầu fetch voucher...");
+        const { data: voucherData, error: voucherError } = await supabase
+          .from("vouchers")
+          .select("*")
+          .eq("is_active", true) // Chỉ lấy voucher đang hoạt động
+          .gt("expired_at", new Date().toISOString()) // SỬA: expiry_date -> expired_at
+          .order("discount_value", { ascending: false }); // SỬA: discount_percent -> discount_value
+
+        if (voucherError) {
+          console.error("Voucher Debug: Lỗi Supabase:", voucherError);
+        }
+
+        if (voucherData && voucherData.length > 0) {
+          console.log("Voucher Debug: Dữ liệu thô từ DB:", voucherData);
+
+          const formattedVouchers = voucherData.map((v) => ({
+            id: v.id,
+            title: v.code,
+            description:
+              v.description ||
+              (v.discount_type === "percentage"
+                ? `Giảm ${v.discount_value}% đơn hàng`
+                : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ đơn hàng`),
+            validUntil: v.expired_at
+              ? new Date(v.expired_at).toLocaleDateString("vi-VN")
+              : "Không thời hạn", // SỬA: expired_at
+            discount: Number(v.discount_value), // Ép kiểu số cho numeric
+            type: v.discount_type, // Lưu lại loại giảm giá để tính toán sau này
+            icon: v.discount_value > 10 ? Gift : ShoppingBag,
+          }));
+          console.log(
+            "Voucher Debug: Dữ liệu sau khi format:",
+            formattedVouchers,
+          );
+          setDbVouchers(formattedVouchers);
+        } else {
+          console.log("Voucher Debug: Không tìm thấy voucher nào (data null)");
+        }
 
         if (cartData) {
           const formattedItems = cartData.map((item: any) => {
@@ -454,66 +478,78 @@ export default function CheckoutScreen() {
             style={styles.voucherList}
             showsVerticalScrollIndicator={false}
           >
-            {VOUCHERS.map((voucher) => {
-              const IconComp = voucher.icon;
-              return (
-                <View key={voucher.id} style={styles.voucherCard}>
-                  {/* Phần tiêu đề của voucher */}
-                  <View style={styles.voucherHeader}>
-                    <Text style={styles.voucherLabel}>Mã giảm giá</Text>
-                    <View style={styles.expiryBadge}>
-                      <Text style={styles.expiryLabel}>
-                        Hạn dùng: {voucher.validUntil}
+            {/* SỬA TẠI ĐÂY: Dùng dbVouchers thay vì VOUCHERS hoặc mảng cũ */}
+            {dbVouchers && dbVouchers.length > 0 ? (
+              dbVouchers.map((voucher) => {
+                const IconComp = voucher.icon;
+                const isSelected = selectedVoucher?.id === voucher.id;
+
+                return (
+                  <View key={voucher.id} style={styles.voucherCard}>
+                    <View style={styles.voucherHeader}>
+                      <Text style={styles.voucherLabel}>
+                        Mã: {voucher.title}
                       </Text>
+                      <View style={styles.expiryBadge}>
+                        <Text style={styles.expiryLabel}>
+                          Hạn dùng: {voucher.validUntil}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
 
-                  {/* Đường kẻ nét đứt */}
-                  <View style={styles.dashedLine} />
+                    <View style={styles.dashedLine} />
+                    <View style={[styles.cutout, styles.cutoutLeft]} />
+                    <View style={[styles.cutout, styles.cutoutRight]} />
 
-                  {/* Vết cắt tròn hai bên cạnh thẻ */}
-                  <View style={[styles.cutout, styles.cutoutLeft]} />
-                  <View style={[styles.cutout, styles.cutoutRight]} />
+                    <View style={styles.voucherContent}>
+                      <View style={styles.voucherInfoRow}>
+                        <IconComp color={COLORS.primary} size={20} />
+                        <Text style={styles.voucherTitle}>
+                          {voucher.type === "percentage"
+                            ? `Giảm ${voucher.discount}%`
+                            : `Giảm ${voucher.discount.toLocaleString("vi-VN")}đ`}
+                        </Text>
+                      </View>
+                      <Text style={styles.voucherDesc}>
+                        {voucher.description}
+                      </Text>
 
-                  {/* Nội dung chi tiết của voucher */}
-                  <View style={styles.voucherContent}>
-                    <View style={styles.voucherInfoRow}>
-                      <IconComp color={COLORS.primary} size={20} />
-                      <Text style={styles.voucherTitle}>{voucher.title}</Text>
-                    </View>
-                    <Text style={styles.voucherDesc}>
-                      {voucher.description}
-                    </Text>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.applyBtn,
-                        selectedVoucher?.id === voucher.id && {
-                          backgroundColor: COLORS.primary,
-                        },
-                      ]}
-                      onPress={() => {
-                        setSelectedVoucher(voucher);
-                        setShowVouchers(false);
-                      }}
-                    >
-                      <Text
+                      <TouchableOpacity
                         style={[
-                          styles.applyText,
-                          selectedVoucher?.id === voucher.id && {
-                            color: "#FFF",
-                          },
+                          styles.applyBtn,
+                          isSelected && { backgroundColor: COLORS.primary },
                         ]}
+                        onPress={() => {
+                          setSelectedVoucher(voucher);
+                          setShowVouchers(false);
+                        }}
                       >
-                        {selectedVoucher?.id === voucher.id
-                          ? "Đã áp dụng"
-                          : "Áp dụng"}
-                      </Text>
-                    </TouchableOpacity>
+                        <Text
+                          style={[
+                            styles.applyText,
+                            isSelected && { color: "#FFF" },
+                          ]}
+                        >
+                          {isSelected ? "Đã áp dụng" : "Áp dụng ngay"}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })
+            ) : (
+              /* Thông báo này chỉ hiện khi dbVouchers thực sự rỗng */
+              <View style={{ padding: 40, alignItems: "center" }}>
+                <ShoppingBag
+                  size={48}
+                  color={C.sub}
+                  style={{ marginBottom: 16, opacity: 0.5 }}
+                />
+                <Text style={{ color: C.sub, textAlign: "center" }}>
+                  Hiện chưa có mã giảm giá nào dành cho bạn
+                </Text>
+              </View>
+            )}
           </ScrollView>
 
           {/* Chân của Bottom Sheet */}
