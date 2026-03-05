@@ -93,8 +93,8 @@ export default function CheckoutScreen() {
   const [showVouchers, setShowVouchers] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
 
-  // States cho Payment
-  const [selectedPaymentId, setSelectedPaymentId] = useState("1");
+  // Đặt mặc định tiền mặt (COD) là phương thức thanh toán được chọn ban đầu
+  const [selectedPaymentId, setSelectedPaymentId] = useState("cash");
   const [paymentStatus, setPaymentStatus] = useState<
     "idle" | "processing" | "success" | "error"
   >("idle");
@@ -210,6 +210,7 @@ export default function CheckoutScreen() {
           .select(
             `
             id,
+            product_id,
             quantity,
             color,
             size,
@@ -278,10 +279,11 @@ export default function CheckoutScreen() {
 
             const imageUrl = imageName?.startsWith("http")
               ? imageName
-              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-imagess/${imageName}`;
+              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
 
             return {
               id: item.id,
+              product_id: item.product_id, // THÊM DÒNG NÀY: Đây là ID số của sản phẩm
               name: p.name,
               price: p.price,
               quantity: item.quantity,
@@ -301,6 +303,83 @@ export default function CheckoutScreen() {
 
     fetchCheckoutInfo();
   }, []);
+
+  const handlePlaceOrder = async () => {
+    if (!userAddress || cartItems.length === 0) {
+      setPaymentStatus("idle");
+      alert("Vui lòng kiểm tra lại địa chỉ và giỏ hàng!");
+      return;
+    }
+
+    setPaymentStatus("processing");
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Chưa đăng nhập");
+
+      // 1. Tạo đơn hàng trong bảng public.orders
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          {
+            user_id: user.id,
+            total_amount: finalTotal,
+            shipping_address: `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`,
+            phone_contact: userProfile?.phone,
+            receiver_name: userProfile?.name,
+            address_id: userAddress.id,
+            status: "pending", // Trạng thái chờ xử lý
+            platform_voucher_id: selectedVoucher?.id || null,
+            shipping_fee: shippingFee,
+          },
+        ])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      // 2. Lưu chi tiết sản phẩm vào public.order_items
+      const orderItemsPayload = cartItems.map((item) => {
+        // Kiểm tra ID sản phẩm. Nếu bạn fetch join products, ID thật nằm ở item.product_id
+        const productId = Number(item.product_id);
+
+        if (isNaN(productId)) {
+          console.error("Lỗi: product_id không phải là số!", item);
+        }
+
+        return {
+          order_id: orderData.id, // ID đơn hàng vừa tạo (bigint)
+          product_id: productId, // ID sản phẩm (PHẢI LÀ SỐ - bigint)
+          quantity: item.quantity,
+          price_at_purchase: item.price,
+          selected_variant: { color: item.color, size: item.size },
+        };
+      });
+
+      const { error: itemsError } = await supabase
+        .from("order_items")
+        .insert(orderItemsPayload);
+
+      if (itemsError) throw itemsError;
+
+      // 3. Xóa các món đã mua khỏi giỏ hàng
+      const { error: deleteCartError } = await supabase
+        .from("cart_items")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("is_selected", true);
+
+      if (deleteCartError) throw deleteCartError;
+
+      // Thành công
+      setPaymentStatus("success");
+    } catch (error: any) {
+      console.error("Lỗi đặt hàng:", error.message);
+      setPaymentStatus("error");
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -582,10 +661,14 @@ export default function CheckoutScreen() {
             (loading || cartItems.length === 0) && { backgroundColor: C.sub },
           ]}
           activeOpacity={0.9}
-          onPress={() => setPaymentStatus("processing")}
-          disabled={loading || cartItems.length === 0}
+          onPress={handlePlaceOrder} // 👈 Thay đổi từ setPaymentStatus sang handlePlaceOrder
+          disabled={
+            loading || cartItems.length === 0 || paymentStatus === "processing"
+          }
         >
-          <Text style={styles.payButtonText}>Thanh toán</Text>
+          <Text style={styles.payButtonText}>
+            {paymentStatus === "processing" ? "Đang xử lý..." : "Thanh toán"}
+          </Text>
         </TouchableOpacity>
       </View>
 

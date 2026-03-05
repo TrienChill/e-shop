@@ -1,25 +1,25 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-  ArrowLeft,
-  ChevronRight,
-  Heart,
-  Share2,
-  ShoppingCart,
-  Star,
-  Tag,
+    ArrowLeft,
+    ChevronRight,
+    Heart,
+    Share2,
+    ShoppingCart,
+    Star,
+    Tag,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Modal,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    Modal,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
@@ -29,7 +29,7 @@ import { PopularCard } from "@/src/components/card/PopularCard";
 import { getPopularProducts } from "@/src/services/product";
 
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const BUCKET_NAME = "product-imagess"; // Tên bucket chứa ảnh của bạn
+const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;

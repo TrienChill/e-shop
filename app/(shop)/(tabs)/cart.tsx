@@ -1,35 +1,35 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
-  ChevronLeft,
-  X as CloseIcon,
-  Minus,
-  Pencil,
-  Plus,
-  ShoppingBag,
-  Trash2,
+    ChevronLeft,
+    X as CloseIcon,
+    Minus,
+    Pencil,
+    Plus,
+    ShoppingBag,
+    Trash2,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  PopularCard,
-  PopularProductItem,
+    PopularCard,
+    PopularProductItem,
 } from "../../../src/components/card/PopularCard";
 import { supabase } from "../../../src/lib/supabase";
 
@@ -493,7 +493,7 @@ export default function CartScreen() {
         if (imageName) {
           imageUrl = imageName.startsWith("http")
             ? imageName
-            : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-imagess/${imageName}`;
+            : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
         }
 
         return {
