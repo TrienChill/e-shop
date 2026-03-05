@@ -710,7 +710,12 @@ export default function CheckoutScreen() {
                 </Text>
                 <TouchableOpacity
                   style={styles.trackOrderBtn}
-                  onPress={() => setPaymentStatus("idle")}
+                  onPress={
+                    () =>
+                      router.push(
+                        "/to-receive",
+                      ) /* Điều hướng đến trang theo dõi đơn hàng */
+                  }
                 >
                   <Text style={styles.trackOrderText}>Theo dõi đơn hàng</Text>
                 </TouchableOpacity>
