@@ -1,15 +1,21 @@
 import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
 import {
+  AlertCircle,
+  Banknote,
   Check,
+  CheckCircle2,
   ChevronLeft,
   Gift,
   Pencil,
+  Plus,
+  Settings,
   ShoppingBag,
   X,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Modal,
@@ -23,7 +29,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Bảng màu chủ đạo cho thiết kế
 const COLORS = {
@@ -39,16 +45,47 @@ const COLORS = {
   expiryBadge: "#FFE4E1",
 };
 
-// ─── Colors ────────────────────────────────────────────────────────────────────
 const C = {
   bg: "#FFFFFF",
   text: "#111827",
   sub: "#6B7280",
   border: "#E5E7EB",
   bg2: "#F3F4F6",
-  blue: "#2563EB",
+  blue: "#0055FF", // Updated to main blue
   white: "#FFFFFF",
+  success: "#4ADE80",
+  error: "#EF4444",
 };
+
+// Dữ liệu mẫu cho Phương thức thanh toán
+const PAYMENT_METHODS = [
+  {
+    id: "1",
+    type: "Mastercard",
+    number: "**** **** **** 1579",
+    holder: "Triển Chill",
+    expiry: "12/22",
+    bgColor: "#EEF2FF", // Light Blue Pastel
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png",
+  },
+  {
+    id: "2",
+    type: "Visa",
+    number: "**** **** **** 4242",
+    holder: "Triển Chill",
+    expiry: "09/25",
+    bgColor: "#FFF1F2", // Light Pink Pastel
+    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png",
+  },
+  {
+    id: "cash",
+    type: "Cash",
+    name: "Tiền mặt (COD)",
+    number: "Thanh toán khi nhận hàng",
+    bgColor: "#F3F4F6", // Light Gray
+    icon: Banknote,
+  },
+];
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -56,7 +93,12 @@ export default function CheckoutScreen() {
   const [showVouchers, setShowVouchers] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
 
-  // Hàm hiển thị các thẻ thông tin (Địa chỉ, Liên hệ)
+  // States cho Payment
+  const [selectedPaymentId, setSelectedPaymentId] = useState("1");
+  const [paymentStatus, setPaymentStatus] = useState<
+    "idle" | "processing" | "success" | "error"
+  >("idle");
+
   const renderInfoCard = (
     title: string,
     content: string,
@@ -68,7 +110,7 @@ export default function CheckoutScreen() {
         <Text
           style={[
             styles.cardContent,
-            content.includes("Chưa") && { color: "#EF4444" }, // Đỏ nếu chưa có dữ liệu
+            content.includes("Chưa") && { color: C.error },
           ]}
         >
           {content}
@@ -76,11 +118,11 @@ export default function CheckoutScreen() {
         {subContent && <Text style={styles.cardSubContent}>{subContent}</Text>}
       </View>
       <TouchableOpacity
-        style={styles.editButtonCircle}
+        style={styles.editButtonCircleLarge}
         activeOpacity={0.8}
-        onPress={() => router.push("/(shop)/(tabs)/cart")} // Quay lại giỏ hàng để sửa địa chỉ
+        onPress={() => router.push("/(shop)/(tabs)/cart")}
       >
-        <Pencil color="#FFFFFF" size={16} />
+        <Pencil color={C.blue} size={18} />
       </TouchableOpacity>
     </View>
   );
@@ -122,6 +164,17 @@ export default function CheckoutScreen() {
   // Đảm bảo số tiền giảm không vượt quá tổng đơn
   const finalDiscount = Math.min(discountAmount, productsTotal);
   const finalTotal = productsTotal + shippingFee - finalDiscount;
+
+  // Giả lập thanh toán
+  useEffect(() => {
+    if (paymentStatus === "processing") {
+      const timer = setTimeout(() => {
+        // Có thể ngẫu nhiên hóa success/error ở đây nếu muốn
+        setPaymentStatus("success");
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [paymentStatus]);
 
   useEffect(() => {
     const fetchCheckoutInfo = async () => {
@@ -288,21 +341,34 @@ export default function CheckoutScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.titleWithBadge}>
-              <Text style={styles.sectionHeaderTitleText}>Sản phẩm</Text>
-              <View style={styles.badgeCount}>
-                <Text style={styles.badgeCountText}>{cartItems.length}</Text>
+              <Text style={styles.sectionHeaderTitleText}>Giỏ hàng</Text>
+              <View style={styles.badgeCountGray}>
+                <Text style={styles.badgeCountTextGray}>
+                  {cartItems.length}
+                </Text>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.addVoucherBtn}
-              onPress={() => setShowVouchers(true)}
-            >
-              <Text style={styles.addVoucherText}>
-                {selectedVoucher
-                  ? `Giảm ${selectedVoucher.discount}%`
-                  : "Mã giảm giá"}
-              </Text>
-            </TouchableOpacity>
+            {selectedVoucher && (
+              <TouchableOpacity
+                style={styles.discountBadgePurple}
+                onPress={() => setSelectedVoucher(null)}
+              >
+                <Text style={styles.discountBadgeText}>
+                  {selectedVoucher.type === "percentage"
+                    ? `Giảm ${selectedVoucher.discount}%`
+                    : `Giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`}
+                </Text>
+                <X color="#FFF" size={14} />
+              </TouchableOpacity>
+            )}
+            {!selectedVoucher && (
+              <TouchableOpacity
+                style={styles.addVoucherBtnMini}
+                onPress={() => setShowVouchers(true)}
+              >
+                <Plus size={16} color={C.blue} />
+              </TouchableOpacity>
+            )}
           </View>
 
           {loading ? (
@@ -420,22 +486,85 @@ export default function CheckoutScreen() {
           )}
         </View>
 
-        {/* Phương thức thanh toán */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionHeaderTitleText}>
-              Phương thức thanh toán
-            </Text>
-            <TouchableOpacity
-              style={styles.editButtonCircle}
-              activeOpacity={0.8}
-            >
-              <Pencil color="#FFFFFF" size={16} />
+        {/* Khối Phương thức thanh toán */}
+        <View style={styles.paymentSection}>
+          <Text style={styles.paymentSectionTitle}>Phương thức thanh toán</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            contentContainerStyle={styles.paymentList}
+            snapToInterval={SCREEN_WIDTH * 0.75 + 16}
+          >
+            {PAYMENT_METHODS.map((method) => {
+              const isSelected = selectedPaymentId === method.id;
+
+              return (
+                <TouchableOpacity
+                  key={method.id}
+                  activeOpacity={0.9}
+                  style={[
+                    styles.paymentCard,
+                    { backgroundColor: method.bgColor },
+                  ]}
+                  onPress={() => setSelectedPaymentId(method.id)}
+                >
+                  {/* Header thẻ */}
+                  <View style={styles.cardHeader}>
+                    {method.logo ? (
+                      <Image
+                        source={{ uri: method.logo }}
+                        style={styles.cardLogo}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      method.icon &&
+                      React.createElement(method.icon as any, {
+                        color: C.blue,
+                        size: 32,
+                      })
+                    )}
+                    <View style={styles.settingsBtn}>
+                      <Settings size={14} color={C.blue} />
+                    </View>
+                  </View>
+
+                  {/* Badge chọn */}
+                  {isSelected && (
+                    <View style={styles.selectedBadge}>
+                      <CheckCircle2 size={24} color={C.blue} fill="#FFF" />
+                    </View>
+                  )}
+
+                  {/* Nội dung thẻ */}
+                  <View style={styles.cardContentBottom}>
+                    <Text
+                      style={[
+                        styles.cardNumber,
+                        method.type === "Cash" && { fontSize: 16 },
+                      ]}
+                    >
+                      {method.number}
+                    </Text>
+                    <View style={styles.cardFooter}>
+                      <Text style={styles.cardHolder}>
+                        {method.type === "Cash" ? method.name : method.holder}
+                      </Text>
+                      {method.expiry && (
+                        <Text style={styles.cardExpiry}>{method.expiry}</Text>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Nút thêm thẻ mới */}
+            <TouchableOpacity style={styles.addCardBtn} activeOpacity={0.8}>
+              <Plus size={32} color="#FFFFFF" />
             </TouchableOpacity>
-          </View>
-          <View style={styles.paymentTag}>
-            <Text style={styles.paymentTagText}>Thẻ</Text>
-          </View>
+          </ScrollView>
         </View>
       </ScrollView>
 
@@ -453,11 +582,91 @@ export default function CheckoutScreen() {
             (loading || cartItems.length === 0) && { backgroundColor: C.sub },
           ]}
           activeOpacity={0.9}
+          onPress={() => setPaymentStatus("processing")}
           disabled={loading || cartItems.length === 0}
         >
           <Text style={styles.payButtonText}>Thanh toán</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Modal Trạng thái Thanh toán */}
+      <Modal
+        visible={paymentStatus !== "idle"}
+        transparent={true}
+        animationType="fade"
+      >
+        <View style={styles.statusModalOverlay}>
+          <View style={styles.statusModalContent}>
+            {paymentStatus === "processing" && (
+              <>
+                <View style={styles.statusIconContainer}>
+                  <View style={styles.loadingCircle}>
+                    <ActivityIndicator size="large" color={C.blue} />
+                  </View>
+                </View>
+                <Text style={styles.statusTitle}>Đang xử lý thanh toán</Text>
+                <Text style={styles.statusDesc}>
+                  Vui lòng đợi trong giây lát
+                </Text>
+              </>
+            )}
+
+            {paymentStatus === "success" && (
+              <>
+                <View
+                  style={[
+                    styles.statusIconContainer,
+                    { backgroundColor: "#E6F6F0" },
+                  ]}
+                >
+                  <CheckCircle2 size={60} color={C.blue} />
+                </View>
+                <Text style={styles.statusTitle}>Thành công!</Text>
+                <Text style={styles.statusDesc}>
+                  Thanh toán của bạn đã được ghi nhận
+                </Text>
+                <TouchableOpacity
+                  style={styles.trackOrderBtn}
+                  onPress={() => setPaymentStatus("idle")}
+                >
+                  <Text style={styles.trackOrderText}>Theo dõi đơn hàng</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {paymentStatus === "error" && (
+              <>
+                <View
+                  style={[
+                    styles.statusIconContainer,
+                    { backgroundColor: "#FEE2E2" },
+                  ]}
+                >
+                  <AlertCircle size={60} color={C.error} />
+                </View>
+                <Text style={styles.statusTitle}>Thanh toán thất bại</Text>
+                <Text style={styles.statusDesc}>
+                  Vui lòng đổi phương thức hoặc thử lại sau
+                </Text>
+                <View style={styles.errorActions}>
+                  <TouchableOpacity
+                    style={styles.tryAgainBtn}
+                    onPress={() => setPaymentStatus("processing")}
+                  >
+                    <Text style={styles.tryAgainText}>Thử lại</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.changeMethodBtn}
+                    onPress={() => setPaymentStatus("idle")}
+                  >
+                    <Text style={styles.changeMethodText}>Thay đổi</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Modal hiển thị danh sách mã giảm giá */}
       <Modal
@@ -978,5 +1187,216 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: COLORS.secondary,
+  },
+  editButtonCircleLarge: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#EFF6FF", // Blue tint
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeCountGray: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeCountTextGray: {
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  discountBadgePurple: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#C7D2FE", // Purple/Blue pastel
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  discountBadgeText: {
+    color: C.blue,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  addVoucherBtnMini: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#EFF6FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // ── Payment Section Styles ──
+  paymentSection: {
+    marginBottom: 40,
+  },
+  paymentSectionTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.secondary,
+    marginBottom: 28,
+    paddingHorizontal: 0,
+  },
+  paymentList: {
+    paddingTop: 12, // Thêm padding để hiển thị dấu tích không bị che
+    paddingRight: 20,
+    gap: 16,
+  },
+  paymentCard: {
+    width: SCREEN_WIDTH * 0.75,
+    aspectRatio: 1.586,
+    borderRadius: 24,
+    padding: 24,
+    justifyContent: "space-between",
+    position: "relative",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  cardLogo: {
+    width: 60,
+    height: 35,
+  },
+  settingsBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  selectedBadge: {
+    position: "absolute",
+    top: -10,
+    right: -10,
+    zIndex: 10,
+  },
+  cardContentBottom: {
+    gap: 12,
+  },
+  cardNumber: {
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: 2,
+    color: COLORS.secondary,
+    fontFamily: "monospace",
+  },
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardHolder: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.secondary,
+  },
+  cardExpiry: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: "600",
+  },
+  addCardBtn: {
+    width: 80,
+    aspectRatio: 0.6,
+    backgroundColor: C.blue,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  // ── Status Modal Styles ──
+  statusModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  statusModalContent: {
+    width: "100%",
+    backgroundColor: "#FFF",
+    borderRadius: 35,
+    padding: 30,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  statusIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  loadingCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  statusTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  statusDesc: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  trackOrderBtn: {
+    width: "100%",
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  trackOrderText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.secondary,
+  },
+  errorActions: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 12,
+  },
+  tryAgainBtn: {
+    flex: 1,
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  tryAgainText: {
+    color: "#FFF",
+    fontWeight: "700",
+  },
+  changeMethodBtn: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  changeMethodText: {
+    color: COLORS.secondary,
+    fontWeight: "700",
   },
 });
