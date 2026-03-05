@@ -32,6 +32,10 @@ import {
     PopularProductItem,
 } from "../../../src/components/card/PopularCard";
 import { supabase } from "../../../src/lib/supabase";
+import {
+    COLOR_TRANSLATIONS,
+    getProductImageByColor,
+} from "../../../src/services/product";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -135,7 +139,6 @@ const POPULAR_ITEMS: PopularProductItem[] = [
   },
 ];
 
-// ─── Colors ────────────────────────────────────────────────────────────────────
 const C = {
   bg: "#FFFFFF",
   text: "#111827",
@@ -144,18 +147,6 @@ const C = {
   bg2: "#F3F4F6",
   blue: "#2563EB",
   white: "#FFFFFF",
-};
-
-const colorTranslations: { [key: string]: string } = {
-  black: "Đen",
-  white: "Trắng",
-  red: "Đỏ",
-  blue: "Xanh dương",
-  green: "Xanh lá",
-  yellow: "Vàng",
-  pink: "Hồng",
-  gray: "Xám",
-  brown: "Nâu",
 };
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
@@ -475,34 +466,13 @@ export default function CartScreen() {
         const productInfo = item.products;
         const selectedColor = item.color; // Ví dụ: "White"
 
-        // Tìm image_index trong JSON variants.options dựa trên item.color
-        const colorOption = productInfo.variants?.options?.find(
-          (opt: any) => opt.color === selectedColor,
-        );
-
-        // Nếu tìm thấy màu thì lấy image_index, không thì mặc định là 0
-        const targetIndex =
-          colorOption?.image_index !== undefined ? colorOption.image_index : 0;
-
-        // Lấy tên file ảnh từ mảng images theo index
-        const imageName =
-          productInfo.images?.[targetIndex] || productInfo.images?.[0];
-
-        // Xử lý URL ảnh từ Supabase Storage
-        let imageUrl = "https://via.placeholder.com/400";
-        if (imageName) {
-          imageUrl = imageName.startsWith("http")
-            ? imageName
-            : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
-        }
-
         return {
           id: item.id,
           name: productInfo.name,
           size: item.size || "M",
-          color: colorTranslations[selectedColor] || selectedColor, // Dịch "White" thành "Trắng"
+          color: COLOR_TRANSLATIONS[selectedColor] || selectedColor, // Dịch "White" thành "Trắng"
           price: productInfo.price,
-          image: imageUrl,
+          image: getProductImageByColor(productInfo, selectedColor),
           quantity: item.quantity,
         };
       });

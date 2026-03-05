@@ -123,3 +123,45 @@ export const getPopularProducts = async (currentProductId?: string) => {
     return [];
   }
 };
+
+// Dịch tên màu sắc sang tiếng Việt
+export const COLOR_TRANSLATIONS: Record<string, string> = {
+  black: "Đen",
+  white: "Trắng",
+  red: "Đỏ",
+  blue: "Xanh dương",
+  green: "Xanh lá",
+  yellow: "Vàng",
+  pink: "Hồng",
+  gray: "Xám",
+  brown: "Nâu",
+};
+
+// Hàm lấy URL ảnh sản phẩm dựa trên màu sắc được chọn
+export const getProductImageByColor = (product: any, color: string): string => {
+  if (!product) return "https://via.placeholder.com/400";
+
+  const selectedColor = color; // e.g: "White"
+
+  // Tìm image_index trong JSON variants.options dựa trên color
+  const colorOption = product.variants?.options?.find(
+    (opt: any) => opt.color?.toLowerCase() === selectedColor?.toLowerCase(),
+  );
+
+  // Nếu tìm thấy màu thì lấy image_index, không thì mặc định là 0
+  const targetIndex =
+    colorOption?.image_index !== undefined ? colorOption.image_index : 0;
+
+  // Lấy tên file ảnh từ mảng images theo index
+  const imageName = product.images?.[targetIndex] || product.images?.[0];
+
+  // Xử lý URL ảnh từ Supabase Storage
+  let imageUrl = "https://via.placeholder.com/400";
+  if (imageName) {
+    imageUrl = imageName.startsWith("http")
+      ? imageName
+      : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
+  }
+
+  return imageUrl;
+};

@@ -1,4 +1,8 @@
 import { supabase } from "@/src/lib/supabase";
+import {
+  COLOR_TRANSLATIONS,
+  getProductImageByColor,
+} from "@/src/services/product";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
@@ -270,25 +274,14 @@ export default function CheckoutScreen() {
         if (cartData) {
           const formattedItems = cartData.map((item: any) => {
             const p = item.products;
-            // Logic lấy ảnh theo màu sắc tương tự màn hình Cart
-            const colorOpt = p.variants?.options?.find(
-              (o: any) => o.color === item.color,
-            );
-            const imgIdx = colorOpt?.image_index ?? 0;
-            const imageName = p.images?.[imgIdx] || p.images?.[0];
-
-            const imageUrl = imageName?.startsWith("http")
-              ? imageName
-              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
-
             return {
               id: item.id,
               product_id: item.product_id, // THÊM DÒNG NÀY: Đây là ID số của sản phẩm
               name: p.name,
               price: p.price,
               quantity: item.quantity,
-              image: imageUrl,
-              color: item.color,
+              image: getProductImageByColor(p, item.color),
+              color: COLOR_TRANSLATIONS[item.color] || item.color,
               size: item.size,
             };
           });
