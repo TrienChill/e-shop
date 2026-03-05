@@ -52,9 +52,7 @@ const C = {
 
 export default function CheckoutScreen() {
   const router = useRouter();
-  const [shippingMethod, setShippingMethod] = useState<"standard" | "express">(
-    "standard",
-  );
+
   const [showVouchers, setShowVouchers] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<any>(null);
 
@@ -100,7 +98,21 @@ export default function CheckoutScreen() {
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
-  const shippingFee = shippingMethod === "express" ? 250000 : 0;
+
+  // Thêm State để lưu voucher từ database
+  const [dbVouchers, setDbVouchers] = useState<any[]>([]);
+
+  // Thêm State mới vào CheckoutScreen
+  const [shippingMethods, setShippingMethods] = useState<any[]>([]);
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(
+    null,
+  );
+
+  // Cập nhật phí vận chuyển dựa trên phương thức được chọn từ DB
+  const selectedMethod = shippingMethods.find(
+    (m) => m.id === selectedShippingId,
+  );
+  const shippingFee = selectedMethod ? Number(selectedMethod.price) : 0;
 
   const discountAmount = selectedVoucher
     ? selectedVoucher.type === "percentage"
@@ -110,9 +122,6 @@ export default function CheckoutScreen() {
   // Đảm bảo số tiền giảm không vượt quá tổng đơn
   const finalDiscount = Math.min(discountAmount, productsTotal);
   const finalTotal = productsTotal + shippingFee - finalDiscount;
-
-  // Thêm State để lưu voucher từ database
-  const [dbVouchers, setDbVouchers] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchCheckoutInfo = async () => {
@@ -163,21 +172,15 @@ export default function CheckoutScreen() {
           .eq("is_selected", true); // Chỉ lấy những món người dùng tích chọn để thanh toán
 
         // 3. Fetch danh sách Voucher khả dụng
-        console.log("Voucher Debug: Bắt đầu fetch voucher...");
-        const { data: voucherData, error: voucherError } = await supabase
+
+        const { data: voucherData } = await supabase
           .from("vouchers")
           .select("*")
           .eq("is_active", true) // Chỉ lấy voucher đang hoạt động
           .gt("expired_at", new Date().toISOString()) // SỬA: expiry_date -> expired_at
           .order("discount_value", { ascending: false }); // SỬA: discount_percent -> discount_value
 
-        if (voucherError) {
-          console.error("Voucher Debug: Lỗi Supabase:", voucherError);
-        }
-
         if (voucherData && voucherData.length > 0) {
-          console.log("Voucher Debug: Dữ liệu thô từ DB:", voucherData);
-
           const formattedVouchers = voucherData.map((v) => ({
             id: v.id,
             title: v.code,
@@ -193,13 +196,21 @@ export default function CheckoutScreen() {
             type: v.discount_type, // Lưu lại loại giảm giá để tính toán sau này
             icon: v.discount_value > 10 ? Gift : ShoppingBag,
           }));
-          console.log(
-            "Voucher Debug: Dữ liệu sau khi format:",
-            formattedVouchers,
-          );
+
           setDbVouchers(formattedVouchers);
-        } else {
-          console.log("Voucher Debug: Không tìm thấy voucher nào (data null)");
+        }
+
+        // 4. Fetch danh sách Phương thức vận chuyển từ bảng mới
+        const { data: shipData } = await supabase
+          .from("shipping_methods")
+          .select("*")
+          .eq("is_active", true)
+          .order("price", { ascending: true });
+
+        if (shipData && shipData.length > 0) {
+          setShippingMethods(shipData);
+          // Tự động chọn phương thức đầu tiên (thường là rẻ nhất) làm mặc định
+          setSelectedShippingId(shipData[0].id);
         }
 
         if (cartData) {
@@ -359,61 +370,54 @@ export default function CheckoutScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionHeaderTitleText}>Tùy chọn giao hàng</Text>
 
-          <TouchableOpacity
-            style={[
-              styles.shippingBtn,
-              shippingMethod === "standard" && styles.shippingBtnActive,
-            ]}
-            onPress={() => setShippingMethod("standard")}
-          >
-            <View style={styles.shippingLeft}>
-              <View
-                style={[
-                  styles.checkbox,
-                  shippingMethod === "standard" && styles.checkboxActive,
-                ]}
-              >
-                {shippingMethod === "standard" && (
-                  <Check color="#FFFFFF" size={14} />
-                )}
-              </View>
-              <Text style={styles.shippingTitle}>Tiêu chuẩn</Text>
-              <View style={styles.timeBadge}>
-                <Text style={styles.timeText}>5-7 ngày</Text>
-              </View>
-            </View>
-            <Text style={styles.shippingPrice}>Miễn phí</Text>
-          </TouchableOpacity>
+          {shippingMethods.length > 0 ? (
+            shippingMethods.map((method) => {
+              const isSelected = selectedShippingId === method.id;
+              return (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.shippingBtn,
+                    isSelected && styles.shippingBtnActive,
+                  ]}
+                  onPress={() => setSelectedShippingId(method.id)}
+                >
+                  <View style={styles.shippingLeft}>
+                    <View
+                      style={[
+                        styles.checkbox,
+                        isSelected && styles.checkboxActive,
+                      ]}
+                    >
+                      {isSelected && <Check color="#FFFFFF" size={14} />}
+                    </View>
+                    <Text style={styles.shippingTitle}>{method.name}</Text>
+                    <View style={styles.timeBadge}>
+                      <Text style={styles.timeText}>
+                        {method.min_time}-{method.max_time} {method.unit}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.shippingPrice}>
+                    {method.price === 0
+                      ? "Miễn phí"
+                      : `${Number(method.price).toLocaleString("vi-VN")}₫`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={{ padding: 10, color: C.sub }}>
+              Đang tải phương thức vận chuyển...
+            </Text>
+          )}
 
-          <TouchableOpacity
-            style={[
-              styles.shippingBtn,
-              shippingMethod === "express" && styles.shippingBtnActive,
-            ]}
-            onPress={() => setShippingMethod("express")}
-          >
-            <View style={styles.shippingLeft}>
-              <View
-                style={[
-                  styles.checkbox,
-                  shippingMethod === "express" && styles.checkboxActive,
-                ]}
-              >
-                {shippingMethod === "express" && (
-                  <Check color="#FFFFFF" size={14} />
-                )}
-              </View>
-              <Text style={styles.shippingTitle}>Hỏa tốc</Text>
-              <View style={styles.timeBadge}>
-                <Text style={styles.timeText}>1-2 ngày</Text>
-              </View>
-            </View>
-            <Text style={styles.shippingPrice}>250.000₫</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.shippingFootnote}>
-            Dự kiến nhận hàng trước Thứ Năm, 23/04/2026
-          </Text>
+          {selectedMethod && (
+            <Text style={styles.shippingFootnote}>
+              Dự kiến nhận hàng sau {selectedMethod.max_time}{" "}
+              {selectedMethod.unit} kể từ ngày đặt.
+            </Text>
+          )}
         </View>
 
         {/* Phương thức thanh toán */}
