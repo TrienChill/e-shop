@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import {
   ArrowUpDown,
   CheckCircle2,
+  ChevronLeft,
   Filter,
   PackageX,
   X,
@@ -291,15 +292,10 @@ export default function ToReceiveScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.avatarContainer}
+            onPress={() => router.push("/(shop)/(tabs)/profile")}
+            style={styles.backBtnHeader}
           >
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80",
-              }}
-              style={styles.avatar}
-            />
+            <ChevronLeft size={28} color={COLORS.secondary} />
           </TouchableOpacity>
           <View style={styles.titleContainer}>
             <Text style={styles.headerTitle}>Lịch sử mua hàng</Text>
@@ -455,15 +451,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  avatarContainer: {
+  backBtnHeader: {
     marginRight: 12,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: "#F0F0F0",
+    padding: 4,
+    marginLeft: -8,
   },
   titleContainer: {
     justifyContent: "center",
