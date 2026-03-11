@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { ArrowRight, Filter, List, Play, Settings } from "lucide-react-native";
+import { ArrowRight, Bell, Play, Settings, Ticket } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Dimensions,
@@ -79,14 +79,19 @@ export default function ProfileScreen() {
   const OrderStatusButton = ({
     title,
     hasNotification,
+    onPress,
   }: {
     title: string;
     hasNotification?: boolean;
+    onPress?: () => void;
   }) => {
     const isActive = activeOrderTab === title;
     return (
       <TouchableOpacity
-        onPress={() => setActiveOrderTab(title)}
+        onPress={() => {
+          setActiveOrderTab(title);
+          onPress?.();
+        }}
         activeOpacity={0.7}
         style={[
           styles.capsuleButton,
@@ -131,10 +136,10 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.iconButton}>
-              <List size={22} color={COLOR.dark} />
+              <Ticket size={22} color={COLOR.dark} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
-              <Filter size={22} color={COLOR.dark} />
+              <Bell size={22} color={COLOR.dark} />
               <View style={styles.filterBadge} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton} onPress={logout}>
@@ -185,7 +190,11 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
           <View style={styles.orderTabs}>
             <OrderStatusButton title="Chờ t.toán" />
-            <OrderStatusButton title="Đang giao" hasNotification={true} />
+            <OrderStatusButton
+              title="Đang giao"
+              hasNotification={true}
+              onPress={() => router.push("/to-receive")}
+            />
             <OrderStatusButton title="Đánh giá" />
           </View>
         </View>
