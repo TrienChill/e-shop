@@ -276,6 +276,7 @@ export default function ToReceiveScreen() {
                 <TouchableOpacity
                   style={styles.trackButton}
                   activeOpacity={0.7}
+                  onPress={() => router.push("/track-order")}
                 >
                   <Text style={styles.trackButtonText}>Theo dõi</Text>
                 </TouchableOpacity>
