@@ -1,5 +1,6 @@
+import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowUpDown,
   CheckCircle2,
@@ -24,7 +25,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CommonHeader from "@/src/components/layout/Header";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -52,10 +52,13 @@ interface OrderItem {
 
 export default function ToReceiveScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams(); // 👈 Lấy params từ URL
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<string>("all");
+  // Lấy status từ params, nếu không có thì mặc định là "all"
+  const initialStatus = (params.status as string) || "all";
+  const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
   const [showFilter, setShowFilter] = useState(false);
   const [isAscending, setIsAscending] = useState(true);
 
@@ -69,40 +72,33 @@ export default function ToReceiveScreen() {
 
   const STATUS_OPTIONS = [
     { key: "all", label: "Tất cả" },
-    { key: "pending", label: "Đang xử lý" },
-    { key: "processing", label: "Đang đóng gói" },
-    { key: "shipping", label: "Đang giao" },
-    { key: "completed", label: "Đã giao" },
-    { key: "cancelled", label: "Đã hủy" },
+    { key: "pending", label: "Chờ xác nhận" }, // Đổi nhãn cho giống Shopee
+    { key: "processing", label: "Chờ lấy hàng" },
+    { key: "shipping", label: "Chờ giao hàng" },
+    { key: "history", label: "Lịch sử mua hàng (Đã giao/Hủy)" }, // Thêm option mới
   ];
 
   const fetchOrders = async (statusFilter = selectedStatus) => {
     try {
       setLoading(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
 
-      let query = supabase
-        .from("orders")
-        .select(
-          `
-          id,
-          status,
-          total_amount,
-          order_items (
-            quantity,
-            products (
-              images
-            )
-          )
-        `,
-        )
-        .eq("user_id", user.id);
+      let query = supabase.from("orders").select(`
+    id,
+    status,
+    total_amount,
+    order_items (
+      quantity,
+      products (
+        images
+      )
+    )
+`);
 
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+      // Sửa logic lọc để xử lý trường hợp "history" (Lịch sử mua hàng)
+      if (statusFilter === "history") {
+        query = query.in("status", ["completed", "cancelled"]); // Lấy cả đã giao và đã hủy
+      } else if (statusFilter !== "all") {
+        query = query.eq("status", statusFilter); // Lọc theo pending, processing, shipping
       }
 
       const { data, error } = await query.order("created_at", {
@@ -112,13 +108,16 @@ export default function ToReceiveScreen() {
       if (error) throw error;
 
       const formattedOrders: OrderItem[] = data.map((order: any) => {
-        const itemsCount = order.order_items.reduce(
-          (sum: number, item: any) => sum + item.quantity,
+        // Thêm kiểm tra: nếu order_items không tồn tại, dùng mảng rỗng
+        const itemsList = order.order_items || [];
+
+        const itemsCount = itemsList.reduce(
+          (sum: number, item: any) => sum + (item.quantity || 0),
           0,
         );
-
         const images: string[] = [];
-        order.order_items.forEach((item: any) => {
+        // Sử dụng itemsList đã được kiểm tra thay vì order.order_items
+        itemsList.forEach((item: any) => {
           if (item.products?.images?.[0] && images.length < 4) {
             const imgName = item.products.images[0];
             const imageUrl = imgName.startsWith("http")

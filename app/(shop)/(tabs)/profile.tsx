@@ -192,18 +192,62 @@ export default function ProfileScreen() {
 
         {/* Phần trạng thái Đơn hàng của tôi */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
-          <Text>Xem lịch sử mua hàng</Text>
-          <View style={styles.orderTabs}>
-            <OrderStatusButton title="Chờ xác nhận" hasNotification={true} />
-            <OrderStatusButton title="Chờ lấy hàng" hasNotification={true} />
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/to-receive",
+                  params: { status: "history" },
+                })
+              }
+              activeOpacity={0.6}
+            >
+              <Text style={styles.seeHistoryText}>Lịch sử mua hàng</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.orderTabs}
+          >
+            <OrderStatusButton
+              title="Chờ xác nhận"
+              hasNotification={true}
+              onPress={() =>
+                router.push({
+                  pathname: "/to-receive",
+                  params: { status: "pending" },
+                })
+              }
+            />
+            <OrderStatusButton
+              title="Chờ lấy hàng"
+              hasNotification={true}
+              onPress={() =>
+                router.push({
+                  pathname: "/to-receive",
+                  params: { status: "processing" },
+                })
+              }
+            />
             <OrderStatusButton
               title="Chờ giao hàng"
               hasNotification={true}
-              onPress={() => router.push("/to-receive")}
+              onPress={() =>
+                router.push({
+                  pathname: "/to-receive",
+                  params: { status: "shipping" },
+                })
+              }
             />
-            <OrderStatusButton title="Đánh giá" hasNotification={true} />
-          </View>
+            <OrderStatusButton
+              title="Đánh giá"
+              hasNotification={true}
+              // Xử lý sau
+            />
+          </ScrollView>
         </View>
 
         {/* Phần Khoảnh khắc/Stories Video */}
@@ -360,12 +404,22 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 22,
     fontWeight: "700",
     color: COLOR.dark,
-    marginBottom: 16,
     letterSpacing: -0.5,
+  },
+  seeHistoryText: {
+    fontSize: 14,
+    color: COLOR.blue,
+    fontWeight: "600",
   },
   horizontalScroll: {
     gap: 16,
