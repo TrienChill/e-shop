@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
@@ -16,6 +17,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width } = Dimensions.get("window");
 
 // Bảng màu hệ thống
@@ -113,7 +115,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="dark-content" />
       {/* Phần Header (Ảnh đại diện và các nút chức năng) */}
       <CommonHeader
@@ -296,7 +298,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLOR.white,
-    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
   },
   scrollContent: {
     paddingHorizontal: 24,

@@ -1,3 +1,4 @@
+// eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -26,6 +27,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const COLORS = {
@@ -166,6 +168,7 @@ export default function ToReceiveScreen() {
 
   useEffect(() => {
     fetchOrders(selectedStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStatus, isAscending]);
 
   const toggleSort = () => {
@@ -285,7 +288,7 @@ export default function ToReceiveScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}

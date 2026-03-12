@@ -1,5 +1,6 @@
 import React from "react";
-import { Platform, StatusBar, StyleSheet, View, ViewStyle } from "react-native";
+import { StyleSheet, View, ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface CommonHeaderProps {
   children?: React.ReactNode;
@@ -17,8 +18,16 @@ export const CommonHeader: React.FC<CommonHeaderProps> = ({
   renderRight,
   containerStyle,
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={[styles.headerContainer, containerStyle]}>
+    <View
+      style={[
+        styles.headerContainer,
+        { paddingTop: insets.top + 5 }, // Thêm một chút padding sau khi tính safe area
+        containerStyle,
+      ]}
+    >
       <View style={styles.header}>
         <View style={styles.headerLeft}>{renderLeft?.()}</View>
         <View style={styles.headerRight}>{renderRight?.()}</View>
