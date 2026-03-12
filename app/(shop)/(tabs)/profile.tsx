@@ -1,3 +1,4 @@
+import CommonHeader from "@/src/components/layout/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { ArrowRight, Bell, Play, Settings, Ticket } from "lucide-react-native";
@@ -14,7 +15,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import CommonHeader from "@/src/components/layout/Header";
 
 const { width } = Dimensions.get("window");
 
@@ -193,14 +193,16 @@ export default function ProfileScreen() {
         {/* Phần trạng thái Đơn hàng của tôi */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Đơn hàng của tôi</Text>
+          <Text>Xem lịch sử mua hàng</Text>
           <View style={styles.orderTabs}>
-            <OrderStatusButton title="Chờ t.toán" />
+            <OrderStatusButton title="Chờ xác nhận" hasNotification={true} />
+            <OrderStatusButton title="Chờ lấy hàng" hasNotification={true} />
             <OrderStatusButton
-              title="Đang giao"
+              title="Chờ giao hàng"
               hasNotification={true}
               onPress={() => router.push("/to-receive")}
             />
-            <OrderStatusButton title="Đánh giá" />
+            <OrderStatusButton title="Đánh giá" hasNotification={true} />
           </View>
         </View>
 
