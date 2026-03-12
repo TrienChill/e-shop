@@ -24,6 +24,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import CommonHeader from "@/src/components/layout/Header";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -289,46 +290,52 @@ export default function ToReceiveScreen() {
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            onPress={() => router.push("/(shop)/(tabs)/profile")}
-            style={styles.backBtnHeader}
-          >
-            <ChevronLeft size={28} color={COLORS.secondary} />
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle}>Lịch sử mua hàng</Text>
-            <Text style={styles.headerSubtitle}>Đơn hàng của tôi</Text>
-          </View>
-        </View>
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.iconButton, !isAscending && styles.iconButtonActive]}
-            activeOpacity={0.7}
-            onPress={toggleSort}
-          >
-            <ArrowUpDown
-              size={22}
-              color={!isAscending ? COLORS.white : COLORS.primary}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.iconButton,
-              selectedStatus !== "all" && { backgroundColor: COLORS.primary },
-            ]}
-            onPress={() => setShowFilter(true)}
-          >
-            <Filter
-              size={22}
-              color={selectedStatus !== "all" ? COLORS.white : COLORS.primary}
-            />
-            {selectedStatus !== "all" && <View style={styles.activeDot} />}
-          </TouchableOpacity>
-        </View>
-      </View>
+      <CommonHeader
+        renderLeft={() => (
+          <>
+            <TouchableOpacity
+              onPress={() => router.push("/(shop)/(tabs)/profile")}
+              style={styles.backBtnHeader}
+            >
+              <ChevronLeft size={28} color={COLORS.secondary} />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <Text style={styles.headerTitle}>Lịch sử mua hàng</Text>
+              <Text style={styles.headerSubtitle}>Đơn hàng của tôi</Text>
+            </View>
+          </>
+        )}
+        renderRight={() => (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                !isAscending && styles.iconButtonActive,
+              ]}
+              activeOpacity={0.7}
+              onPress={toggleSort}
+            >
+              <ArrowUpDown
+                size={22}
+                color={!isAscending ? COLORS.white : COLORS.primary}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.iconButton,
+                selectedStatus !== "all" && { backgroundColor: COLORS.primary },
+              ]}
+              onPress={() => setShowFilter(true)}
+            >
+              <Filter
+                size={22}
+                color={selectedStatus !== "all" ? COLORS.white : COLORS.primary}
+              />
+              {selectedStatus !== "all" && <View style={styles.activeDot} />}
+            </TouchableOpacity>
+          </>
+        )}
+      />
 
       {/* Modal Bộ lọc trạng thái */}
       <Modal
@@ -439,13 +446,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
   },
   headerLeft: {
     flexDirection: "row",

@@ -6,7 +6,6 @@ import {
   Dimensions,
   Image,
   Platform,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -14,6 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import CommonHeader from "@/src/components/layout/Header";
 
 const { width } = Dimensions.get("window");
 
@@ -114,13 +115,10 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Phần Header (Ảnh đại diện và các nút chức năng) */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
+      {/* Phần Header (Ảnh đại diện và các nút chức năng) */}
+      <CommonHeader
+        renderLeft={() => (
+          <>
             <Image
               source={{
                 uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
@@ -133,8 +131,10 @@ export default function ProfileScreen() {
             >
               <Text style={styles.myActivityText}>Hoạt động</Text>
             </TouchableOpacity>
-          </View>
-          <View style={styles.headerRight}>
+          </>
+        )}
+        renderRight={() => (
+          <>
             <TouchableOpacity style={styles.iconButton}>
               <Ticket size={22} color={COLOR.dark} />
             </TouchableOpacity>
@@ -145,12 +145,17 @@ export default function ProfileScreen() {
             <TouchableOpacity style={styles.iconButton} onPress={logout}>
               <Settings size={22} color={COLOR.dark} />
             </TouchableOpacity>
-          </View>
-        </View>
+          </>
+        )}
+      />
 
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Lời chào mừng */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>Chào, Amanda!</Text>
+          <Text style={styles.welcomeText}>Chào, Triển Chill!</Text>
         </View>
 
         {/* Khung Thông báo (Announcement Card) */}
@@ -250,12 +255,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop: 10,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
+    paddingBottom: 20,
   },
   headerLeft: {
     flexDirection: "row",
