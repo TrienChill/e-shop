@@ -16,10 +16,10 @@ import {
   getLatestProducts,
   getMostPopularProducts,
   getTopSellingProducts,
-  calculateDiscountedPrice
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 
 const { width } = Dimensions.get("window");
 
@@ -245,26 +245,13 @@ const HomeScreen = () => {
                   <Text style={styles.productName} numberOfLines={1}>
                     {product.name}
                   </Text>
-                  
-                  <View style={styles.priceContainer}>
-                    {product.hasDiscount ? (
-                      <>
-                        {/* Giá mới đã giảm (Màu đỏ) */}
-                        <Text style={styles.finalPrice}>
-                          {product.finalPrice?.toLocaleString("vi-VN")}₫
-                        </Text>
-                        {/* Giá gốc bị gạch ngang */}
-                        <Text style={styles.originalPriceStrikethrough}>
-                          {product.originalPrice?.toLocaleString("vi-VN")}₫
-                        </Text>
-                      </>
-                    ) : (
-                      /* Nếu không có giảm giá thì dùng style chữ đen ban đầu */
-                      <Text style={styles.productPrice}>
-                        {product.originalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                    )}
-                  </View>
+                  <PriceDisplay
+                    hasDiscount={product.hasDiscount}
+                    finalPrice={product.finalPrice}
+                    originalPrice={product.originalPrice}
+                    size="sm"
+                    justify="center"
+                  />
                 </View>
               </TouchableOpacity>
             ))}
@@ -309,22 +296,12 @@ const HomeScreen = () => {
                 <Text style={styles.productName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
-                  {item.hasDiscount ? (
-                    <>
-                      <Text style={styles.finalPrice}>
-                        {item.finalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                      <Text style={styles.originalPriceStrikethrough}>
-                        {item.originalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.productPrice}>
-                      {item.originalPrice?.toLocaleString("vi-VN")}₫
-                    </Text>
-                  )}
-                </View>
+                <PriceDisplay
+                  hasDiscount={item.hasDiscount}
+                  finalPrice={item.finalPrice}
+                  originalPrice={item.originalPrice}
+                  size="md"
+                />
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -409,22 +386,12 @@ const HomeScreen = () => {
                 <Text style={styles.popularName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
-                  {item.hasDiscount ? (
-                    <>
-                      <Text style={styles.finalPrice}>
-                        {item.finalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                      <Text style={styles.originalPriceStrikethrough}>
-                        {item.originalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.popularPrice}>
-                      {item.originalPrice?.toLocaleString("vi-VN")}₫
-                    </Text>
-                  )}
-                </View>
+                <PriceDisplay
+                  hasDiscount={item.hasDiscount}
+                  finalPrice={item.finalPrice}
+                  originalPrice={item.originalPrice}
+                  size="md"
+                />
               </TouchableOpacity>
             ))}
           </View>
@@ -448,22 +415,12 @@ const HomeScreen = () => {
                 <Text style={styles.justForYouName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
-                  {item.hasDiscount ? (
-                    <>
-                      <Text style={styles.finalPrice}>
-                        {item.finalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                      <Text style={styles.originalPriceStrikethrough}>
-                        {item.originalPrice?.toLocaleString("vi-VN")}₫
-                      </Text>
-                    </>
-                  ) : (
-                    <Text style={styles.justForYouPrice}>
-                      {item.originalPrice?.toLocaleString("vi-VN")}₫
-                    </Text>
-                  )}
-                </View>
+                <PriceDisplay
+                  hasDiscount={item.hasDiscount}
+                  finalPrice={item.finalPrice}
+                  originalPrice={item.originalPrice}
+                  size="md"
+                />
               </View>
             ))}
           </View>
@@ -686,24 +643,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#1f2937",
-  },
-  priceContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 4,
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 6, // Khoảng cách giữa giá mới và giá cũ
-  },
-  finalPrice: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#EF4444", // Màu đỏ nổi bật cho giá đang bán
-  },
-  originalPriceStrikethrough: {
-    fontSize: 12,
-    color: "#9CA3AF", // Màu xám nhạt
-    textDecorationLine: "line-through", // Hiệu ứng gạch ngang
   },
 
   // Flash Sale

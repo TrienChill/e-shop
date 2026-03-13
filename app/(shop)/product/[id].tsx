@@ -24,6 +24,7 @@ import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supaba
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import { calculateDiscountedPrice, getPopularProducts } from "@/src/services/product";
 
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -411,22 +412,12 @@ export default function ProductDetailScreen() {
         {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
           <View style={styles.priceRow}>
-            {product.hasDiscount ? (
-              <View style={styles.discountPriceContainer}>
-                <Text style={styles.finalDetailPrice}>
-                  {formatVND(product.finalPrice)}
-                  <Text style={{ fontSize: 18 }}> đ</Text>
-                </Text>
-                <Text style={styles.originalDetailPrice}>
-                  {formatVND(product.originalPrice)}₫
-                </Text>
-              </View>
-            ) : (
-              <Text style={styles.price}>
-                {product.originalPrice ? formatVND(product.originalPrice) : "0"}
-                <Text style={{ fontSize: 19 }}> đ</Text>
-              </Text>
-            )}
+            <PriceDisplay
+              hasDiscount={product.hasDiscount}
+              finalPrice={product.finalPrice}
+              originalPrice={product.originalPrice ?? product.price ?? 0}
+              size="lg"
+            />
             <TouchableOpacity style={styles.shareBtn} activeOpacity={0.7}>
               <Share2 size={16} color="#3B82F6" />
             </TouchableOpacity>
@@ -743,22 +734,12 @@ export default function ProductDetailScreen() {
                 style={styles.modalThumbnail}
               />
               <View style={styles.modalProductInfo}>
-                {product?.hasDiscount ? (
-                  <View style={styles.modalDiscountContainer}>
-                    <Text style={styles.modalFinalPrice}>
-                      {formatVND(product.finalPrice)}
-                      <Text style={{ fontSize: 14 }}> đ</Text>
-                    </Text>
-                    <Text style={styles.modalOriginalPrice}>
-                      {formatVND(product.originalPrice)}₫
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.modalPrice}>
-                    {product?.originalPrice ? formatVND(product.originalPrice) : "0"}
-                    <Text style={{ fontSize: 16 }}> đ</Text>
-                  </Text>
-                )}
+                <PriceDisplay
+                  hasDiscount={product?.hasDiscount}
+                  finalPrice={product?.finalPrice}
+                  originalPrice={product?.originalPrice ?? 0}
+                  size="sm"
+                />
                 <View style={styles.modalSelectedChips}>
                   <Text style={styles.modalChipText}>
                     {selectedColor?.color
@@ -1010,23 +991,7 @@ const styles = StyleSheet.create({
     color: "#111827",
     letterSpacing: 0.3,
   },
-  discountPriceContainer: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 10,
-  },
-  finalDetailPrice: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#EF4444",
-    letterSpacing: 0.3,
-  },
-  originalDetailPrice: {
-    fontSize: 16,
-    color: "#9CA3AF",
-    textDecorationLine: "line-through",
-    fontWeight: "500",
-  },
+
   shareBtn: {
     width: 36,
     height: 36,

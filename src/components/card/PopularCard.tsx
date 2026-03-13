@@ -10,11 +10,7 @@ import {
     View,
     ViewStyle,
 } from "react-native";
-
-// Hàm định dạng tiền tệ VNĐ
-const formatVND = (price: number) => {
-  return price?.toLocaleString("vi-VN") || "0";
-};
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 
 export interface PopularProductItem {
   id: string | number;
@@ -23,6 +19,9 @@ export interface PopularProductItem {
   name: string;
   badge?: string;
   badgeColor?: string;
+  hasDiscount?: boolean;
+  finalPrice?: number;
+  originalPrice?: number;
 }
 
 interface PopularCardProps {
@@ -70,10 +69,12 @@ export function PopularCard({ item, style }: PopularCardProps) {
         </View>
 
         <View style={styles.infoContent}>
-          <Text style={styles.popularPrice}>
-            {formatVND(item.price)}
-            <Text style={styles.currencySymbol}> đ</Text>
-          </Text>
+          <PriceDisplay
+            hasDiscount={item.hasDiscount}
+            finalPrice={item.finalPrice}
+            originalPrice={item.originalPrice ?? item.price}
+            size="sm"
+          />
           <Text style={styles.popularName} numberOfLines={1}>
             {item.name}
           </Text>
@@ -143,19 +144,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
-  popularPrice: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  currencySymbol: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
+
   popularName: {
     fontSize: 13,
     color: "#6B7280",
-    marginTop: 4,
+    marginTop: 2,
   },
 });
 

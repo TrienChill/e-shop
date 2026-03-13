@@ -112,9 +112,35 @@ export const getMostPopularProducts = async () => {
     return [];
   }
 
-  // Đối với rpc, nếu chưa có thông tin discount thì cần fetch thêm hoặc xử lý sau.
-  // Ở đây chúng ta tạm thời lấy data và map nếu có thông tin (RPC get_most_popular_products nên được cập nhật để join discounts)
-  return data.map(calculateDiscountedPrice);
+  // Nếu RPC không trả về product_discounts, chúng ta cần fetch thêm details
+  // Lấy danh sách ID
+  const productIds = data.map((p: any) => p.id);
+  
+  if (productIds.length === 0) return [];
+
+  // Fetch lại details kèm discounts
+  const { data: enrichedProducts, error: enrichError } = await supabase
+    .from("products")
+    .select(`
+      *,
+      product_discounts (
+        discounts (*)
+      )
+    `)
+    .in("id", productIds);
+
+  if (enrichError) {
+    console.error("Lỗi enrich sản phẩm phổ biến:", enrichError);
+    return data.map(calculateDiscountedPrice);
+  }
+
+  // Sắp xếp lại theo thứ tự của RPC ban đầu
+  const result = productIds.map((id: any) => {
+    const product = enrichedProducts.find((p) => p.id === id);
+    return calculateDiscountedPrice(product);
+  });
+
+  return result;
 };
 
 // Lấy 20 sản phẩm có lượt bán cao hoặc mới nhất, sau đó dùng hàm sort(() => Math.random() - 0.5) để chọn ra 4 cái ngẫu nhiên hiển thị.
@@ -123,7 +149,12 @@ export const getPopularProducts = async (currentProductId?: string) => {
     // 1. Lấy danh sách sản phẩm đang hoạt động
     let query = supabase
       .from("products")
-      .select("*")
+      .select(`
+        *,
+        product_discounts (
+          discounts (*)
+        )
+      `)
       .eq("is_active", true)
       .limit(20); // Lấy ứng viên từ 20 sản phẩm mới/hot nhất
 
@@ -135,10 +166,13 @@ export const getPopularProducts = async (currentProductId?: string) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    // 3. Xáo trộn ngẫu nhiên để tạo sự mới mẻ mỗi lần load
-    const shuffled = (data || []).sort(() => Math.random() - 0.5);
+    // 3. Tính toán giá giảm giá
+    const processed = (data || []).map(calculateDiscountedPrice);
 
-    // 4. Trả về 4 sản phẩm
+    // 4. Xáo trộn ngẫu nhiên để tạo sự mới mẻ mỗi lần load
+    const shuffled = processed.sort(() => Math.random() - 0.5);
+
+    // 5. Trả về 4 sản phẩm
     return shuffled.slice(0, 4);
   } catch (error) {
     console.error("Lỗi lấy sản phẩm phổ biến:", error);

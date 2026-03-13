@@ -1,6 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
+    Check,
     ChevronLeft,
     X as CloseIcon,
     Minus,
@@ -31,8 +32,10 @@ import {
     PopularCard,
     PopularProductItem,
 } from "../../../src/components/card/PopularCard";
+import { PriceDisplay } from "../../../src/components/common/PriceDisplay";
 import { supabase } from "../../../src/lib/supabase";
 import {
+    calculateDiscountedPrice,
     COLOR_TRANSLATIONS,
     getProductImageByColor,
 } from "../../../src/services/product";
@@ -46,6 +49,12 @@ interface CartItem {
   price: number;
   image: string;
   quantity: number;
+  /** Giá gốc (trước giảm giá) */
+  originalPrice: number;
+  /** Giá sau khi giảm */
+  finalPrice: number;
+  /** Có đang áp dụng giảm giá không */
+  hasDiscount: boolean;
 }
 
 interface WishlistItem {
@@ -65,6 +74,9 @@ const INITIAL_CART: CartItem[] = [
     size: "M",
     color: "Hồng",
     price: 170000,
+    originalPrice: 170000,
+    finalPrice: 170000,
+    hasDiscount: false,
     image:
       "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80",
     quantity: 1,
@@ -75,6 +87,9 @@ const INITIAL_CART: CartItem[] = [
     size: "M",
     color: "Hồng",
     price: 170000,
+    originalPrice: 170000,
+    finalPrice: 170000,
+    hasDiscount: false,
     image:
       "https://images.unsplash.com/photo-1529139574466-a303027614a4?w=400&q=80",
     quantity: 1,
@@ -154,27 +169,23 @@ const CartItemRow = ({
   item,
   onIncrease,
   onDecrease,
-  onDelete,
+  isSelected,
+  onToggleSelect,
 }: {
   item: CartItem;
   onIncrease: (id: string) => void;
   onDecrease: (id: string) => void;
-  onDelete: (id: string) => void;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
 }) => (
   <View style={styles.cartRow}>
-    {/* Image + delete */}
+    {/* Image (không còn nút xoá) */}
     <View style={styles.cartImageWrap}>
       <Image
         source={{ uri: item.image }}
         style={styles.cartImage}
         resizeMode="cover"
       />
-      <TouchableOpacity
-        style={styles.deleteBtn}
-        onPress={() => onDelete(item.id)}
-      >
-        <Trash2 size={16} color={C.sub} />
-      </TouchableOpacity>
     </View>
 
     {/* Details */}
@@ -182,9 +193,14 @@ const CartItemRow = ({
       <Text style={styles.cartName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.cartMeta}>
-        {item.price.toLocaleString("vi-VN")} đ
-      </Text>
+
+      {/* Giá: dùng PriceDisplay để hiển thị giảm giá nếu có */}
+      <PriceDisplay
+        hasDiscount={item.hasDiscount}
+        finalPrice={item.finalPrice}
+        originalPrice={item.originalPrice}
+        size="sm"
+      />
 
       {/* Color + Size tags */}
       <View style={styles.tagsRow}>
@@ -214,6 +230,15 @@ const CartItemRow = ({
         </TouchableOpacity>
       </View>
     </View>
+
+    {/* ── Checkbox tích chọn (bên phải) ── */}
+    <TouchableOpacity
+      style={[styles.checkbox, isSelected && styles.checkboxChecked]}
+      onPress={() => onToggleSelect(item.id)}
+      activeOpacity={0.7}
+    >
+      {isSelected && <Check size={13} color="#fff" strokeWidth={3} />}
+    </TouchableOpacity>
   </View>
 );
 
@@ -415,11 +440,50 @@ export default function CartScreen() {
         return prev.map((i) =>
           i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
         );
-      return [...prev, { ...item, quantity: 1 }];
+      // Bổ sung các trường discount mặc định (wishlist item chưa có discount info)
+      const newItem: CartItem = {
+        ...item,
+        originalPrice: item.price,
+        finalPrice: item.price,
+        hasDiscount: false,
+        quantity: 1,
+      };
+      return [...prev, newItem];
     });
   };
 
-  const total = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+  // ── State tích chọn sản phẩm ──────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllSelected =
+    cartItems.length > 0 && selectedIds.size === cartItems.length;
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(cartItems.map((i) => i.id)));
+    }
+  };
+
+  // Tính tổng theo giá đã giảm (chỉ tính sản phẩm được tích chọn)
+  const total = cartItems
+    .filter((i) => selectedIds.has(i.id))
+    .reduce((s, i) => s + i.finalPrice * i.quantity, 0);
+  // Tổng giá gốc – dùng để tính mức tiết kiệm
+  const subtotal = cartItems
+    .filter((i) => selectedIds.has(i.id))
+    .reduce((s, i) => s + i.originalPrice * i.quantity, 0);
+  const savings = subtotal - total;
   const isEmpty = cartItems.length === 0;
   const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
 
@@ -452,7 +516,10 @@ export default function CartScreen() {
           name,
           price,
           images,
-          variants
+          variants,
+          product_discounts (
+            discounts (*)
+          )
         )
       `,
         )
@@ -466,18 +533,26 @@ export default function CartScreen() {
         const productInfo = item.products;
         const selectedColor = item.color; // Ví dụ: "White"
 
+        // Tính giá giảm giá dựa trên product_discounts
+        const withDiscount = calculateDiscountedPrice(productInfo);
+
         return {
           id: item.id,
           name: productInfo.name,
           size: item.size || "M",
-          color: COLOR_TRANSLATIONS[selectedColor] || selectedColor, // Dịch "White" thành "Trắng"
+          color: COLOR_TRANSLATIONS[selectedColor?.toLowerCase()] || selectedColor,
           price: productInfo.price,
+          originalPrice: withDiscount.originalPrice,
+          finalPrice: withDiscount.finalPrice,
+          hasDiscount: withDiscount.hasDiscount,
           image: getProductImageByColor(productInfo, selectedColor),
           quantity: item.quantity,
         };
       });
 
       setCartItems(formattedCart);
+      // Mặc định tích chọn tất cả sản phẩm khi load
+      setSelectedIds(new Set(formattedCart.map((i) => i.id)));
     } catch (error) {
       console.error("Lỗi tải giỏ hàng:", error);
     } finally {
@@ -570,13 +645,35 @@ export default function CartScreen() {
           <EmptyCartState />
         ) : (
           <View style={styles.section}>
+            {/* ── Chọn tất cả ── */}
+            <TouchableOpacity
+              style={styles.selectAllRow}
+              onPress={toggleSelectAll}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  isAllSelected && styles.checkboxChecked,
+                ]}
+              >
+                {isAllSelected && (
+                  <Check size={13} color="#fff" strokeWidth={3} />
+                )}
+              </View>
+              <Text style={styles.selectAllText}>
+                Chọn tất cả ({cartItems.length})
+              </Text>
+            </TouchableOpacity>
+
             {cartItems.map((item) => (
               <CartItemRow
                 key={item.id}
                 item={item}
                 onIncrease={increase}
                 onDecrease={decrease}
-                onDelete={deleteItem}
+                isSelected={selectedIds.has(item.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </View>
@@ -625,11 +722,19 @@ export default function CartScreen() {
 
       {/* ── Fixed Footer ── */}
       <View style={styles.footer}>
-        <View style={styles.totalWrap}>
-          <Text style={styles.totalLabel}>Tổng cộng</Text>
-          <Text style={styles.totalValue}>
-            {total.toLocaleString("vi-VN")} đ
-          </Text>
+        <View style={styles.footerLeft}>
+          {/* Dòng Tiết kiệm (chỉ hiện khi có giảm giá) */}
+          {savings > 0 && (
+            <Text style={styles.savingsText}>
+              Tiết kiệm ↓ {savings.toLocaleString("vi-VN")} đ
+            </Text>
+          )}
+          <View style={styles.totalWrap}>
+            <Text style={styles.totalLabel}>Tổng cộng</Text>
+            <Text style={styles.totalValue}>
+              {total.toLocaleString("vi-VN")} đ
+            </Text>
+          </View>
         </View>
         <TouchableOpacity
           style={[styles.checkoutBtn, isEmpty && styles.checkoutBtnDisabled]}
@@ -851,7 +956,38 @@ const styles = StyleSheet.create({
   },
   cartDetails: { flex: 1, paddingVertical: 4, justifyContent: "space-between" },
   cartName: { fontSize: 14, fontWeight: "500", color: C.text, lineHeight: 20 },
-  cartMeta: { fontSize: 16, fontWeight: "700", color: C.text },
+
+  // Checkbox
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: C.border,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "center",
+    backgroundColor: C.bg,
+  },
+  checkboxChecked: {
+    backgroundColor: C.blue,
+    borderColor: C.blue,
+  },
+  // Hàng "Chọn tất cả"
+  selectAllRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  selectAllText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.text,
+  },
 
   // Tags
   tagsRow: { flexDirection: "row", gap: 8, marginTop: 4 },
@@ -956,8 +1092,16 @@ const styles = StyleSheet.create({
     borderTopColor: C.border,
   },
   totalWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
-  totalLabel: { fontSize: 18, fontWeight: "800", color: C.text },
-  totalValue: { fontSize: 18, fontWeight: "700", color: C.text },
+  totalLabel: { fontSize: 16, fontWeight: "700", color: C.text },
+  totalValue: { fontSize: 18, fontWeight: "800", color: C.text },
+  footerLeft: { flex: 1 },
+  savingsText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#16A34A",
+    marginBottom: 2,
+    letterSpacing: 0.2,
+  },
   checkoutBtn: {
     backgroundColor: C.blue,
     paddingHorizontal: 32,

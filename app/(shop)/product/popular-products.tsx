@@ -24,12 +24,22 @@ export default function PopularProductsScreen() {
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("*")
+          .select(`
+            *,
+            product_discounts (
+              discounts (*)
+            )
+          `)
           .eq("is_active", true)
           .order("created_at", { ascending: false }); // Ưu tiên hàng mới
 
         if (error) throw error;
-        setProducts(data || []);
+        
+        // Import hàm tính toán từ service
+        const { calculateDiscountedPrice } = require("@/src/services/product");
+        const processed = (data || []).map(calculateDiscountedPrice);
+        
+        setProducts(processed);
       } catch (error) {
         console.error("Lỗi lấy danh sách sản phẩm:", error);
       } finally {
