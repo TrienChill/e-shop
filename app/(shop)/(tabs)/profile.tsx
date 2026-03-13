@@ -130,6 +130,7 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.myActivityButton}
               activeOpacity={0.8}
+              onPress={() => router.push("/my-activity")}
             >
               <Text style={styles.myActivityText}>Hoạt động</Text>
             </TouchableOpacity>
