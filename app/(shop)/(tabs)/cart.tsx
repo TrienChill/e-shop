@@ -2,8 +2,10 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
     Check,
+    ChevronDown,
     ChevronLeft,
     X as CloseIcon,
+    Lock,
     Minus,
     Pencil,
     Plus,
@@ -268,7 +270,7 @@ const WishlistRow = ({
       <Text style={styles.cartName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={styles.cartMeta}>
+      <Text style={{ fontSize: 15, fontWeight: "700", color: C.text }}>
         {item.price.toLocaleString("vi-VN")} đ
       </Text>
 
@@ -305,33 +307,108 @@ const EmptyCartState = () => (
 // ─── Shipping Address Card ─────────────────────────────────────────────────────
 const ShippingCard = ({
   address,
+  allAddresses,
+  dropdownVisible,
+  onToggleDropdown,
+  onSelectAddress,
   onEdit,
   loading,
 }: {
   address: any;
+  allAddresses: any[];
+  dropdownVisible: boolean;
+  onToggleDropdown: () => void;
+  onSelectAddress: (addr: any) => void;
   onEdit: () => void;
   loading: boolean;
 }) => (
-  <View style={styles.shippingCard}>
-    <View style={styles.shippingTextWrap}>
-      <Text style={styles.shippingTitle}>Địa chỉ giao hàng</Text>
-      {loading ? (
-        <Text style={styles.shippingAddr}>Đang tải địa chỉ...</Text>
-      ) : address ? (
-        <Text style={styles.shippingAddr}>
-          {address.receiver_name} | {address.phone_number}
-          {"\n"}
-          {address.street_address}, {address.district}, {address.province_city}
-        </Text>
-      ) : (
-        <Text style={[styles.shippingAddr, { color: "#EF4444" }]}>
-          Chưa có địa chỉ mặc định. Vui lòng thiết lập!
-        </Text>
-      )}
+  <View>
+    {/* ── Card chính ── */}
+    <View style={styles.shippingCard}>
+      {/* Nút mở dropdown (mũi tên xuống) */}
+      <TouchableOpacity
+        style={styles.dropdownTriggerBtn}
+        onPress={onToggleDropdown}
+        activeOpacity={0.7}
+      >
+        <ChevronDown size={18} color={C.blue} />
+      </TouchableOpacity>
+
+      {/* Thông tin địa chỉ đang chọn */}
+      <View style={styles.shippingTextWrap}>
+        <Text style={styles.shippingTitle}>Địa chỉ giao hàng</Text>
+        {loading ? (
+          <Text style={styles.shippingAddr}>Đang tải địa chỉ...</Text>
+        ) : address ? (
+          <Text style={styles.shippingAddr}>
+            {address.receiver_name} | {address.phone_number}
+            {"\n"}
+            {address.street_address}, {address.district},{" "}
+            {address.province_city}
+          </Text>
+        ) : (
+          <Text style={[styles.shippingAddr, { color: "#EF4444" }]}>
+            Chưa có địa chỉ mặc định. Vui lòng thiết lập!
+          </Text>
+        )}
+      </View>
+
+      {/* Nút chỉnh sửa */}
+      <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
+        <Pencil size={16} color={C.white} />
+      </TouchableOpacity>
     </View>
-    <TouchableOpacity style={styles.editBtn} onPress={onEdit}>
-      <Pencil size={16} color={C.white} />
-    </TouchableOpacity>
+
+    {/* ── Dropdown danh sách địa chỉ ── */}
+    {dropdownVisible && (
+      <View style={styles.addressDropdown}>
+        {allAddresses.length === 0 ? (
+          <Text style={styles.dropdownEmpty}>
+            Chưa có địa chỉ nào. Hãy thêm địa chỉ!
+          </Text>
+        ) : (
+          allAddresses.map((addr) => {
+            const isSelected = address?.id === addr.id;
+            return (
+              <TouchableOpacity
+                key={addr.id}
+                style={[
+                  styles.addressDropdownItem,
+                  isSelected && styles.addressDropdownItemActive,
+                ]}
+                onPress={() => onSelectAddress(addr)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.addressDropdownContent}>
+                  {/* Icon khoá nếu là địa chỉ mặc định */}
+                  {addr.is_default && (
+                    <View style={styles.defaultBadge}>
+                      <Lock size={11} color="#fff" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.addrItemName}>
+                      {addr.receiver_name}{" "}
+                      <Text style={styles.addrItemPhone}>
+                        | {addr.phone_number}
+                      </Text>
+                    </Text>
+                    <Text style={styles.addrItemDetail} numberOfLines={1}>
+                      {addr.street_address}, {addr.district},{" "}
+                      {addr.province_city}
+                    </Text>
+                  </View>
+                  {/* Dấu tích cho địa chỉ đang được chọn */}
+                  {isSelected && (
+                    <Check size={16} color={C.blue} strokeWidth={3} />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </View>
+    )}
   </View>
 );
 
@@ -490,6 +567,12 @@ export default function CartScreen() {
   // Thêm vào trong CartScreen
   const [defaultAddress, setDefaultAddress] = useState<any>(null);
   const [loadingAddress, setLoadingAddress] = useState(true);
+  // Danh sách tất cả địa chỉ của user
+  const [allAddresses, setAllAddresses] = useState<any[]>([]);
+  // Địa chỉ đang được chọn để giao hàng (có thể khác defaultAddress)
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  // Ẩn/hiện dropdown
+  const [addressDropdownVisible, setAddressDropdownVisible] = useState(false);
 
   // Thêm State để quản lý trạng thái tải giỏ hàng
   const [loadingCart, setLoadingCart] = useState(true);
@@ -562,27 +645,34 @@ export default function CartScreen() {
 
   const fetchDefaultAddress = async () => {
     try {
-      // Lấy địa chỉ được đánh dấu là mặc định của user hiện tại
+      setLoadingAddress(true);
+
+      // Lấy tất cả địa chỉ của user (không chỉ mặc định)
       const { data, error } = await supabase
         .from("user_addresses")
         .select("*")
-        .eq("is_default", true)
-        .single(); // Chỉ lấy 1 bản ghi mặc định
+        .order("is_default", { ascending: false }); // Mặc định lên đầu
 
       if (error && error.code !== "PGRST116") {
-        // PGRST116 là lỗi không tìm thấy bản ghi
         console.error("Lỗi lấy địa chỉ:", error.message);
       } else {
-        setDefaultAddress(data);
-        // Nếu tìm thấy, cập nhật luôn dữ liệu vào modal edit để đồng bộ
-        if (data) {
+        const addresses = data || [];
+        setAllAddresses(addresses);
+
+        // Tìm địa chỉ mặc định
+        const def = addresses.find((a: any) => a.is_default) || addresses[0] || null;
+        setDefaultAddress(def);
+        setSelectedAddress(def);
+
+        // Sync dữ liệu vào modal edit
+        if (def) {
           setAddressData({
-            name: data.receiver_name,
-            phone: data.phone_number,
-            city: data.province_city,
-            district: data.district,
-            street: data.street_address,
-            isDefault: data.is_default,
+            name: def.receiver_name,
+            phone: def.phone_number,
+            city: def.province_city,
+            district: def.district,
+            street: def.street_address,
+            isDefault: def.is_default,
           });
         }
       }
@@ -629,7 +719,16 @@ export default function CartScreen() {
       >
         {/* Shipping Address */}
         <ShippingCard
-          address={defaultAddress}
+          address={selectedAddress}
+          allAddresses={allAddresses}
+          dropdownVisible={addressDropdownVisible}
+          onToggleDropdown={() =>
+            setAddressDropdownVisible((v) => !v)
+          }
+          onSelectAddress={(addr) => {
+            setSelectedAddress(addr);
+            setAddressDropdownVisible(false);
+          }}
           onEdit={() => setAddressModalVisible(true)}
           loading={loadingAddress}
         />
@@ -898,9 +997,81 @@ const styles = StyleSheet.create({
     backgroundColor: C.bg2,
     borderRadius: 16,
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 0,
     padding: 16,
-    gap: 12,
+    gap: 10,
+  },
+  // Nút mở dropdown (mũi tên xuống)
+  dropdownTriggerBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EFF6FF",
+  },
+  // Dropdown container
+  addressDropdown: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: C.bg,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: C.border,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  addressDropdownItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  addressDropdownItemActive: {
+    backgroundColor: "#EFF6FF",
+  },
+  addressDropdownContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  // Badge icon khoá (địa chỉ mặc định)
+  defaultBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.blue,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addrItemName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: C.text,
+    marginBottom: 2,
+  },
+  addrItemPhone: {
+    fontWeight: "400",
+    color: C.sub,
+  },
+  addrItemDetail: {
+    fontSize: 12,
+    color: C.sub,
+    lineHeight: 17,
+  },
+  dropdownEmpty: {
+    padding: 14,
+    fontSize: 13,
+    color: C.sub,
+    textAlign: "center",
   },
   shippingTextWrap: { flex: 1 },
   shippingTitle: {
