@@ -24,7 +24,7 @@ import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supaba
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
-import { getPopularProducts } from "@/src/services/product";
+import { calculateDiscountedPrice, getPopularProducts } from "@/src/services/product";
 
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
@@ -198,12 +198,20 @@ export default function ProductDetailScreen() {
       try {
         const { data, error } = await supabase
           .from("products")
-          .select("*")
+          .select(`
+            *,
+            product_discounts (
+              discounts (*)
+            )
+          `)
           .eq("id", id)
           .single();
 
         if (error) throw error;
-        setProduct(data);
+        
+        // Tính toán giá giảm giá
+        const productWithDiscount = calculateDiscountedPrice(data);
+        setProduct(productWithDiscount);
 
         // Đảm bảo ban đầu là null
         setSelectedSize(null);
@@ -403,11 +411,22 @@ export default function ProductDetailScreen() {
         {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
           <View style={styles.priceRow}>
-            {/* Lấy giá từ state product */}
-            <Text style={styles.price}>
-              {product.price ? formatVND(product.price) : "0"}
-              <Text style={{ fontSize: 19 }}> đ</Text>
-            </Text>
+            {product.hasDiscount ? (
+              <View style={styles.discountPriceContainer}>
+                <Text style={styles.finalDetailPrice}>
+                  {formatVND(product.finalPrice)}
+                  <Text style={{ fontSize: 18 }}> đ</Text>
+                </Text>
+                <Text style={styles.originalDetailPrice}>
+                  {formatVND(product.originalPrice)}₫
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.price}>
+                {product.originalPrice ? formatVND(product.originalPrice) : "0"}
+                <Text style={{ fontSize: 19 }}> đ</Text>
+              </Text>
+            )}
             <TouchableOpacity style={styles.shareBtn} activeOpacity={0.7}>
               <Share2 size={16} color="#3B82F6" />
             </TouchableOpacity>
@@ -724,10 +743,22 @@ export default function ProductDetailScreen() {
                 style={styles.modalThumbnail}
               />
               <View style={styles.modalProductInfo}>
-                <Text style={styles.modalPrice}>
-                  {product?.price ? formatVND(product.price) : "0"}
-                  <Text style={{ fontSize: 16 }}> đ</Text>
-                </Text>
+                {product?.hasDiscount ? (
+                  <View style={styles.modalDiscountContainer}>
+                    <Text style={styles.modalFinalPrice}>
+                      {formatVND(product.finalPrice)}
+                      <Text style={{ fontSize: 14 }}> đ</Text>
+                    </Text>
+                    <Text style={styles.modalOriginalPrice}>
+                      {formatVND(product.originalPrice)}₫
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.modalPrice}>
+                    {product?.originalPrice ? formatVND(product.originalPrice) : "0"}
+                    <Text style={{ fontSize: 16 }}> đ</Text>
+                  </Text>
+                )}
                 <View style={styles.modalSelectedChips}>
                   <Text style={styles.modalChipText}>
                     {selectedColor?.color
@@ -978,6 +1009,23 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#111827",
     letterSpacing: 0.3,
+  },
+  discountPriceContainer: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+  },
+  finalDetailPrice: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#EF4444",
+    letterSpacing: 0.3,
+  },
+  originalDetailPrice: {
+    fontSize: 16,
+    color: "#9CA3AF",
+    textDecorationLine: "line-through",
+    fontWeight: "500",
   },
   shareBtn: {
     width: 36,
@@ -1312,6 +1360,20 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#111",
     marginBottom: 8,
+  },
+  modalDiscountContainer: {
+    marginBottom: 8,
+  },
+  modalFinalPrice: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#EF4444",
+  },
+  modalOriginalPrice: {
+    fontSize: 14,
+    color: "#9CA3AF",
+    textDecorationLine: "line-through",
+    marginTop: 2,
   },
   modalSelectedChips: {
     flexDirection: "row",
