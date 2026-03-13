@@ -27,7 +27,16 @@ export const getTopSellingProducts = async () => {
     // 2. Lấy tất cả sản phẩm (để làm fallback nếu không có lượt bán)
     const { data: allProducts, error: productsError } = await supabase
       .from("products")
-      .select("*")
+      .select(
+        `
+        *,
+        product_discounts (
+          discounts (
+            id, type, value, is_active, start_date, end_date
+          )
+        )
+      `,
+      )
       .eq("is_active", true);
 
     if (productsError) throw productsError;
@@ -40,7 +49,7 @@ export const getTopSellingProducts = async () => {
     });
 
     // 4. Kết hợp dữ liệu: Gán total_sold vào danh sách sản phẩm
-    const processedProducts = allProducts.map((product: any) => ({
+    const processedProducts = (allProducts || []).map((product: any) => ({
       ...product,
       total_sold: salesMap[product.id] || 0,
     }));
@@ -57,8 +66,11 @@ export const getTopSellingProducts = async () => {
       );
     });
 
+    // 5. Tính toán giá giảm giá
+    const finalProducts = sortedProducts.map(calculateDiscountedPrice);
+
     // Trả về 10 sản phẩm đầu tiên
-    return sortedProducts.slice(0, 10);
+    return finalProducts.slice(0, 10);
   } catch (error) {
     console.error("Lỗi lấy sản phẩm bán chạy:", error);
     return [];
@@ -70,17 +82,24 @@ export const getTopSellingProducts = async () => {
 export const getLatestProducts = async () => {
   const { data, error } = await supabase
     .from("products")
-    .select("*")
-    .order("created_at", { ascending: false }) // Mới nhất lên đầu
+    .select(
+      `
+      *,
+      product_discounts (
+        discounts (*)
+      )
+    `,
+    ) // Phải có đoạn join này để tránh undefined
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) {
     console.error("Lỗi lấy sản phẩm mới:", error);
     return [];
   }
-  return data;
+  return (data || []).map(calculateDiscountedPrice);
 };
-
 // Lấy 10 sản phẩm nổi tiếng nhất (dựa trên số lượt xem, đánh giá và bán hàng)
 
 // src/services/product.ts
@@ -92,7 +111,10 @@ export const getMostPopularProducts = async () => {
     console.error("Lỗi fetch sản phẩm phổ biến:", error);
     return [];
   }
-  return data;
+
+  // Đối với rpc, nếu chưa có thông tin discount thì cần fetch thêm hoặc xử lý sau.
+  // Ở đây chúng ta tạm thời lấy data và map nếu có thông tin (RPC get_most_popular_products nên được cập nhật để join discounts)
+  return data.map(calculateDiscountedPrice);
 };
 
 // Lấy 20 sản phẩm có lượt bán cao hoặc mới nhất, sau đó dùng hàm sort(() => Math.random() - 0.5) để chọn ra 4 cái ngẫu nhiên hiển thị.
@@ -164,4 +186,47 @@ export const getProductImageByColor = (product: any, color: string): string => {
   }
 
   return imageUrl;
+};
+
+// Hàm tính toán giá đã giảm
+export const calculateDiscountedPrice = (product: any) => {
+  let finalPrice = product.price;
+  let hasDiscount = false;
+
+  // Đảm bảo lấy được mảng discounts, kể cả khi Supabase trả về object đơn lẻ hoặc undefined
+  const discountsArray = Array.isArray(product.product_discounts)
+    ? product.product_discounts
+    : product.product_discounts
+      ? [product.product_discounts]
+      : [];
+
+  // Tìm discount đang active
+  const activeDiscountObj = discountsArray.find((pd: any) => {
+    const d = pd.discounts;
+    if (!d) return false;
+
+    const now = new Date();
+    const startDate = new Date(d.start_date);
+    const endDate = d.end_date ? new Date(d.end_date) : null;
+
+    return d.is_active && startDate <= now && (!endDate || endDate >= now);
+  });
+
+  const activeDiscount = activeDiscountObj?.discounts;
+
+  if (activeDiscount) {
+    hasDiscount = true;
+    if (activeDiscount.type === "percentage") {
+      finalPrice = product.price - (product.price * activeDiscount.value) / 100;
+    } else {
+      finalPrice = Math.max(0, product.price - activeDiscount.value);
+    }
+  }
+
+  return {
+    ...product,
+    originalPrice: product.price,
+    finalPrice: finalPrice,
+    hasDiscount: hasDiscount,
+  };
 };

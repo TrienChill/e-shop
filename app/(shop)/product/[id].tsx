@@ -1,25 +1,23 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-    ArrowLeft,
-    ChevronRight,
-    Heart,
-    Share2,
-    ShoppingCart,
-    Star,
-    Tag,
+  ArrowLeft,
+  ChevronRight,
+  Heart,
+  Share2,
+  Star
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Dimensions,
-    Image,
-    Modal,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
@@ -693,15 +691,6 @@ export default function ProductDetailScreen() {
               color={wishlist ? "#EF4444" : "#fff"}
               fill={wishlist ? "#EF4444" : "transparent"}
             />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.actionIcon} activeOpacity={0.7}>
-            <ShoppingCart size={22} color="#fff" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.discountBadge} activeOpacity={0.7}>
-            <Tag size={14} color="#FBBF24" />
-            <Text style={styles.discountText}>GIẢM 10%</Text>
           </TouchableOpacity>
         </View>
 

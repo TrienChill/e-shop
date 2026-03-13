@@ -16,6 +16,7 @@ import {
   getLatestProducts,
   getMostPopularProducts,
   getTopSellingProducts,
+  calculateDiscountedPrice
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -52,26 +53,34 @@ const FLASH_SALE_PRODUCTS = [
 const JUST_FOR_YOU = [
   {
     id: "1",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$2.00",
+    name: "Cotton T-Shirt Classic",
+    originalPrice: 250000,
+    finalPrice: 200000,
+    hasDiscount: true,
     image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400",
   },
   {
     id: "2",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$2.00",
+    name: "Summer Floral Dress",
+    originalPrice: 450000,
+    finalPrice: 450000,
+    hasDiscount: false,
     image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400",
   },
   {
     id: "3",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$2.00",
+    name: "Denim Jacket Vintage",
+    originalPrice: 850000,
+    finalPrice: 650000,
+    hasDiscount: true,
     image: "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=400",
   },
   {
     id: "4",
-    name: "Lorem Ipsum is simply dummy text of the",
-    price: "$2.00",
+    name: "Slim Fit Chinos",
+    originalPrice: 350000,
+    finalPrice: 350000,
+    hasDiscount: false,
     image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400",
   },
 ];
@@ -90,7 +99,7 @@ const HomeScreen = () => {
         const data = await getTopSellingProducts();
         setTopProducts(data);
       } catch (error) {
-        console.error("Lỗi lấy sản phẩm bán chạy:", error);
+        console.error("Lỗi lấy sản phẩm:", error);
       }
     };
     fetchTopProducts();
@@ -231,6 +240,32 @@ const HomeScreen = () => {
                     resizeMode="cover"
                   />
                 </View>
+                {/* Thông tin sản phẩm */}
+                <View style={styles.productInfo}>
+                  <Text style={styles.productName} numberOfLines={1}>
+                    {product.name}
+                  </Text>
+                  
+                  <View style={styles.priceContainer}>
+                    {product.hasDiscount ? (
+                      <>
+                        {/* Giá mới đã giảm (Màu đỏ) */}
+                        <Text style={styles.finalPrice}>
+                          {product.finalPrice?.toLocaleString("vi-VN")}₫
+                        </Text>
+                        {/* Giá gốc bị gạch ngang */}
+                        <Text style={styles.originalPriceStrikethrough}>
+                          {product.originalPrice?.toLocaleString("vi-VN")}₫
+                        </Text>
+                      </>
+                    ) : (
+                      /* Nếu không có giảm giá thì dùng style chữ đen ban đầu */
+                      <Text style={styles.productPrice}>
+                        {product.originalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                    )}
+                  </View>
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -274,10 +309,22 @@ const HomeScreen = () => {
                 <Text style={styles.productName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.productPrice}>
-                  {/* Định dạng tiền tệ nếu cần, ví dụ: item.price.toLocaleString() */}
-                  ${item.price}
-                </Text>
+                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
+                  {item.hasDiscount ? (
+                    <>
+                      <Text style={styles.finalPrice}>
+                        {item.finalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                      <Text style={styles.originalPriceStrikethrough}>
+                        {item.originalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.productPrice}>
+                      {item.originalPrice?.toLocaleString("vi-VN")}₫
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -362,7 +409,22 @@ const HomeScreen = () => {
                 <Text style={styles.popularName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.popularPrice}>${item.price}</Text>
+                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
+                  {item.hasDiscount ? (
+                    <>
+                      <Text style={styles.finalPrice}>
+                        {item.finalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                      <Text style={styles.originalPriceStrikethrough}>
+                        {item.originalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.popularPrice}>
+                      {item.originalPrice?.toLocaleString("vi-VN")}₫
+                    </Text>
+                  )}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -386,7 +448,22 @@ const HomeScreen = () => {
                 <Text style={styles.justForYouName} numberOfLines={2}>
                   {item.name}
                 </Text>
-                <Text style={styles.justForYouPrice}>{item.price}</Text>
+                <View style={[styles.priceContainer, { justifyContent: "flex-start" }]}>
+                  {item.hasDiscount ? (
+                    <>
+                      <Text style={styles.finalPrice}>
+                        {item.finalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                      <Text style={styles.originalPriceStrikethrough}>
+                        {item.originalPrice?.toLocaleString("vi-VN")}₫
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={styles.justForYouPrice}>
+                      {item.originalPrice?.toLocaleString("vi-VN")}₫
+                    </Text>
+                  )}
+                </View>
               </View>
             ))}
           </View>
@@ -578,6 +655,12 @@ const styles = StyleSheet.create({
     borderRadius: 32,
   },
 
+  productInfo: {
+    marginTop: 8,
+    alignItems: "center",
+    width: 80,
+  },
+
   // New Items & Product Cards
   horizontalList: {
     paddingHorizontal: 16,
@@ -603,6 +686,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#1f2937",
+  },
+  priceContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 6, // Khoảng cách giữa giá mới và giá cũ
+  },
+  finalPrice: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#EF4444", // Màu đỏ nổi bật cho giá đang bán
+  },
+  originalPriceStrikethrough: {
+    fontSize: 12,
+    color: "#9CA3AF", // Màu xám nhạt
+    textDecorationLine: "line-through", // Hiệu ứng gạch ngang
   },
 
   // Flash Sale
