@@ -4,7 +4,7 @@ import {
   ChevronRight,
   Heart,
   Share2,
-  Star
+  Star,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -25,7 +25,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
-import { calculateDiscountedPrice, getPopularProducts } from "@/src/services/product";
+import {
+  calculateDiscountedPrice,
+  getPopularProducts,
+} from "@/src/services/product";
 
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
@@ -33,11 +36,6 @@ const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 const CARD_WIDTH = (SCREEN_WIDTH - 46) / 2; // Adjusted for gap
-
-// Hàm định dạng tiền tệ VNĐ (chỉ trả về chuỗi số)
-const formatVND = (price: number) => {
-  return price.toLocaleString("vi-VN");
-};
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
 
@@ -199,17 +197,19 @@ export default function ProductDetailScreen() {
       try {
         const { data, error } = await supabase
           .from("products")
-          .select(`
+          .select(
+            `
             *,
             product_discounts (
               discounts (*)
             )
-          `)
+          `,
+          )
           .eq("id", id)
           .single();
 
         if (error) throw error;
-        
+
         // Tính toán giá giảm giá
         const productWithDiscount = calculateDiscountedPrice(data);
         setProduct(productWithDiscount);
