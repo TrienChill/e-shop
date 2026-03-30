@@ -58,6 +58,15 @@ export default function ToReceiveScreen() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+    };
+    getUser();
+  }, []);
   // Lấy status từ params, nếu không có thì mặc định là "all"
   const initialStatus = (params.status as string) || "all";
   const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
@@ -84,17 +93,34 @@ export default function ToReceiveScreen() {
     try {
       setLoading(true);
 
-      let query = supabase.from("orders").select(`
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+// Trong file app/(shop)/to-receive.tsx, tìm đến hàm fetchOrders
+
+let query = supabase
+  .from("orders")
+  .select(
+    `
     id,
     status,
     total_amount,
+    created_at,
     order_items (
       quantity,
+      price_at_purchase,
+selected_variant,  
       products (
-        images
+        name,
+        images,
+        variants
       )
     )
-`);
+  `,
+  )
+  .eq("user_id", user.id);
 
       // Sửa logic lọc để xử lý trường hợp "history" (Lịch sử mua hàng)
       if (statusFilter === "history") {
@@ -112,6 +138,7 @@ export default function ToReceiveScreen() {
       const formattedOrders: OrderItem[] = data.map((order: any) => {
         // Thêm kiểm tra: nếu order_items không tồn tại, dùng mảng rỗng
         const itemsList = order.order_items || [];
+        
 
         const itemsCount = itemsList.reduce(
           (sum: number, item: any) => sum + (item.quantity || 0),
@@ -119,15 +146,35 @@ export default function ToReceiveScreen() {
         );
         const images: string[] = [];
         // Sử dụng itemsList đã được kiểm tra thay vì order.order_items
-        itemsList.forEach((item: any) => {
-          if (item.products?.images?.[0] && images.length < 4) {
-            const imgName = item.products.images[0];
-            const imageUrl = imgName.startsWith("http")
-              ? imgName
-              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imgName}`;
-            images.push(imageUrl);
-          }
-        });
+// Trong hàm .map() của data
+itemsList.forEach((item: any) => {
+  if (images.length < 4) {
+    const p = item.products;
+    
+    // LẤY MÀU TỪ JSONB
+    const orderColor = item.selected_variant?.color; 
+    let targetIndex = 0;
+
+    if (orderColor && p?.variants?.options) {
+      const colorOption = p.variants.options.find(
+        (opt: any) => opt.color?.toLowerCase() === orderColor.toLowerCase()
+      );
+      if (colorOption?.image_index !== undefined) {
+        targetIndex = colorOption.image_index;
+      }
+    }
+
+    if (p?.images && p.images.length > 0) {
+      const imgName = p.images[targetIndex] || p.images[0];
+      const imageUrl = imgName.startsWith("http")
+        ? imgName
+        : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imgName}`;
+      
+      images.push(imageUrl);
+    }
+  }
+});
+        
 
         const statusMap: Record<string, string> = {
           pending: "Đang xử lý",
@@ -276,7 +323,12 @@ export default function ToReceiveScreen() {
                 <TouchableOpacity
                   style={styles.trackButton}
                   activeOpacity={0.7}
-                  onPress={() => router.push("/track-order")}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/track-order",
+                      params: { orderId: item.id },
+                    })
+                  }
                 >
                   <Text style={styles.trackButtonText}>Theo dõi</Text>
                 </TouchableOpacity>

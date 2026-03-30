@@ -1,8 +1,9 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ChevronLeft, MoveRight } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StatusBar,
@@ -14,6 +15,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
+import { supabase } from "@/src/lib/supabase";
+import { useLocalSearchParams } from "expo-router";
 
 // Bảng màu hệ thống
 const COLOR = {
@@ -79,7 +82,43 @@ const TIMELINE_DATA = [
 
 export default function TrackOrderScreen() {
   const router = useRouter();
+  const { orderId } = useLocalSearchParams();
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Ánh xạ trạng thái từ database sang tiếng Việt
+  const statusMap: Record<string, string> = {
+    pending: "Chờ xác nhận",
+    processing: "Đang lấy hàng",
+    shipping: "Đang giao hàng",
+    completed: "Đã giao thành công",
+    cancelled: "Đã hủy",
+  };
+
+  const fetchOrderDetails = async () => {
+    try {
+      if (!orderId) return;
+
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+
+      if (error) throw error;
+      setOrder(data);
+    } catch (error) {
+      console.error("Lỗi khi lấy thông tin đơn hàng:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrderDetails();
+  }, [orderId]);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -97,7 +136,9 @@ export default function TrackOrderScreen() {
             </TouchableOpacity>
             <View>
               <Text style={styles.headerTitle}>Theo dõi đơn hàng</Text>
-              <Text style={styles.headerSubtitle}>Mã đơn: #LGS-i929278393</Text>
+              <Text style={styles.headerSubtitle}>
+                Mã đơn: #{orderId || "N/A"}
+              </Text>
             </View>
           </View>
         )}
@@ -130,10 +171,17 @@ export default function TrackOrderScreen() {
         {/* Mã vận đơn (Tracking Number Card) */}
         <View style={styles.trackingNumberCard}>
           <View>
-            <Text style={styles.trackingLabel}>Mã vận đơn</Text>
-            <Text style={styles.trackingValue}>LGS-i92927839300763731</Text>
+            <Text style={styles.trackingLabel}>Trạng thái hiện tại</Text>
+            <Text style={styles.trackingValue}>
+              {loading
+                ? "Đang tải..."
+                : statusMap[order?.status] || "Không xác định"}
+            </Text>
           </View>
-          <TouchableOpacity style={styles.copyButton}>
+          <TouchableOpacity
+            style={styles.copyButton}
+            onPress={fetchOrderDetails}
+          >
             <View style={styles.copyIcon}>
               <View style={styles.copyLine} />
               <View style={[styles.copyLine, { marginTop: 4 }]} />
@@ -143,64 +191,71 @@ export default function TrackOrderScreen() {
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Danh sách mốc thời gian (Timeline) */}
-        <View style={styles.timelineContainer}>
-          {TIMELINE_DATA.map((item, index) => (
-            <View key={item.id} style={styles.timelineItem}>
-              {/* Line connector */}
-              {index !== TIMELINE_DATA.length - 1 && (
-                <View style={styles.timelineLine} />
-              )}
-
-              <View style={styles.timelineContent}>
-                <View style={styles.timelineHeader}>
-                  <TouchableOpacity
-                    onPress={() => item.isError && setShowErrorModal(true)}
-                    activeOpacity={item.isError ? 0.7 : 1}
-                    style={styles.titleContainer}
-                  >
-                    <Text
-                      style={[
-                        styles.statusTitle,
-                        item.isError && styles.errorText,
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-                    {item.isError && (
-                      <MoveRight
-                        size={18}
-                        color={COLOR.blue}
-                        style={{ marginLeft: 8 }}
-                      />
-                    )}
-                  </TouchableOpacity>
-                  <View
-                    style={[
-                      styles.timeBadge,
-                      item.isError && styles.errorBadge,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.timeText,
-                        item.isError && styles.whiteText,
-                      ]}
-                    >
-                      {item.time}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.statusDescription}>{item.description}</Text>
-              </View>
-            </View>
-          ))}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={COLOR.blue} />
+          <Text style={styles.loadingText}>Đang tải dữ liệu...</Text>
         </View>
-      </ScrollView>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Danh sách mốc thời gian (Timeline) */}
+          <View style={styles.timelineContainer}>
+            {TIMELINE_DATA.map((item, index) => (
+              <View key={item.id} style={styles.timelineItem}>
+                {/* Line connector */}
+                {index !== TIMELINE_DATA.length - 1 && (
+                  <View style={styles.timelineLine} />
+                )}
+
+                <View style={styles.timelineContent}>
+                  <View style={styles.timelineHeader}>
+                    <TouchableOpacity
+                      onPress={() => item.isError && setShowErrorModal(true)}
+                      activeOpacity={item.isError ? 0.7 : 1}
+                      style={styles.titleContainer}
+                    >
+                      <Text
+                        style={[
+                          styles.statusTitle,
+                          item.isError && styles.errorText,
+                        ]}
+                      >
+                        {item.title}
+                      </Text>
+                      {item.isError && (
+                        <MoveRight
+                          size={18}
+                          color={COLOR.blue}
+                          style={{ marginLeft: 8 }}
+                        />
+                      )}
+                    </TouchableOpacity>
+                    <View
+                      style={[
+                        styles.timeBadge,
+                        item.isError && styles.errorBadge,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.timeText,
+                          item.isError && styles.whiteText,
+                        ]}
+                      >
+                        {item.time}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.statusDescription}>{item.description}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
 
       {/* Modal Thông báo lỗi (Bottom Sheet) */}
       <Modal
@@ -472,5 +527,17 @@ const styles = StyleSheet.create({
     color: COLOR.white,
     fontSize: 16,
     fontWeight: "bold",
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: COLOR.textSecondary,
+    fontWeight: "500",
   },
 });
