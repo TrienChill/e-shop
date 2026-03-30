@@ -16,19 +16,29 @@ import {
   Dimensions,
   FlatList,
   Image,
+  LayoutAnimation,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const COLORS = {
   primary: "#0055FF",
@@ -50,6 +60,7 @@ interface OrderItem {
   status: string;
   images: string[];
   rawStatus: string;
+  allProducts: any[];
 }
 
 export default function ToReceiveScreen() {
@@ -72,6 +83,12 @@ export default function ToReceiveScreen() {
   const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
   const [showFilter, setShowFilter] = useState(false);
   const [isAscending, setIsAscending] = useState(true);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+  const toggleExpand = (orderId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
+  };
 
   const STATUS_PRIORITY: Record<string, number> = {
     completed: 1, // Đã giao
@@ -193,6 +210,7 @@ itemsList.forEach((item: any) => {
           status: statusMap[order.status] || "Đang đóng gói",
           images,
           rawStatus: order.status,
+          allProducts: itemsList,
         };
       });
 
@@ -274,49 +292,83 @@ itemsList.forEach((item: any) => {
 
   const renderItem = ({ item }: { item: OrderItem }) => {
     const isDelivered = item.status === "Đã giao";
+    const isExpanded = expandedOrderId === item.id;
 
     return (
       <View style={styles.orderCard}>
-        <View style={styles.cardContent}>
-          <View style={styles.imageContainer}>
-            {renderImageGrid(item.images)}
-          </View>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => toggleExpand(item.id)}
+          style={styles.cardHeader}
+        >
+          <View style={styles.cardContent}>
+            <View style={styles.imageContainer}>
+              {renderImageGrid(item.images)}
+            </View>
 
-          <View style={styles.infoContainer}>
-            <View style={styles.infoHeader}>
-              <Text style={styles.orderCode}>Đơn hàng #{item.orderCode}</Text>
-              <View style={styles.itemBadge}>
-                <Text style={styles.itemBadgeText}>
-                  {item.itemsCount} sản phẩm
+            <View style={styles.infoContainer}>
+              <View style={styles.infoHeader}>
+                <Text style={styles.orderCode}>Đơn hàng #{item.orderCode}</Text>
+                <ChevronLeft
+                  size={20}
+                  color={COLORS.textSecondary}
+                  style={{
+                    transform: [{ rotate: isExpanded ? "90deg" : "-90deg" }],
+                  }}
+                />
+              </View>
+
+              <View style={styles.priceRow}>
+                <Text style={styles.shippingMethod}>{item.shippingMethod}</Text>
+                <Text style={styles.totalAmount}>
+                  {item.totalAmount.toLocaleString("vi-VN")}₫
                 </Text>
               </View>
-            </View>
 
-            <View style={styles.priceRow}>
-              <Text style={styles.shippingMethod}>{item.shippingMethod}</Text>
-              <Text style={styles.totalAmount}>
-                {item.totalAmount.toLocaleString("vi-VN")}₫
-              </Text>
-            </View>
-
-            <View style={styles.statusRow}>
-              <View style={styles.statusInfo}>
-                <Text style={styles.statusText}>{item.status}</Text>
-                {isDelivered && (
-                  <CheckCircle2
-                    size={18}
-                    color={COLORS.primary}
-                    fill={"#E6EFFF"}
-                    style={{ marginLeft: 6 }}
-                  />
-                )}
+              <View style={styles.statusRow}>
+                <View style={styles.statusInfo}>
+                  <Text style={styles.statusText}>{item.status}</Text>
+                  {isDelivered && (
+                    <CheckCircle2
+                      size={18}
+                      color={COLORS.primary}
+                      fill={"#E6EFFF"}
+                      style={{ marginLeft: 6 }}
+                    />
+                  )}
+                </View>
+                <View style={styles.itemBadge}>
+                  <Text style={styles.itemBadgeText}>
+                    {item.itemsCount} sản phẩm
+                  </Text>
+                </View>
               </View>
+            </View>
+          </View>
+        </TouchableOpacity>
 
+        {isExpanded && (
+          <View style={styles.dropdownContent}>
+            <View style={styles.divider} />
+            {item.allProducts?.map((prod: any, index: number) => (
+              <View key={index} style={styles.productDetailItem}>
+                <Text style={styles.productDetailName} numberOfLines={1}>
+                  {prod.products?.name}
+                </Text>
+                <View style={styles.productDetailSub}>
+                  <Text style={styles.productDetailVariant}>
+                    Phân loại: {prod.selected_variant?.color},{" "}
+                    {prod.selected_variant?.size}
+                  </Text>
+                  <Text style={styles.productDetailQty}>x{prod.quantity}</Text>
+                </View>
+              </View>
+            ))}
+
+            {/* Nút hành động nhanh bên dưới */}
+            <View style={styles.actionRow}>
               {isDelivered ? (
-                <TouchableOpacity
-                  style={styles.reviewButton}
-                  activeOpacity={0.7}
-                >
+                <TouchableOpacity style={styles.reviewButton} activeOpacity={0.7}>
                   <Text style={styles.reviewButtonText}>Đánh giá</Text>
                 </TouchableOpacity>
               ) : (
@@ -333,9 +385,20 @@ itemsList.forEach((item: any) => {
                   <Text style={styles.trackButtonText}>Theo dõi</Text>
                 </TouchableOpacity>
               )}
+              <TouchableOpacity 
+                style={styles.detailButton}
+                onPress={() =>
+                  router.push({
+                    pathname: "/track-order",
+                    params: { orderId: item.id },
+                  })
+                }
+              >
+                <Text style={styles.detailButtonText}>Chi tiết đơn hàng</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
+        )}
       </View>
     );
   };
@@ -637,6 +700,58 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: COLORS.primary,
+  },
+  cardHeader: {
+    paddingBottom: 4,
+  },
+  dropdownContent: {
+    marginTop: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginBottom: 12,
+  },
+  productDetailItem: {
+    marginBottom: 10,
+    paddingLeft: 4,
+  },
+  productDetailName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.secondary,
+  },
+  productDetailSub: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  productDetailVariant: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  productDetailQty: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+  },
+  actionRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  detailButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#F0F5FF",
+    justifyContent: "center",
+  },
+  detailButtonText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
   },
   statusRow: {
     flexDirection: "row",
