@@ -111,9 +111,17 @@ export default function ProductDetailScreen() {
     setActiveIndex(index);
   };
 
+  const hasSizes =
+    product?.variants?.sizes && product.variants.sizes.length > 0;
+  const hasColors =
+    product?.variants?.options && product.variants.options.length > 0;
+
   // Hàm xử lý Thêm vào giỏ từ màn hình chính
   const handleAddToBag = () => {
-    if (!selectedSize || !selectedColor) {
+    const isSizeSelected = !hasSizes || !!selectedSize;
+    const isColorSelected = !hasColors || !!selectedColor;
+
+    if (!isSizeSelected || !isColorSelected) {
       setModalVisible(true);
       return;
     }
@@ -123,8 +131,16 @@ export default function ProductDetailScreen() {
 
   // Hàm xử lý xác nhận bên trong Pop-up Modal
   const handleConfirmModal = () => {
-    if (!selectedSize || !selectedColor) {
-      alert("Vui lòng chọn đầy đủ màu sắc và kích cỡ!");
+    const isSizeSelected = !hasSizes || !!selectedSize;
+    const isColorSelected = !hasColors || !!selectedColor;
+
+    if (!isSizeSelected || !isColorSelected) {
+      let message = "Vui lòng chọn đầy đủ ";
+      if (!isSizeSelected && !isColorSelected) message += "màu sắc và kích cỡ!";
+      else if (!isSizeSelected) message += "kích cỡ!";
+      else message += "màu sắc!";
+
+      alert(message);
       return;
     }
     // Thực hiện thêm vào giỏ với số lượng 'quantity' từ Modal
@@ -148,8 +164,8 @@ export default function ProductDetailScreen() {
         .select("id, quantity")
         .eq("user_id", user.id)
         .eq("product_id", product.id)
-        .eq("size", selectedSize) // Khớp cột size
-        .eq("color", selectedColor?.color) // Khớp cột color
+        .eq("size", selectedSize || null) // Khớp cột size - Dùng null nếu không có size
+        .eq("color", selectedColor?.color || null) // Khớp cột color - Dùng null nếu không có màu
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -174,8 +190,8 @@ export default function ProductDetailScreen() {
               user_id: user.id,
               product_id: product.id,
               quantity: selectedQty,
-              size: selectedSize,
-              color: selectedColor?.color,
+              size: selectedSize || null,
+              color: selectedColor?.color || null,
               is_selected: true,
             },
           ]);
