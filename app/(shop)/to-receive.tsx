@@ -1,18 +1,19 @@
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
+import ReviewModal from "@/src/components/modals/ReviewModal";
 import { supabase } from "@/src/lib/supabase";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowUpDown,
   CheckCircle2,
   ChevronLeft,
   Filter,
   PackageX,
-  X,
+  X
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -25,6 +26,7 @@ import {
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
@@ -88,7 +90,14 @@ export default function ToReceiveScreen() {
   const initialStatus = (params.status as string) || "all";
   const [selectedStatus, setSelectedStatus] = useState<string>(initialStatus);
   const [showFilter, setShowFilter] = useState(false);
-  const [isAscending, setIsAscending] = useState(true);
+  const [isAscending, setIsAscending] = useState(false);
+
+  // Review states
+  const [isReviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedReviewItem, setSelectedReviewItem] = useState<any>(null);
+  const [showProductSelection, setShowProductSelection] = useState(false);
+  const [selectedOrderForReview, setSelectedOrderForReview] = useState<any>(null);
+
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   const toggleExpand = (orderId: string) => {
@@ -128,6 +137,16 @@ export default function ToReceiveScreen() {
         return;
       }
 
+      // [WORKAROUND RLS] Lấy danh sách order_item_id mà user đã đánh giá
+      const { data: userReviews } = await supabase
+        .from("reviews")
+        .select("order_item_id")
+        .eq("user_id", user.id);
+      
+      const reviewedItemIds = new Set(
+        userReviews?.map((r) => r.order_item_id) || []
+      );
+
       // Trong file app/(shop)/to-receive.tsx, tìm đến hàm fetchOrders
 
       let query = supabase
@@ -139,9 +158,13 @@ export default function ToReceiveScreen() {
     total_amount,
     created_at,
     order_items (
+      id,
+      order_id,
+      is_reviewed,
       quantity,
       price_at_purchase,
-selected_variant,  
+      selected_variant,
+      product_id,
       products (
         name,
         images,
@@ -176,6 +199,8 @@ selected_variant,
         const processedItems = itemsList.map((item: any) => {
           return {
             ...item,
+            // Fallback an toàn: Nếu DB is_reviewed = true hoặc item có trong bảng reviews
+            is_reviewed: item.is_reviewed || reviewedItemIds.has(item.id),
             image: getProductImageByColor(item.products, item.selected_variant?.color),
           };
         });
@@ -215,8 +240,10 @@ selected_variant,
       });
 
       setOrders(formattedOrders);
+      return formattedOrders; 
     } catch (error) {
       console.error("Lỗi lấy danh sách đơn hàng:", error);
+      return [];
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -237,6 +264,71 @@ selected_variant,
   const onRefresh = () => {
     setRefreshing(true);
     fetchOrders(selectedStatus);
+  };
+
+  const handleReviewPress = (order: OrderItem) => {
+    // Nếu đơn hàng chỉ có duy nhất 1 sản phẩm (tổng cộng)
+    if (order.allProducts.length === 1) {
+      const prod = order.allProducts[0];
+      if (prod.is_reviewed) {
+        alert("Sản phẩm này đã được đánh giá rồi!");
+        return;
+      }
+      setSelectedReviewItem(prod);
+      setReviewModalVisible(true);
+      return;
+    }
+
+    // Nếu đơn hàng có nhiều sản phẩm, luôn hiện bảng chọn để người dùng thấy icon Verify
+    setSelectedOrderForReview(order);
+    setShowProductSelection(true);
+  };
+
+  const onReviewSubmit = async (data: { rating: number; comment: string }) => {
+    try {
+      if (!selectedReviewItem) return;
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Lưu vào bảng reviews
+      const { error: reviewError } = await supabase.from("reviews").insert([
+        {
+          user_id: user.id,
+          product_id: selectedReviewItem.product_id,
+          order_id: selectedReviewItem.order_id, 
+          order_item_id: selectedReviewItem.id, 
+          rating: data.rating,
+          comment: data.comment,
+        },
+      ]);
+
+      if (reviewError) throw reviewError;
+
+      // 2. Cập nhật trạng thái is_reviewed trong order_items
+      const { error: updateError } = await supabase
+        .from("order_items")
+        .update({ is_reviewed: true })
+        .eq("id", selectedReviewItem.id);
+
+      if (updateError) throw updateError;
+
+      alert("Cảm ơn bạn đã đánh giá!");
+      setReviewModalVisible(false);
+      setSelectedReviewItem(null); 
+      
+      const updatedOrdersList = await fetchOrders(selectedStatus); 
+      
+      if (updatedOrdersList && selectedOrderForReview) {
+        const updatedOrder = updatedOrdersList.find((o: OrderItem) => o.id === selectedOrderForReview.id);
+        if (updatedOrder) setSelectedOrderForReview(updatedOrder);
+      }
+    } catch (error: any) {
+      console.error("Lỗi gửi đánh giá:", error.message);
+      alert("Không thể gửi đánh giá: " + error.message);
+    }
   };
 
   const renderImageGrid = (images: string[]) => {
@@ -287,6 +379,7 @@ selected_variant,
   const renderItem = ({ item }: { item: OrderItem }) => {
     const isDelivered = item.status === "Đã giao";
     const isExpanded = expandedOrderId === item.id;
+    const isAllReviewed = item.allProducts?.every((p: any) => p.is_reviewed);
 
     return (
       <View style={styles.orderCard}>
@@ -351,9 +444,17 @@ selected_variant,
                   style={styles.productDetailImage}
                 />
                 <View style={styles.productDetailInfo}>
-                  <Text style={styles.productDetailName} numberOfLines={1}>
-                    {prod.products?.name}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Text style={styles.productDetailName} numberOfLines={1}>
+                      {prod.products?.name}
+                    </Text>
+                    {prod.is_reviewed && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, color: COLORS.primary, marginRight: 4, fontWeight: '500' }}>Đã đánh giá</Text>
+                        <CheckCircle2 size={16} color={COLORS.primary} />
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.productDetailSub}>
                     <Text style={styles.productDetailVariant}>
                       Phân loại:{" "}
@@ -372,10 +473,28 @@ selected_variant,
             <View style={styles.actionRow}>
               {isDelivered ? (
                 <TouchableOpacity
-                  style={styles.reviewButton}
+                  style={[
+                    styles.reviewButton,
+                    isAllReviewed && styles.reviewButtonCompleted,
+                  ]}
                   activeOpacity={0.7}
+                  onPress={() => handleReviewPress(item)}
                 >
-                  <Text style={styles.reviewButtonText}>Đánh giá</Text>
+                  <Text
+                    style={[
+                      styles.reviewButtonText,
+                      isAllReviewed && styles.reviewButtonTextCompleted,
+                    ]}
+                  >
+                      {isAllReviewed ? "Xem đánh giá" : "Đánh giá"}
+                  </Text>
+                  {isAllReviewed && (
+                    <CheckCircle2
+                      size={14}
+                      color={COLORS.primary}
+                      style={{ marginLeft: 6 }}
+                    />
+                  )}
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
@@ -512,6 +631,88 @@ selected_variant,
           </View>
         </View>
       </Modal>
+
+      {/* Modal Lựa chọn sản phẩm để đánh giá */}
+      <Modal
+        visible={showProductSelection}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowProductSelection(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowProductSelection(false)}
+        />
+        <View style={styles.bottomSheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Chọn sản phẩm đánh giá</Text>
+            <TouchableOpacity onPress={() => setShowProductSelection(false)}>
+              <X color={COLORS.secondary} size={24} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.selectionList}>
+            {selectedOrderForReview?.allProducts.map((prod: any, idx: number) => (
+              <TouchableOpacity
+                key={idx}
+                style={[
+                  styles.selectionItem,
+                  prod.is_reviewed && { opacity: 0.8 }
+                ]}
+                onPress={() => {
+                  if (prod.is_reviewed) {
+                    alert("Sản phẩm này đã được đánh giá rồi!");
+                    return;
+                  }
+                  setSelectedReviewItem(prod);
+                  setReviewModalVisible(true);
+                }}
+              >
+                <Image
+                  source={{ uri: prod.image }}
+                  style={styles.selectionImage}
+                />
+                <View style={styles.selectionInfo}>
+                  <Text style={styles.selectionName} numberOfLines={1}>
+                    {prod.products?.name}
+                  </Text>
+                  <Text style={styles.selectionVariant}>
+                    {COLOR_TRANSLATIONS[
+                      prod.selected_variant?.color?.toLowerCase()
+                    ] || prod.selected_variant?.color}
+                    , {prod.selected_variant?.size}
+                  </Text>
+                </View>
+                {prod.is_reviewed && (
+                  <View style={styles.reviewedStatus}>
+                    <Text style={styles.reviewedText}>Xem đánh giá</Text>
+                    <CheckCircle2 size={18} color={COLORS.primary} fill={"#E6EFFF"} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Review Modal chung */}
+      <ReviewModal
+        visible={isReviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+        onSubmit={onReviewSubmit}
+        product={
+          selectedReviewItem
+            ? {
+              name: selectedReviewItem.products?.name,
+              variant: `${COLOR_TRANSLATIONS[
+                selectedReviewItem.selected_variant?.color?.toLowerCase()
+              ] || selectedReviewItem.selected_variant?.color
+                }, ${selectedReviewItem.selected_variant?.size}`,
+              image: selectedReviewItem.image,
+            }
+            : null
+        }
+      />
 
       {selectedStatus !== "all" && (
         <View style={styles.activeFilterBar}>
@@ -809,6 +1010,13 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  reviewButtonCompleted: {
+    backgroundColor: "#F0F5FF",
+    borderColor: COLORS.primary,
+  },
+  reviewButtonTextCompleted: {
+    color: COLORS.primary,
+  },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
@@ -916,5 +1124,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.primary,
     fontWeight: "bold",
+  },
+  // Selection Modal Styles
+  selectionList: {
+    maxHeight: 400,
+    marginTop: 10,
+  },
+  selectionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  selectionImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  selectionInfo: {
+    flex: 1,
+  },
+  selectionName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.secondary,
+  },
+  selectionVariant: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  reviewedBadge: {
+    marginLeft: 10,
+  },
+  reviewedStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F5FF",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  reviewedText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: "bold",
+    marginRight: 6,
   },
 });

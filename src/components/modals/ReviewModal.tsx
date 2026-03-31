@@ -45,6 +45,14 @@ export default function ReviewModal({
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
 
+  // Reset state mỗi khi modal hiển thị hoặc sản phẩm thay đổi
+  React.useEffect(() => {
+    if (visible) {
+      setRating(0);
+      setComment("");
+    }
+  }, [visible, product?.name]); // Trigger reset khi mở hoặc đổi tên SP
+
   const handleStarPress = (index: number, isHalf: boolean) => {
     const newRating = index + (isHalf ? 0.5 : 1);
     setRating(newRating);
