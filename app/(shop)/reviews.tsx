@@ -1,12 +1,13 @@
 import { useRouter } from "expo-router";
 import {
-    Camera,
     ChevronLeft,
     PackageSearch,
     PencilLine,
-    Star
+    Star,
+    StarHalf
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
+import ReviewModal from "@/src/components/modals/ReviewModal";
 import {
     Animated,
     Dimensions,
@@ -60,11 +61,7 @@ export default function ReviewsScreen() {
     const [isModalVisible, setModalVisible] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ReviewData | null>(null);
 
-    // Form State
-    const [rating, setRating] = useState(0);
-    const [comment, setComment] = useState("");
-
-    // Animation values
+    // Tab switching animation values
     const tabLinePosition = useRef(new Animated.Value(0)).current;
 
     // Mock data (Sẽ kết nối Supabase tại đây)
@@ -101,19 +98,17 @@ export default function ReviewsScreen() {
 
     const handleOpenReview = (item: ReviewData) => {
         setSelectedItem(item);
-        setRating(0);
-        setComment("");
         setModalVisible(true);
     };
 
-    const handleSubmitReview = () => {
+    const handleSubmitReview = (data: { rating: number; comment: string }) => {
         // Logic: 1. Lưu vào bảng 'reviews', 2. Cập nhật bảng 'order_items' is_reviewed = true
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 
         if (selectedItem) {
             if (activeTab === "pending") {
                 setReviewedItems([
-                    { ...selectedItem, rating, comment, date: "Vừa xong" },
+                    { ...selectedItem, ...data, date: "Vừa xong" },
                     ...reviewedItems
                 ]);
                 setPendingItems(pendingItems.filter(i => i.id !== selectedItem.id));
@@ -150,14 +145,24 @@ export default function ReviewsScreen() {
 
                     {activeTab === "reviewed" && (
                         <View style={styles.ratingRow}>
-                            {[1, 2, 3, 4, 5].map(s => (
-                                <Star
-                                    key={s}
-                                    size={14}
-                                    color={s <= (item.rating || 0) ? COLORS.star : COLORS.border}
-                                    fill={s <= (item.rating || 0) ? COLORS.star : "transparent"}
-                                />
-                            ))}
+                            {[0, 1, 2, 3, 4].map((i) => {
+                                const ratingValue = item.rating || 0;
+                                const filled = ratingValue >= i + 1;
+                                const half = !filled && ratingValue >= i + 0.5;
+
+                                return (
+                                    <View key={i} style={{ position: "relative" }}>
+                                        <Star size={14} color={COLORS.border} fill="transparent" />
+                                        <View style={{ position: "absolute", top: 0, left: 0 }}>
+                                            {half ? (
+                                                <StarHalf size={14} color={COLORS.star} fill={COLORS.star} />
+                                            ) : filled ? (
+                                                <Star size={14} color={COLORS.star} fill={COLORS.star} />
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                );
+                            })}
                         </View>
                     )}
                 </View>
@@ -233,63 +238,16 @@ export default function ReviewsScreen() {
             />
 
             {/* Review Bottom Sheet (Modal) */}
-            <Modal visible={isModalVisible} transparent animationType="slide">
-                <View style={styles.modalOverlay}>
-                    <TouchableOpacity style={styles.modalBackdrop} onPress={() => setModalVisible(false)} />
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <View style={styles.modalIndicator} />
-                            <Text style={styles.modalTitle}>Cảm nhận của bạn về sản phẩm?</Text>
-                        </View>
-
-                        <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
-                            <View style={styles.reviewTarget}>
-                                <Image source={{ uri: selectedItem?.image }} style={styles.modalProductImage} />
-                                <View>
-                                    <Text style={styles.modalProductName}>{selectedItem?.productName}</Text>
-                                    <Text style={styles.modalProductVariant}>{selectedItem?.variant}</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.starSelection}>
-                                {[1, 2, 3, 4, 5].map(s => (
-                                    <TouchableOpacity key={s} onPress={() => setRating(s)}>
-                                        <Star
-                                            size={42}
-                                            color={s <= rating ? COLORS.star : COLORS.border}
-                                            fill={s <= rating ? COLORS.star : "transparent"}
-                                            style={styles.bigStar}
-                                        />
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    placeholder="Hãy chia sẻ cảm nhận của bạn về chất lượng sản phẩm nhé..."
-                                    placeholderTextColor={COLORS.textGray}
-                                    multiline
-                                    numberOfLines={5}
-                                    style={styles.textInput}
-                                    value={comment}
-                                    onChangeText={setComment}
-                                />
-                            </View>
-
-                            <TouchableOpacity style={styles.uploadBtn}>
-                                <Camera size={24} color={COLORS.primary} />
-                                <Text style={styles.uploadText}>Thêm hình ảnh thực tế</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmitReview}>
-                                <Text style={styles.submitBtnText}>Gửi đánh giá ngay</Text>
-                            </TouchableOpacity>
-
-                            <View style={{ height: 40 }} />
-                        </ScrollView>
-                    </View>
-                </View>
-            </Modal>
+            <ReviewModal
+                visible={isModalVisible}
+                onClose={() => setModalVisible(false)}
+                onSubmit={handleSubmitReview}
+                product={selectedItem ? {
+                    name: selectedItem.productName,
+                    variant: selectedItem.variant,
+                    image: selectedItem.image
+                } : null}
+            />
         </SafeAreaView>
     );
 }
