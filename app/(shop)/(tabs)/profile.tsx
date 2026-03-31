@@ -248,7 +248,11 @@ export default function ProfileScreen() {
             <OrderStatusButton
               title="Đánh giá"
               hasNotification={true}
-              // Xử lý sau
+              onPress={() => {
+                router.push({
+                  pathname: "/reviews",
+                });
+              }}
             />
           </ScrollView>
         </View>
