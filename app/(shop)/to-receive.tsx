@@ -271,7 +271,13 @@ export default function ToReceiveScreen() {
     if (order.allProducts.length === 1) {
       const prod = order.allProducts[0];
       if (prod.is_reviewed) {
-        alert("Sản phẩm này đã được đánh giá rồi!");
+        router.push({
+          pathname: "/(shop)/product/reviews",
+          params: {
+            productId: prod.product_id,
+            productName: prod.products?.name,
+          },
+        });
         return;
       }
       setSelectedReviewItem(prod);
@@ -661,7 +667,14 @@ export default function ToReceiveScreen() {
                 ]}
                 onPress={() => {
                   if (prod.is_reviewed) {
-                    alert("Sản phẩm này đã được đánh giá rồi!");
+                    setShowProductSelection(false);
+                    router.push({
+                      pathname: "/(shop)/product/reviews",
+                      params: {
+                        productId: prod.product_id,
+                        productName: prod.products?.name,
+                      },
+                    });
                     return;
                   }
                   setSelectedReviewItem(prod);
