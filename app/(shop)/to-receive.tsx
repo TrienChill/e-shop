@@ -3,6 +3,10 @@ import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
+  COLOR_TRANSLATIONS,
+  getProductImageByColor,
+} from "@/src/services/product";
+import {
   ArrowUpDown,
   CheckCircle2,
   ChevronLeft,
@@ -163,31 +167,9 @@ selected_variant,
           0,
         );
         const processedItems = itemsList.map((item: any) => {
-          const p = item.products;
-          const orderColor = item.selected_variant?.color;
-          let targetIndex = 0;
-
-          if (orderColor && p?.variants?.options) {
-            const colorOption = p.variants.options.find(
-              (opt: any) =>
-                opt.color?.toLowerCase() === orderColor.toLowerCase(),
-            );
-            if (colorOption?.image_index !== undefined) {
-              targetIndex = colorOption.image_index;
-            }
-          }
-
-          let imageUrl = "";
-          if (p?.images && p.images.length > 0) {
-            const imgName = p.images[targetIndex] || p.images[0];
-            imageUrl = imgName.startsWith("http")
-              ? imgName
-              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imgName}`;
-          }
-
           return {
             ...item,
-            image: imageUrl,
+            image: getProductImageByColor(item.products, item.selected_variant?.color),
           };
         });
 
@@ -365,8 +347,11 @@ selected_variant,
                   </Text>
                   <View style={styles.productDetailSub}>
                     <Text style={styles.productDetailVariant}>
-                      Phân loại: {prod.selected_variant?.color},{" "}
-                      {prod.selected_variant?.size}
+                      Phân loại:{" "}
+                      {COLOR_TRANSLATIONS[
+                        prod.selected_variant?.color?.toLowerCase()
+                      ] || prod.selected_variant?.color}
+                      , size: {prod.selected_variant?.size}
                     </Text>
                     <Text style={styles.productDetailQty}>x{prod.quantity}</Text>
                   </View>
