@@ -96,6 +96,13 @@ export default function ToReceiveScreen() {
     setExpandedOrderId(expandedOrderId === orderId ? null : orderId);
   };
 
+  // Sync selectedStatus with URL params
+  useEffect(() => {
+    if (params.status) {
+      setSelectedStatus(params.status as string);
+    }
+  }, [params.status]);
+
   const STATUS_PRIORITY: Record<string, number> = {
     completed: 1, // Đã giao
     shipping: 2, // Đang giao
@@ -217,9 +224,11 @@ selected_variant,
   };
 
   useEffect(() => {
-    fetchOrders(selectedStatus);
+    if (user) {
+      fetchOrders(selectedStatus);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, isAscending]);
+  }, [selectedStatus, isAscending, user]);
 
   const toggleSort = () => {
     setIsAscending(!isAscending);
