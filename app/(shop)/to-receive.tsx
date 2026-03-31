@@ -73,7 +73,9 @@ export default function ToReceiveScreen() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const {
+        data: { user: currentUser },
+      } = await supabase.auth.getUser();
       setUser(currentUser);
     };
     getUser();
@@ -115,12 +117,12 @@ export default function ToReceiveScreen() {
         return;
       }
 
-// Trong file app/(shop)/to-receive.tsx, tìm đến hàm fetchOrders
+      // Trong file app/(shop)/to-receive.tsx, tìm đến hàm fetchOrders
 
-let query = supabase
-  .from("orders")
-  .select(
-    `
+      let query = supabase
+        .from("orders")
+        .select(
+          `
     id,
     status,
     total_amount,
@@ -136,8 +138,8 @@ selected_variant,
       )
     )
   `,
-  )
-  .eq("user_id", user.id);
+        )
+        .eq("user_id", user.id);
 
       // Sửa logic lọc để xử lý trường hợp "history" (Lịch sử mua hàng)
       if (statusFilter === "history") {
@@ -155,47 +157,48 @@ selected_variant,
       const formattedOrders: OrderItem[] = data.map((order: any) => {
         // Thêm kiểm tra: nếu order_items không tồn tại, dùng mảng rỗng
         const itemsList = order.order_items || [];
-        
 
         const itemsCount = itemsList.reduce(
           (sum: number, item: any) => sum + (item.quantity || 0),
           0,
         );
-        const images: string[] = [];
-        // Sử dụng itemsList đã được kiểm tra thay vì order.order_items
-// Trong hàm .map() của data
-itemsList.forEach((item: any) => {
-  if (images.length < 4) {
-    const p = item.products;
-    
-    // LẤY MÀU TỪ JSONB
-    const orderColor = item.selected_variant?.color; 
-    let targetIndex = 0;
+        const processedItems = itemsList.map((item: any) => {
+          const p = item.products;
+          const orderColor = item.selected_variant?.color;
+          let targetIndex = 0;
 
-    if (orderColor && p?.variants?.options) {
-      const colorOption = p.variants.options.find(
-        (opt: any) => opt.color?.toLowerCase() === orderColor.toLowerCase()
-      );
-      if (colorOption?.image_index !== undefined) {
-        targetIndex = colorOption.image_index;
-      }
-    }
+          if (orderColor && p?.variants?.options) {
+            const colorOption = p.variants.options.find(
+              (opt: any) =>
+                opt.color?.toLowerCase() === orderColor.toLowerCase(),
+            );
+            if (colorOption?.image_index !== undefined) {
+              targetIndex = colorOption.image_index;
+            }
+          }
 
-    if (p?.images && p.images.length > 0) {
-      const imgName = p.images[targetIndex] || p.images[0];
-      const imageUrl = imgName.startsWith("http")
-        ? imgName
-        : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imgName}`;
-      
-      images.push(imageUrl);
-    }
-  }
-});
-        
+          let imageUrl = "";
+          if (p?.images && p.images.length > 0) {
+            const imgName = p.images[targetIndex] || p.images[0];
+            imageUrl = imgName.startsWith("http")
+              ? imgName
+              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imgName}`;
+          }
+
+          return {
+            ...item,
+            image: imageUrl,
+          };
+        });
+
+        const images = processedItems
+          .slice(0, 4)
+          .map((item: any) => item.image)
+          .filter((img: string) => img !== "");
 
         const statusMap: Record<string, string> = {
-          pending: "Đang xử lý",
-          processing: "Đang đóng gói",
+          pending: "Chờ xác nhận",
+          processing: "Chờ lấy hàng",
           shipping: "Đang giao",
           completed: "Đã giao",
           cancelled: "Đã hủy",
@@ -210,7 +213,7 @@ itemsList.forEach((item: any) => {
           status: statusMap[order.status] || "Đang đóng gói",
           images,
           rawStatus: order.status,
-          allProducts: itemsList,
+          allProducts: processedItems,
         };
       });
 
@@ -352,15 +355,21 @@ itemsList.forEach((item: any) => {
             <View style={styles.divider} />
             {item.allProducts?.map((prod: any, index: number) => (
               <View key={index} style={styles.productDetailItem}>
-                <Text style={styles.productDetailName} numberOfLines={1}>
-                  {prod.products?.name}
-                </Text>
-                <View style={styles.productDetailSub}>
-                  <Text style={styles.productDetailVariant}>
-                    Phân loại: {prod.selected_variant?.color},{" "}
-                    {prod.selected_variant?.size}
+                <Image
+                  source={{ uri: prod.image }}
+                  style={styles.productDetailImage}
+                />
+                <View style={styles.productDetailInfo}>
+                  <Text style={styles.productDetailName} numberOfLines={1}>
+                    {prod.products?.name}
                   </Text>
-                  <Text style={styles.productDetailQty}>x{prod.quantity}</Text>
+                  <View style={styles.productDetailSub}>
+                    <Text style={styles.productDetailVariant}>
+                      Phân loại: {prod.selected_variant?.color},{" "}
+                      {prod.selected_variant?.size}
+                    </Text>
+                    <Text style={styles.productDetailQty}>x{prod.quantity}</Text>
+                  </View>
                 </View>
               </View>
             ))}
@@ -368,7 +377,10 @@ itemsList.forEach((item: any) => {
             {/* Nút hành động nhanh bên dưới */}
             <View style={styles.actionRow}>
               {isDelivered ? (
-                <TouchableOpacity style={styles.reviewButton} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.reviewButton}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.reviewButtonText}>Đánh giá</Text>
                 </TouchableOpacity>
               ) : (
@@ -385,7 +397,7 @@ itemsList.forEach((item: any) => {
                   <Text style={styles.trackButtonText}>Theo dõi</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.detailButton}
                 onPress={() =>
                   router.push({
@@ -713,25 +725,36 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   productDetailItem: {
-    marginBottom: 10,
-    paddingLeft: 4,
+    flexDirection: "row",
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  productDetailImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: "#F5F5F5",
+    marginRight: 12,
+  },
+  productDetailInfo: {
+    flex: 1,
   },
   productDetailName: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     color: COLORS.secondary,
   },
   productDetailSub: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 2,
+    marginTop: 4,
   },
   productDetailVariant: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.textSecondary,
   },
   productDetailQty: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "bold",
     color: COLORS.secondary,
   },
