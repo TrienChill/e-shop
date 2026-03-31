@@ -2,7 +2,7 @@
 import CommonHeader from "@/src/components/layout/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { ArrowRight, Bell, Play, Settings, Ticket } from "lucide-react-native";
+import { ArrowRight, Bell, Play, Settings, Ticket, Wallet, Package, Truck, Star } from "lucide-react-native";
 import React, { useState } from "react";
 import {
   Dimensions,
@@ -78,38 +78,29 @@ export default function ProfileScreen() {
     router.replace("./auth/login");
   };
 
-  // Thành phần nút trạng thái đơn hàng (Capsule Button)
-  const OrderStatusButton = ({
+  // Thành phần nút trạng thái đơn hàng kiểu Shopee (Icon + Text)
+  const OrderIconButton = ({
     title,
+    icon: Icon,
     hasNotification,
     onPress,
   }: {
     title: string;
+    icon: any;
     hasNotification?: boolean;
     onPress?: () => void;
   }) => {
-    const isActive = activeOrderTab === title;
     return (
       <TouchableOpacity
-        onPress={() => {
-          setActiveOrderTab(title);
-          onPress?.();
-        }}
+        onPress={onPress}
         activeOpacity={0.7}
-        style={[
-          styles.capsuleButton,
-          { backgroundColor: isActive ? COLOR.blue : COLOR.lightBlue },
-        ]}
+        style={styles.orderIconButton}
       >
-        <Text
-          style={[
-            styles.capsuleText,
-            { color: isActive ? COLOR.white : COLOR.blue },
-          ]}
-        >
-          {title}
-        </Text>
-        {hasNotification && <View style={styles.tabBadge} />}
+        <View style={styles.iconContainer}>
+          <Icon size={28} color={COLOR.dark} strokeWidth={1.5} />
+          {hasNotification && <View style={styles.iconBadge} />}
+        </View>
+        <Text style={styles.orderIconText}>{title}</Text>
       </TouchableOpacity>
     );
   };
@@ -210,13 +201,10 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.orderTabs}
-          >
-            <OrderStatusButton
+          <View style={styles.orderGrid}>
+            <OrderIconButton
               title="Chờ xác nhận"
+              icon={Wallet}
               hasNotification={true}
               onPress={() =>
                 router.push({
@@ -225,8 +213,9 @@ export default function ProfileScreen() {
                 })
               }
             />
-            <OrderStatusButton
+            <OrderIconButton
               title="Chờ lấy hàng"
+              icon={Package}
               hasNotification={true}
               onPress={() =>
                 router.push({
@@ -235,8 +224,9 @@ export default function ProfileScreen() {
                 })
               }
             />
-            <OrderStatusButton
+            <OrderIconButton
               title="Chờ giao hàng"
+              icon={Truck}
               hasNotification={true}
               onPress={() =>
                 router.push({
@@ -245,8 +235,9 @@ export default function ProfileScreen() {
                 })
               }
             />
-            <OrderStatusButton
+            <OrderIconButton
               title="Đánh giá"
+              icon={Star}
               hasNotification={true}
               onPress={() => {
                 router.push({
@@ -254,7 +245,7 @@ export default function ProfileScreen() {
                 });
               }}
             />
-          </ScrollView>
+          </View>
         </View>
 
         {/* Phần Khoảnh khắc/Stories Video */}
@@ -458,31 +449,49 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 42,
   },
-  orderTabs: {
+  orderGrid: {
     flexDirection: "row",
-    gap: 12,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    backgroundColor: COLOR.white,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
-  capsuleButton: {
-    borderRadius: 30,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    position: "relative",
-    minWidth: 100,
+  orderIconButton: {
     alignItems: "center",
+    flex: 1,
   },
-  capsuleText: {
-    fontSize: 14,
-    fontWeight: "700",
+  iconContainer: {
+    position: "relative",
+    marginBottom: 8,
   },
-  tabBadge: {
+  orderIconText: {
+    fontSize: 12,
+    color: COLOR.dark,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  iconBadge: {
     position: "absolute",
-    top: 0,
-    right: 5,
+    top: -2,
+    right: -4,
+    backgroundColor: COLOR.red,
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: COLOR.red,
-    borderWidth: 2.5,
+    borderWidth: 2,
     borderColor: COLOR.white,
   },
   storyCard: {
