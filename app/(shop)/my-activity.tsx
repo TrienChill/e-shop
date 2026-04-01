@@ -4,11 +4,11 @@ import { router, useFocusEffect } from "expo-router";
 import {
   ChevronLeft,
   ChevronRight,
-  Filter,
   LayoutGrid,
   PackageX,
   PieChart,
   Settings,
+  BarChart
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -57,6 +57,8 @@ const CATEGORY_COLORS = [
 
 export default function MyActivityScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<"pie" | "bar">("pie");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasedProducts, setPurchasedProducts] = useState<any[]>([]);
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
@@ -79,6 +81,16 @@ export default function MyActivityScreen() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+
+      // Fetch user profile for avatar
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", user.id)
+        .single();
+      if (profile?.avatar_url) {
+        setAvatarUrl(profile.avatar_url);
+      }
 
       // 1. Xác định khung thời gian tháng hiện tại
       const firstDay = new Date(
@@ -110,7 +122,7 @@ export default function MyActivityScreen() {
       let delivered = 0;
       let pendingCount = 0;
       const validOrderIds = new Set();
-      
+
       orders.forEach((o: any) => {
         // - "Đã đặt": trạng thái pending/processing và đơn được TẠO trong tháng này
         const isPendingProc = ["pending", "processing"].includes(o.status) && isDateInMonth(o.created_at);
@@ -161,7 +173,7 @@ export default function MyActivityScreen() {
 
       items.forEach((item: any) => {
         const order = item.orders;
-        
+
         // Chỉ tổng hợp những item nằm trong danh sách Order hợp lệ của Tháng
         if (!validOrderIds.has(order.id)) return;
 
@@ -249,6 +261,19 @@ export default function MyActivityScreen() {
     });
   }, [totalAmount, categoriesData]);
 
+  const maxCategoryAmount = useMemo(() => {
+    if (categoriesData.length === 0) return 0;
+    return Math.max(...categoriesData.map(c => c.amount));
+  }, [categoriesData]);
+
+  const getAvatarUrl = (path: string | null) => {
+    if (!path)
+      return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop";
+    if (path.startsWith("http")) return path;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
+  };
+
   const getProductImageUrl = (path: string | null) => {
     if (!path) return "https://via.placeholder.com/150";
     if (path.startsWith("http")) return path;
@@ -271,9 +296,7 @@ export default function MyActivityScreen() {
               <ChevronLeft size={28} color={COLORS.dark} />
             </TouchableOpacity>
             <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
-              }}
+              source={{ uri: getAvatarUrl(avatarUrl) }}
               style={styles.avatar}
             />
             <Text style={styles.headerTitle}>Hoạt động</Text>
@@ -281,12 +304,15 @@ export default function MyActivityScreen() {
         )}
         renderRight={() => (
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconButton}>
-              <LayoutGrid size={22} color={COLORS.dark} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Filter size={22} color={COLORS.dark} />
-              <View style={styles.activeDot} />
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => setChartType(prev => prev === "pie" ? "bar" : "pie")}
+            >
+              {chartType === "pie" ? (
+                <BarChart size={22} color={COLORS.dark} />
+              ) : (
+                <PieChart size={22} color={COLORS.dark} />
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
               <Settings size={22} color={COLORS.dark} />
@@ -319,46 +345,77 @@ export default function MyActivityScreen() {
                 </Text>
               </View>
             ) : totalAmount > 0 ? (
-              <>
-                <Svg
-                  width={CHART_SIZE}
-                  height={CHART_SIZE}
-                  viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
-                >
-                  <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
-                    {chartData.map((segment) => (
-                      <Circle
-                        key={segment.id}
-                        cx={CHART_SIZE / 2}
-                        cy={CHART_SIZE / 2}
-                        r={RADIUS}
-                        stroke={segment.color}
-                        strokeWidth={STROKE_WIDTH}
-                        strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={segment.strokeDashoffset}
-                        strokeLinecap="round"
-                        transform={`rotate(${segment.rotation}, ${CHART_SIZE / 2}, ${CHART_SIZE / 2})`}
-                        opacity={
-                          selectedCategory && selectedCategory !== segment.id
-                            ? 0.3
-                            : 1
-                        }
-                      />
-                    ))}
-                  </G>
-                </Svg>
+              chartType === "pie" ? (
+                <>
+                  <Svg
+                    width={CHART_SIZE}
+                    height={CHART_SIZE}
+                    viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
+                  >
+                    <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
+                      {chartData.map((segment) => (
+                        <Circle
+                          key={segment.id}
+                          cx={CHART_SIZE / 2}
+                          cy={CHART_SIZE / 2}
+                          r={RADIUS}
+                          stroke={segment.color}
+                          strokeWidth={STROKE_WIDTH}
+                          strokeDasharray={CIRCUMFERENCE}
+                          strokeDashoffset={segment.strokeDashoffset}
+                          strokeLinecap="round"
+                          transform={`rotate(${segment.rotation}, ${CHART_SIZE / 2}, ${CHART_SIZE / 2})`}
+                          opacity={
+                            selectedCategory && selectedCategory !== segment.id
+                              ? 0.3
+                              : 1
+                          }
+                        />
+                      ))}
+                    </G>
+                  </Svg>
 
-                {/* Nội dung trung tâm biểu đồ */}
-                <View style={styles.chartCenterContent}>
-                  <Text style={styles.totalLabel}>
+                  {/* Nội dung trung tâm biểu đồ */}
+                  <View style={styles.chartCenterContent}>
+                    <Text style={styles.totalLabel}>
+                      {selectedCategory ? "Chi phí" : "Tổng cộng"}
+                    </Text>
+                    <Text style={styles.totalValue}>
+                      {displayAmount?.toLocaleString("vi-VN")}
+                      <Text style={{ fontSize: 16 }}> ₫</Text>
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <View style={{ width: CHART_SIZE, height: CHART_SIZE, justifyContent: "flex-end", alignItems: "center", paddingTop: 10 }}>
+                  <Text style={[styles.totalLabel, { marginBottom: 4 }]}>
                     {selectedCategory ? "Chi phí" : "Tổng cộng"}
                   </Text>
-                  <Text style={styles.totalValue}>
+                  <Text style={[styles.totalValue, { color: COLORS.dark, marginBottom: 20 }]}>
                     {displayAmount?.toLocaleString("vi-VN")}
                     <Text style={{ fontSize: 16 }}> ₫</Text>
                   </Text>
+                  <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 12, height: 130, width: "100%" }}>
+                    {categoriesData.map((cat) => {
+                      const heightPercent = maxCategoryAmount > 0 ? (cat.amount / maxCategoryAmount) * 100 : 0;
+                      return (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={{
+                            width: Math.min(32, (CHART_SIZE - 40 - (categoriesData.length - 1) * 12) / (categoriesData.length || 1)),
+                            height: `${heightPercent}%`,
+                            backgroundColor: cat.color,
+                            borderTopLeftRadius: 6,
+                            borderTopRightRadius: 6,
+                            opacity: selectedCategory && selectedCategory !== cat.id ? 0.3 : 1
+                          }}
+                          onPress={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                        />
+                      );
+                    })}
+                  </View>
                 </View>
-              </>
+              )
             ) : (
               <View style={styles.chartCenterContent}>
                 <PieChart size={64} color="#888888" opacity={0.6} />
@@ -531,7 +588,7 @@ const styles = StyleSheet.create({
     borderColor: "#FF7676",
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "bold",
     color: COLORS.dark,
   },
