@@ -1,11 +1,10 @@
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-import { ArrowRight, Bell, Play, Settings, Ticket, Wallet, Package, Truck, Star } from "lucide-react-native";
-import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/src/lib/supabase";
-import { useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router, useFocusEffect } from "expo-router";
+import { ArrowRight, Bell, Package, Play, Settings, Star, Ticket, Truck, Wallet } from "lucide-react-native";
+import React, { useCallback, useState } from "react";
 import {
   Dimensions,
   Image,
@@ -34,14 +33,8 @@ const COLOR = {
   dark: "#1A1A1A",
 };
 
-// Dữ liệu mẫu cho "Đã xem gần đây"
-const RECENTLY_VIEWED = [
-  "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=200&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1539109132374-34fa48d3a829?q=80&w=200&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=200&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1554412930-bc96efecdc3c?q=80&w=200&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1529139513477-42f4d94d8128?q=80&w=200&auto=format&fit=crop",
-];
+// Dữ liệu mẫu cho "Đã xem gần đây" (Xóa vì dùng data thật từ profile.recent_views)
+// const RECENTLY_VIEWED = [...];
 
 // Dữ liệu mẫu cho "Khoảnh khắc" (Stories)
 const STORIES = [
@@ -148,6 +141,13 @@ export default function ProfileScreen() {
     return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
   };
 
+  const getProductImageUrl = (path: string | null) => {
+    if (!path) return "https://via.placeholder.com/150";
+    if (path.startsWith("http")) return path;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="dark-content" />
@@ -209,7 +209,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Danh sách sản phẩm đã xem gần đây */}
+        {/* Danh sách sản phẩm đã xem gần đây (Lấy 5 cái từ profile.recent_views) */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Đã xem gần đây</Text>
           <ScrollView
@@ -217,13 +217,27 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
           >
-            {RECENTLY_VIEWED.map((uri, index) => (
-              <View key={index} style={styles.recentViewedItemContainer}>
-                <View style={styles.recentViewedItem}>
-                  <Image source={{ uri }} style={styles.recentViewedImage} />
-                </View>
-              </View>
-            ))}
+            {profile?.recent_views && profile.recent_views.length > 0 ? (
+              profile.recent_views.slice(0, 5).map((item: any, index: number) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.recentViewedItemContainer}
+                  activeOpacity={0.8}
+                  onPress={() => router.push(`/(shop)/product/${item.id}`)}
+                >
+                  <View style={styles.recentViewedItem}>
+                    <Image
+                      source={{ uri: getProductImageUrl(item.image) }}
+                      style={styles.recentViewedImage}
+                    />
+                  </View>
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={{ color: COLOR.textSecondary, fontSize: 14 }}>
+                Duyệt sản phẩm để lưu lịch sử
+              </Text>
+            )}
           </ScrollView>
         </View>
 
