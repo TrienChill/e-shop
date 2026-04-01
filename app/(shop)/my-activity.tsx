@@ -8,7 +8,8 @@ import {
   PackageX,
   PieChart,
   Settings,
-  BarChart
+  BarChart,
+  X
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -21,6 +22,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, G } from "react-native-svg";
@@ -63,15 +66,40 @@ export default function MyActivityScreen() {
   const [purchasedProducts, setPurchasedProducts] = useState<any[]>([]);
   const [categoriesData, setCategoriesData] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Time filter state
+  type FilterType = "last7" | "last30" | "month" | "quarter" | "year" | "custom";
+  const [filterType, setFilterType] = useState<FilterType>("month");
+  const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
+  const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
+  
+  // Modal state
+  const [isFilterModalVisible, setFilterModalVisible] = useState(false);
+  const [tempFilterType, setTempFilterType] = useState<FilterType>("month");
+  const [customStartText, setCustomStartText] = useState("");
+  const [customEndText, setCustomEndText] = useState("");
+
   const [stats, setStats] = useState({
     total: 0,
     delivered: 0,
     pending: 0,
   });
 
-  const displayMonth = useMemo(() => {
-    return `Tháng ${currentDate.getMonth() + 1}`;
-  }, [currentDate]);
+  const displayTimeRange = useMemo(() => {
+    switch (filterType) {
+      case "last7": return "7 ngày gần nhất";
+      case "last30": return "30 ngày gần nhất";
+      case "month": return `Tháng ${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`;
+      case "quarter": return `Quý ${Math.floor(currentDate.getMonth() / 3) + 1}/${currentDate.getFullYear()}`;
+      case "year": return `Năm ${currentDate.getFullYear()}`;
+      case "custom": {
+        const start = customStartDate.toLocaleDateString('vi-VN');
+        const end = customEndDate.toLocaleDateString('vi-VN');
+        return `${start} - ${end}`;
+      }
+      default: return "";
+    }
+  }, [filterType, currentDate, customStartDate, customEndDate]);
 
   // Fetch real activity data
   const fetchActivityData = useCallback(async () => {
@@ -92,19 +120,41 @@ export default function MyActivityScreen() {
         setAvatarUrl(profile.avatar_url);
       }
 
-      // 1. Xác định khung thời gian tháng hiện tại
-      const firstDay = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        1,
-      ).getTime();
-      const lastDay = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() + 1,
-        1,
-      ).getTime();
+      // 1. Xác định khung thời gian
+      const now = new Date();
+      let firstDay: number = 0, lastDay: number = 0;
 
-      const isDateInMonth = (dateString: string | null) => {
+      switch (filterType) {
+        case "last7":
+          firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+          lastDay = now.getTime();
+          break;
+        case "last30":
+          firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
+          lastDay = now.getTime();
+          break;
+        case "quarter": {
+          const quarterFloorMonth = Math.floor(currentDate.getMonth() / 3) * 3;
+          firstDay = new Date(currentDate.getFullYear(), quarterFloorMonth, 1).getTime();
+          lastDay = new Date(currentDate.getFullYear(), quarterFloorMonth + 3, 1).getTime();
+          break;
+        }
+        case "year":
+          firstDay = new Date(currentDate.getFullYear(), 0, 1).getTime();
+          lastDay = new Date(currentDate.getFullYear() + 1, 0, 1).getTime();
+          break;
+        case "custom":
+          firstDay = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate()).getTime();
+          lastDay = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate() + 1).getTime();
+          break;
+        case "month":
+        default:
+          firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getTime();
+          lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).getTime();
+          break;
+      }
+
+      const isDateInRange = (dateString: string | null) => {
         if (!dateString) return false;
         const ms = new Date(dateString).getTime();
         return ms >= firstDay && ms < lastDay;
@@ -124,12 +174,12 @@ export default function MyActivityScreen() {
       const validOrderIds = new Set();
 
       orders.forEach((o: any) => {
-        // - "Đã đặt": trạng thái pending/processing và đơn được TẠO trong tháng này
-        const isPendingProc = ["pending", "processing"].includes(o.status) && isDateInMonth(o.created_at);
-        // - "Chờ nhận": trạng thái shipping và BẮT ĐẦU GIAO trong tháng này (nếu ko có shipping_at thì lấy created_at)
-        const isShipping = o.status === "shipping" && isDateInMonth(o.shipping_at || o.created_at);
-        // - "Đã nhận/Chi phí": trạng thái completed và ĐÃ HOÀN THÀNH trong tháng này
-        const isCompleted = o.status === "completed" && isDateInMonth(o.completed_at || o.time_finished);
+        // - "Đã đặt": trạng thái pending/processing và đơn được TẠO trong thời gian
+        const isPendingProc = ["pending", "processing"].includes(o.status) && isDateInRange(o.created_at);
+        // - "Chờ nhận": trạng thái shipping và BẮT ĐẦU GIAO trong thời gian (nếu ko có shipping_at thì lấy created_at)
+        const isShipping = o.status === "shipping" && isDateInRange(o.shipping_at || o.created_at);
+        // - "Đã nhận/Chi phí": trạng thái completed và ĐÃ HOÀN THÀNH trong thời gian
+        const isCompleted = o.status === "completed" && isDateInRange(o.completed_at || o.time_finished);
 
         if (isPendingProc) total++;
         if (isShipping) pendingCount++;
@@ -215,7 +265,7 @@ export default function MyActivityScreen() {
     } finally {
       setLoading(false);
     }
-  }, [currentDate]);
+  }, [currentDate, filterType, customStartDate, customEndDate]);
 
   useFocusEffect(
     useCallback(() => {
@@ -223,16 +273,43 @@ export default function MyActivityScreen() {
     }, [fetchActivityData]),
   );
 
-  const handlePrevMonth = () => {
-    setCurrentDate(
-      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
-    );
+  const handlePrevTime = () => {
+    if (filterType === "month") {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    } else if (filterType === "quarter") {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 3, 1));
+    } else if (filterType === "year") {
+      setCurrentDate((prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), 1));
+    }
   };
 
-  const handleNextMonth = () => {
-    setCurrentDate(
-      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
-    );
+  const handleNextTime = () => {
+    if (filterType === "month") {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    } else if (filterType === "quarter") {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 3, 1));
+    } else if (filterType === "year") {
+      setCurrentDate((prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), 1));
+    }
+  };
+
+  const canNavigate = ["month", "quarter", "year"].includes(filterType);
+
+  const parseDate = (text: string) => {
+    const [d, m, y] = text.split('/');
+    if (d && m && y) {
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+    return new Date();
+  };
+
+  const applyFilter = () => {
+    setFilterType(tempFilterType);
+    if (tempFilterType === 'custom') {
+       if (customStartText) setCustomStartDate(parseDate(customStartText));
+       if (customEndText) setCustomEndDate(parseDate(customEndText));
+    }
+    setFilterModalVisible(false);
   };
 
   // Tính toán dữ liệu biểu đồ
@@ -288,7 +365,7 @@ export default function MyActivityScreen() {
       {/* 1. Header & Bộ lọc thời gian */}
       <CommonHeader
         renderLeft={() => (
-          <View style={styles.headerLeft}>
+          <>
             <TouchableOpacity
               onPress={() => router.back()}
               style={styles.backBtnHeader}
@@ -300,10 +377,10 @@ export default function MyActivityScreen() {
               style={styles.avatar}
             />
             <Text style={styles.headerTitle}>Hoạt động</Text>
-          </View>
+          </>
         )}
         renderRight={() => (
-          <View style={styles.headerRight}>
+          <>
             <TouchableOpacity 
               style={styles.iconButton}
               onPress={() => setChartType(prev => prev === "pie" ? "bar" : "pie")}
@@ -314,10 +391,16 @@ export default function MyActivityScreen() {
                 <PieChart size={22} color={COLORS.dark} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => {
+                setTempFilterType(filterType);
+                setFilterModalVisible(true);
+              }}
+            >
               <Settings size={22} color={COLORS.dark} />
             </TouchableOpacity>
-          </View>
+          </>
         )}
       />
 
@@ -327,14 +410,18 @@ export default function MyActivityScreen() {
       >
         {/* Thanh chọn tháng */}
         <View style={styles.monthPickerContainer}>
-          <Text style={styles.monthText}>{displayMonth}</Text>
+          <Text style={styles.monthText}>{displayTimeRange}</Text>
         </View>
 
         {/* 2. Biểu đồ chi tiêu (Donut Chart Section) */}
         <View style={styles.chartSection}>
-          <TouchableOpacity style={styles.arrowNav} onPress={handlePrevMonth}>
-            <ChevronLeft size={28} color={COLORS.blue} />
-          </TouchableOpacity>
+          <View style={{ width: 44 }}>
+            {canNavigate && (
+              <TouchableOpacity style={styles.arrowNav} onPress={handlePrevTime}>
+                <ChevronLeft size={28} color={COLORS.blue} />
+              </TouchableOpacity>
+            )}
+          </View>
 
           <View style={styles.chartWrapper}>
             {loading ? (
@@ -426,9 +513,13 @@ export default function MyActivityScreen() {
             )}
           </View>
 
-          <TouchableOpacity style={styles.arrowNav} onPress={handleNextMonth}>
-            <ChevronRight size={28} color={COLORS.blue} />
-          </TouchableOpacity>
+          <View style={{ width: 44 }}>
+            {canNavigate && (
+              <TouchableOpacity style={styles.arrowNav} onPress={handleNextTime}>
+                <ChevronRight size={28} color={COLORS.blue} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* 3. Chú thích phân mục (Categories) */}
@@ -561,6 +652,75 @@ export default function MyActivityScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Filter Modal */}
+      <Modal
+        visible={isFilterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Thời gian</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={{ padding: 4 }}>
+                <X size={24} color={COLORS.dark} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.filterOptionsGrid}>
+              {[
+                { id: 'last7', label: '7 ngày gần nhất' },
+                { id: 'last30', label: '30 ngày gần nhất' },
+                { id: 'month', label: 'Theo Tháng' },
+                { id: 'quarter', label: 'Theo Quý' },
+                { id: 'year', label: 'Theo Năm' },
+                { id: 'custom', label: 'Tùy chỉnh thời gian' },
+              ].map((item: any) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.filterOptionBtn, tempFilterType === item.id && styles.filterOptionBtnActive]}
+                  onPress={() => setTempFilterType(item.id)}
+                >
+                  <Text style={[styles.filterOptionText, tempFilterType === item.id && styles.filterOptionTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {tempFilterType === 'custom' && (
+              <View style={styles.customDateContainer}>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={styles.dateInputLabel}>Từ ngày</Text>
+                  <TextInput 
+                    style={styles.dateInput} 
+                    placeholder="DD/MM/YYYY" 
+                    value={customStartText}
+                    onChangeText={setCustomStartText}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.dateInputWrapper}>
+                  <Text style={styles.dateInputLabel}>Đến ngày</Text>
+                  <TextInput 
+                    style={styles.dateInput} 
+                    placeholder="DD/MM/YYYY" 
+                    value={customEndText}
+                    onChangeText={setCustomEndText}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity style={styles.applyFilterBtn} onPress={applyFilter}>
+              <Text style={styles.applyFilterText}>Áp dụng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -581,10 +741,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
     borderColor: "#FF7676",
   },
   headerTitle: {
@@ -598,10 +758,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   iconButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
+    borderRadius: 14,
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
@@ -799,5 +959,88 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
     fontWeight: "500",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: COLORS.dark,
+  },
+  filterOptionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 24,
+  },
+  filterOptionBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: COLORS.lightGray,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  filterOptionBtnActive: {
+    backgroundColor: "#E8F0FF",
+    borderColor: COLORS.blue,
+  },
+  filterOptionText: {
+    fontSize: 14,
+    color: COLORS.dark,
+    fontWeight: "500",
+  },
+  filterOptionTextActive: {
+    color: COLORS.blue,
+    fontWeight: "bold",
+  },
+  customDateContainer: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 24,
+  },
+  dateInputWrapper: {
+    flex: 1,
+  },
+  dateInputLabel: {
+    fontSize: 14,
+    color: "#666666",
+    marginBottom: 8,
+  },
+  dateInput: {
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: COLORS.dark,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+  },
+  applyFilterBtn: {
+    backgroundColor: COLORS.blue,
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: "center",
+  },
+  applyFilterText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
