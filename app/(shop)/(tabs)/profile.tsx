@@ -3,7 +3,9 @@ import CommonHeader from "@/src/components/layout/Header";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { ArrowRight, Bell, Play, Settings, Ticket, Wallet, Package, Truck, Star } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/src/lib/supabase";
+import { useFocusEffect } from "expo-router";
 import {
   Dimensions,
   Image,
@@ -71,6 +73,38 @@ const STORIES = [
 
 export default function ProfileScreen() {
   const [activeOrderTab, setActiveOrderTab] = useState("Đang giao");
+  const [profile, setProfile] = useState<any>(null);
+
+  // Fetch profile data
+  const fetchProfile = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error fetching profile:", error);
+        } else {
+          setProfile(data);
+        }
+      }
+    } catch (error) {
+      console.error("Error in fetchProfile:", error);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
 
   // Hàm xử lý đăng xuất
   const logout = async () => {
@@ -105,6 +139,15 @@ export default function ProfileScreen() {
     );
   };
 
+  const getAvatarUrl = (path: string | null) => {
+    if (!path)
+      return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop";
+    if (path.startsWith("http")) return path;
+    // Assuming 'avatars' is the bucket name as seen in reviews.tsx
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="dark-content" />
@@ -114,7 +157,7 @@ export default function ProfileScreen() {
           <>
             <Image
               source={{
-                uri: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop",
+                uri: getAvatarUrl(profile?.avatar_url),
               }}
               style={styles.avatar}
             />
@@ -149,7 +192,7 @@ export default function ProfileScreen() {
       >
         {/* Lời chào mừng */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>Chào, Triển Chill!</Text>
+          <Text style={styles.welcomeText}>Chào, {profile?.full_name || "Triển Chill"}!</Text>
         </View>
 
         {/* Khung Thông báo (Announcement Card) */}
