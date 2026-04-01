@@ -6,6 +6,8 @@ import {
   ChevronRight,
   Filter,
   LayoutGrid,
+  PackageX,
+  PieChart,
   Settings,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
@@ -38,27 +40,36 @@ const COLORS = {
   white: "#FFFFFF",
   dark: "#1A1A1A",
   lightGray: "#F5F8FF",
-  textSecondary: "#666666",
+  textSecondary: "#ffffff",
   shadow: "rgba(0, 0, 0, 0.1)",
 };
 
-const CATEGORIES = [
-  { id: "clothing", label: "Quần áo", amount: 183, color: COLORS.blue },
-  { id: "lingerie", label: "Nội y", amount: 92, color: COLORS.green },
-  { id: "shoes", label: "Giày dép", amount: 47, color: COLORS.orange },
-  { id: "bags", label: "Túi xách", amount: 43, color: COLORS.pink },
+// Bảng màu cho các phân đoạn biểu đồ
+const CATEGORY_COLORS = [
+  "#0055FF", // Blue
+  "#A2FF33", // Green
+  "#FF8A00", // Orange
+  "#FF4D8D", // Pink
+  "#A855F7", // Purple
+  "#00D1FF", // Cyan
+  "#FACC15", // Yellow
 ];
 
 export default function MyActivityScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState("Tháng 4");
   const [loading, setLoading] = useState(true);
   const [purchasedProducts, setPurchasedProducts] = useState<any[]>([]);
+  const [categoriesData, setCategoriesData] = useState<any[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [stats, setStats] = useState({
     total: 0,
     delivered: 0,
     pending: 0,
   });
+
+  const displayMonth = useMemo(() => {
+    return `Tháng ${currentDate.getMonth() + 1}`;
+  }, [currentDate]);
 
   // Fetch real activity data
   const fetchActivityData = useCallback(async () => {
@@ -69,40 +80,92 @@ export default function MyActivityScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Fetch stats
+      // 1. Xác định khung thời gian tháng hiện tại
+      const firstDay = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth(),
+        1,
+      ).getTime();
+      const lastDay = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        1,
+      ).getTime();
+
+      const isDateInMonth = (dateString: string | null) => {
+        if (!dateString) return false;
+        const ms = new Date(dateString).getTime();
+        return ms >= firstDay && ms < lastDay;
+      };
+
+      // 2. Fetch toàn bộ orders của user để tự filter
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, status")
+        .select("id, status, created_at, processing_at, shipping_at, completed_at, time_finished")
         .eq("user_id", user.id);
 
       if (ordersError) throw ordersError;
 
-      const total = orders.length;
-      const delivered = orders.filter((o) => o.status === "completed").length;
-      const pending = orders.filter((o) =>
-        ["pending", "processing", "shipping"].includes(o.status),
-      ).length;
+      let total = 0;
+      let delivered = 0;
+      let pendingCount = 0;
+      const validOrderIds = new Set();
+      
+      orders.forEach((o: any) => {
+        // - "Đã đặt": trạng thái pending/processing và đơn được TẠO trong tháng này
+        const isPendingProc = ["pending", "processing"].includes(o.status) && isDateInMonth(o.created_at);
+        // - "Chờ nhận": trạng thái shipping và BẮT ĐẦU GIAO trong tháng này (nếu ko có shipping_at thì lấy created_at)
+        const isShipping = o.status === "shipping" && isDateInMonth(o.shipping_at || o.created_at);
+        // - "Đã nhận/Chi phí": trạng thái completed và ĐÃ HOÀN THÀNH trong tháng này
+        const isCompleted = o.status === "completed" && isDateInMonth(o.completed_at || o.time_finished);
 
-      setStats({ total, delivered, pending });
+        if (isPendingProc) total++;
+        if (isShipping) pendingCount++;
+        if (isCompleted) delivered++;
 
-      // 2. Fetch purchased products (limit to 10 latest unique products)
+        // Nếu đơn hàng liên quan đến tháng này ở bất kì trạng thái nào, mở khóa chi tiêu & SP của nó
+        if (isPendingProc || isShipping || isCompleted) {
+          validOrderIds.add(o.id);
+        }
+      });
+
+      setStats({ total, delivered, pending: pendingCount });
+
+      // 3. Fetch toàn bộ order items của user
       const { data: items, error: itemsError } = await supabase
         .from("order_items")
         .select(
           `
           product_id,
-          products (id, name, images),
-          orders!inner (user_id)
+          quantity,
+          price_at_purchase,
+          products (
+            id, 
+            name, 
+            images,
+            categories (id, name, name_vi)
+          ),
+          orders!inner (id)
         `,
         )
-        .eq("orders.user_id", user.id)
-        .order("created_at", { ascending: false });
+        .eq("orders.user_id", user.id);
 
       if (itemsError) throw itemsError;
 
-      // Filter unique products
+      // Filter unique products & Calculate spending by category
       const productsMap = new Map();
+      const categorySpending: Record<
+        string,
+        { label: string; amount: number }
+      > = {};
+
       items.forEach((item: any) => {
+        const order = item.orders;
+        
+        // Chỉ tổng hợp những item nằm trong danh sách Order hợp lệ của Tháng
+        if (!validOrderIds.has(order.id)) return;
+
+        // Build product list
         if (item.products && !productsMap.has(item.products.id)) {
           productsMap.set(item.products.id, {
             id: item.products.id,
@@ -110,15 +173,37 @@ export default function MyActivityScreen() {
             image: item.products.images?.[0] || "",
           });
         }
+
+        // Calculate spending
+        const category = item.products?.categories;
+        if (category) {
+          const catName = category.name_vi || category.name || "Khác";
+          if (!categorySpending[catName]) {
+            categorySpending[catName] = { label: catName, amount: 0 };
+          }
+          categorySpending[catName].amount +=
+            (item.price_at_purchase || 0) * (item.quantity || 0);
+        }
       });
 
+      // Format category data for chart
+      const formattedCategories = Object.entries(categorySpending).map(
+        ([name, data], index) => ({
+          id: name,
+          label: data.label,
+          amount: data.amount,
+          color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
+        }),
+      );
+
+      setCategoriesData(formattedCategories);
       setPurchasedProducts(Array.from(productsMap.values()).slice(0, 10));
     } catch (error) {
       console.error("Lỗi lấy dữ liệu hoạt động:", error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentDate]);
 
   useFocusEffect(
     useCallback(() => {
@@ -126,19 +211,32 @@ export default function MyActivityScreen() {
     }, [fetchActivityData]),
   );
 
+  const handlePrevMonth = () => {
+    setCurrentDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
+    );
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
+    );
+  };
+
   // Tính toán dữ liệu biểu đồ
   const totalAmount = useMemo(
-    () => CATEGORIES.reduce((acc, cat) => acc + cat.amount, 0),
-    [],
+    () => categoriesData.reduce((acc, cat) => acc + cat.amount, 0),
+    [categoriesData],
   );
   const displayAmount = selectedCategory
-    ? CATEGORIES.find((c) => c.id === selectedCategory)?.amount
+    ? categoriesData.find((c) => c.id === selectedCategory)?.amount
     : totalAmount;
 
   // Tính toán các phân đoạn biểu đồ
   const chartData = useMemo(() => {
     let currentOffset = 0;
-    return CATEGORIES.map((cat) => {
+    if (totalAmount === 0) return [];
+    return categoriesData.map((cat) => {
       const percentage = cat.amount / totalAmount;
       const strokeDashoffset = CIRCUMFERENCE - CIRCUMFERENCE * percentage;
       const rotation = (currentOffset / totalAmount) * 360;
@@ -149,7 +247,7 @@ export default function MyActivityScreen() {
         rotation,
       };
     });
-  }, [totalAmount]);
+  }, [totalAmount, categoriesData]);
 
   const getProductImageUrl = (path: string | null) => {
     if (!path) return "https://via.placeholder.com/150";
@@ -203,81 +301,104 @@ export default function MyActivityScreen() {
       >
         {/* Thanh chọn tháng */}
         <View style={styles.monthPickerContainer}>
-          <Text style={styles.monthText}>{currentMonth}</Text>
+          <Text style={styles.monthText}>{displayMonth}</Text>
         </View>
 
         {/* 2. Biểu đồ chi tiêu (Donut Chart Section) */}
         <View style={styles.chartSection}>
-          <TouchableOpacity style={styles.arrowNav}>
+          <TouchableOpacity style={styles.arrowNav} onPress={handlePrevMonth}>
             <ChevronLeft size={28} color={COLORS.blue} />
           </TouchableOpacity>
 
           <View style={styles.chartWrapper}>
-            <Svg
-              width={CHART_SIZE}
-              height={CHART_SIZE}
-              viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
-            >
-              <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
-                {chartData.map((segment) => (
-                  <Circle
-                    key={segment.id}
-                    cx={CHART_SIZE / 2}
-                    cy={CHART_SIZE / 2}
-                    r={RADIUS}
-                    stroke={segment.color}
-                    strokeWidth={STROKE_WIDTH}
-                    strokeDasharray={CIRCUMFERENCE}
-                    strokeDashoffset={segment.strokeDashoffset}
-                    strokeLinecap="round"
-                    transform={`rotate(${segment.rotation}, ${CHART_SIZE / 2}, ${CHART_SIZE / 2})`}
-                    opacity={
-                      selectedCategory && selectedCategory !== segment.id
-                        ? 0.3
-                        : 1
-                    }
-                  />
-                ))}
-              </G>
-            </Svg>
+            {loading ? (
+              <View style={styles.chartCenterContent}>
+                <ActivityIndicator size="large" color={COLORS.blue} />
+                <Text style={{ marginTop: 8, color: COLORS.blue, fontWeight: "500" }}>
+                  Đang tải...
+                </Text>
+              </View>
+            ) : totalAmount > 0 ? (
+              <>
+                <Svg
+                  width={CHART_SIZE}
+                  height={CHART_SIZE}
+                  viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
+                >
+                  <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
+                    {chartData.map((segment) => (
+                      <Circle
+                        key={segment.id}
+                        cx={CHART_SIZE / 2}
+                        cy={CHART_SIZE / 2}
+                        r={RADIUS}
+                        stroke={segment.color}
+                        strokeWidth={STROKE_WIDTH}
+                        strokeDasharray={CIRCUMFERENCE}
+                        strokeDashoffset={segment.strokeDashoffset}
+                        strokeLinecap="round"
+                        transform={`rotate(${segment.rotation}, ${CHART_SIZE / 2}, ${CHART_SIZE / 2})`}
+                        opacity={
+                          selectedCategory && selectedCategory !== segment.id
+                            ? 0.3
+                            : 1
+                        }
+                      />
+                    ))}
+                  </G>
+                </Svg>
 
-            {/* Nội dung trung tâm biểu đồ */}
-            <View style={styles.chartCenterContent}>
-              <Text style={styles.totalLabel}>
-                {selectedCategory ? "Chi phí" : "Tổng cộng"}
-              </Text>
-              <Text style={styles.totalValue}>
-                ${displayAmount?.toLocaleString()},00
-              </Text>
-            </View>
+                {/* Nội dung trung tâm biểu đồ */}
+                <View style={styles.chartCenterContent}>
+                  <Text style={styles.totalLabel}>
+                    {selectedCategory ? "Chi phí" : "Tổng cộng"}
+                  </Text>
+                  <Text style={styles.totalValue}>
+                    {displayAmount?.toLocaleString("vi-VN")}
+                    <Text style={{ fontSize: 16 }}> ₫</Text>
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.chartCenterContent}>
+                <PieChart size={64} color="#888888" opacity={0.6} />
+                <Text style={{ marginTop: 12, color: "#888888", fontWeight: "500", fontSize: 16 }}>
+                  Chưa có chi tiêu
+                </Text>
+              </View>
+            )}
           </View>
 
-          <TouchableOpacity style={styles.arrowNav}>
+          <TouchableOpacity style={styles.arrowNav} onPress={handleNextMonth}>
             <ChevronRight size={28} color={COLORS.blue} />
           </TouchableOpacity>
         </View>
 
         {/* 3. Chú thích phân mục (Categories) */}
         <View style={styles.categoriesContainer}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat.id}
-              style={[
-                styles.categoryPill,
-                { backgroundColor: cat.color },
-                selectedCategory === cat.id && styles.activePill,
-              ]}
-              onPress={() =>
-                setSelectedCategory(
-                  selectedCategory === cat.id ? null : cat.id,
-                )
-              }
-            >
-              <Text style={styles.categoryLabel}>
-                {cat.label} ${cat.amount},00
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {categoriesData.length > 0 ? (
+            categoriesData.map((cat) => (
+              <TouchableOpacity
+                key={cat.id}
+                style={[
+                  styles.categoryPill,
+                  { backgroundColor: cat.color },
+                  selectedCategory === cat.id && styles.activePill,
+                ]}
+                onPress={() =>
+                  setSelectedCategory(
+                    selectedCategory === cat.id ? null : cat.id,
+                  )
+                }
+              >
+                <Text style={styles.categoryLabel}>
+                  {cat.label} {cat.amount.toLocaleString("vi-VN")}₫
+                </Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>Chưa có dữ liệu chi tiêu.</Text>
+          )}
         </View>
 
         {/* 4. Thống kê đơn hàng (Order Stats) */}
@@ -361,7 +482,10 @@ export default function MyActivityScreen() {
               ))}
             </ScrollView>
           ) : (
-            <Text style={styles.emptyText}>Bạn chưa mua sản phẩm nào.</Text>
+            <View style={styles.emptyProductsView}>
+              <PackageX size={48} color="#888888" opacity={0.6} />
+              <Text style={styles.emptyTextFixed}>Bạn chưa mua sản phẩm nào.</Text>
+            </View>
           )}
         </View>
 
@@ -369,7 +493,10 @@ export default function MyActivityScreen() {
         <TouchableOpacity
           style={styles.historyButton}
           onPress={() =>
-            router.push({ pathname: "/to-receive", params: { status: "history" } })
+            router.push({
+              pathname: "/to-receive",
+              params: { status: "history" },
+            })
           }
         >
           <Text style={styles.historyButtonText}>Lịch sử mua hàng</Text>
@@ -483,7 +610,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 32,
     fontWeight: "bold",
-    color: COLORS.dark,
+    color: COLORS.white,
   },
   categoriesContainer: {
     flexDirection: "row",
@@ -598,10 +725,22 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
   },
+  emptyProductsView: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 32,
+  },
   emptyText: {
     textAlign: "center",
     color: COLORS.textSecondary,
     fontSize: 14,
-    paddingVertical: 20,
+    marginTop: 12,
+  },
+  emptyTextFixed: {
+    textAlign: "center",
+    color: "#888888",
+    fontSize: 14,
+    marginTop: 12,
+    fontWeight: "500",
   },
 });
