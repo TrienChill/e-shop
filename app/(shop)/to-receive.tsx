@@ -113,11 +113,11 @@ export default function ToReceiveScreen() {
   }, [params.status]);
 
   const STATUS_PRIORITY: Record<string, number> = {
-    completed: 1, // Đã giao
-    shipping: 2, // Đang giao
-    processing: 3, // Đang đóng gói
-    pending: 4, // Đang xử lý
-    cancelled: 5, // Đã hủy
+    pending: 5,
+    processing: 4,
+    shipping: 3,
+    completed: 2,
+    cancelled: 1,
   };
 
   const STATUS_OPTIONS = [
