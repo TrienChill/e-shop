@@ -1,8 +1,16 @@
 import CommonHeader from "@/src/components/layout/Header";
-import { router } from "expo-router";
-import { ChevronLeft, ChevronRight, Filter, Settings, LayoutGrid } from "lucide-react-native";
-import React, { useState, useMemo } from "react";
+import { supabase } from "@/src/lib/supabase";
+import { router, useFocusEffect } from "expo-router";
 import {
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  LayoutGrid,
+  Settings,
+} from "lucide-react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
   Dimensions,
   Image,
   ScrollView,
@@ -44,19 +52,95 @@ const CATEGORIES = [
 export default function MyActivityScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState("Tháng 4");
+  const [loading, setLoading] = useState(true);
+  const [purchasedProducts, setPurchasedProducts] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    delivered: 0,
+    pending: 0,
+  });
+
+  // Fetch real activity data
+  const fetchActivityData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Fetch stats
+      const { data: orders, error: ordersError } = await supabase
+        .from("orders")
+        .select("id, status")
+        .eq("user_id", user.id);
+
+      if (ordersError) throw ordersError;
+
+      const total = orders.length;
+      const delivered = orders.filter((o) => o.status === "completed").length;
+      const pending = orders.filter((o) =>
+        ["pending", "processing", "shipping"].includes(o.status),
+      ).length;
+
+      setStats({ total, delivered, pending });
+
+      // 2. Fetch purchased products (limit to 10 latest unique products)
+      const { data: items, error: itemsError } = await supabase
+        .from("order_items")
+        .select(
+          `
+          product_id,
+          products (id, name, images),
+          orders!inner (user_id)
+        `,
+        )
+        .eq("orders.user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (itemsError) throw itemsError;
+
+      // Filter unique products
+      const productsMap = new Map();
+      items.forEach((item: any) => {
+        if (item.products && !productsMap.has(item.products.id)) {
+          productsMap.set(item.products.id, {
+            id: item.products.id,
+            name: item.products.name,
+            image: item.products.images?.[0] || "",
+          });
+        }
+      });
+
+      setPurchasedProducts(Array.from(productsMap.values()).slice(0, 10));
+    } catch (error) {
+      console.error("Lỗi lấy dữ liệu hoạt động:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActivityData();
+    }, [fetchActivityData]),
+  );
 
   // Tính toán dữ liệu biểu đồ
-  const totalAmount = useMemo(() => CATEGORIES.reduce((acc, cat) => acc + cat.amount, 0), []);
-  const displayAmount = selectedCategory 
-    ? CATEGORIES.find(c => c.id === selectedCategory)?.amount 
+  const totalAmount = useMemo(
+    () => CATEGORIES.reduce((acc, cat) => acc + cat.amount, 0),
+    [],
+  );
+  const displayAmount = selectedCategory
+    ? CATEGORIES.find((c) => c.id === selectedCategory)?.amount
     : totalAmount;
 
   // Tính toán các phân đoạn biểu đồ
   const chartData = useMemo(() => {
     let currentOffset = 0;
-    return CATEGORIES.map(cat => {
+    return CATEGORIES.map((cat) => {
       const percentage = cat.amount / totalAmount;
-      const strokeDashoffset = CIRCUMFERENCE - (CIRCUMFERENCE * percentage);
+      const strokeDashoffset = CIRCUMFERENCE - CIRCUMFERENCE * percentage;
       const rotation = (currentOffset / totalAmount) * 360;
       currentOffset += cat.amount;
       return {
@@ -67,15 +151,25 @@ export default function MyActivityScreen() {
     });
   }, [totalAmount]);
 
+  const getProductImageUrl = (path: string | null) => {
+    if (!path) return "https://via.placeholder.com/150";
+    if (path.startsWith("http")) return path;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
       <StatusBar barStyle="dark-content" />
-      
+
       {/* 1. Header & Bộ lọc thời gian */}
       <CommonHeader
         renderLeft={() => (
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtnHeader}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtnHeader}
+            >
               <ChevronLeft size={28} color={COLORS.dark} />
             </TouchableOpacity>
             <Image
@@ -89,7 +183,7 @@ export default function MyActivityScreen() {
         )}
         renderRight={() => (
           <View style={styles.headerRight}>
-             <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton}>
               <LayoutGrid size={22} color={COLORS.dark} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
@@ -103,7 +197,10 @@ export default function MyActivityScreen() {
         )}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Thanh chọn tháng */}
         <View style={styles.monthPickerContainer}>
           <Text style={styles.monthText}>{currentMonth}</Text>
@@ -116,8 +213,12 @@ export default function MyActivityScreen() {
           </TouchableOpacity>
 
           <View style={styles.chartWrapper}>
-            <Svg width={CHART_SIZE} height={CHART_SIZE} viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}>
-              <G rotation="-90" origin={`${CHART_SIZE/2}, ${CHART_SIZE/2}`}>
+            <Svg
+              width={CHART_SIZE}
+              height={CHART_SIZE}
+              viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
+            >
+              <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
                 {chartData.map((segment) => (
                   <Circle
                     key={segment.id}
@@ -129,17 +230,25 @@ export default function MyActivityScreen() {
                     strokeDasharray={CIRCUMFERENCE}
                     strokeDashoffset={segment.strokeDashoffset}
                     strokeLinecap="round"
-                    transform={`rotate(${segment.rotation}, ${CHART_SIZE/2}, ${CHART_SIZE/2})`}
-                    opacity={selectedCategory && selectedCategory !== segment.id ? 0.3 : 1}
+                    transform={`rotate(${segment.rotation}, ${CHART_SIZE / 2}, ${CHART_SIZE / 2})`}
+                    opacity={
+                      selectedCategory && selectedCategory !== segment.id
+                        ? 0.3
+                        : 1
+                    }
                   />
                 ))}
               </G>
             </Svg>
-            
+
             {/* Nội dung trung tâm biểu đồ */}
             <View style={styles.chartCenterContent}>
-              <Text style={styles.totalLabel}>{selectedCategory ? "Chi phí" : "Tổng cộng"}</Text>
-              <Text style={styles.totalValue}>${displayAmount?.toLocaleString()},00</Text>
+              <Text style={styles.totalLabel}>
+                {selectedCategory ? "Chi phí" : "Tổng cộng"}
+              </Text>
+              <Text style={styles.totalValue}>
+                ${displayAmount?.toLocaleString()},00
+              </Text>
             </View>
           </View>
 
@@ -156,11 +265,17 @@ export default function MyActivityScreen() {
               style={[
                 styles.categoryPill,
                 { backgroundColor: cat.color },
-                selectedCategory === cat.id && styles.activePill
+                selectedCategory === cat.id && styles.activePill,
               ]}
-              onPress={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+              onPress={() =>
+                setSelectedCategory(
+                  selectedCategory === cat.id ? null : cat.id,
+                )
+              }
             >
-              <Text style={styles.categoryLabel}>{cat.label} ${cat.amount},00</Text>
+              <Text style={styles.categoryLabel}>
+                {cat.label} ${cat.amount},00
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -169,34 +284,97 @@ export default function MyActivityScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <View style={[styles.statCircle, styles.shadowEffect]}>
-              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statNumber}>{stats.total}</Text>
             </View>
             <Text style={styles.statLabel}>Đã đặt</Text>
           </View>
-          
+
           <View style={styles.statItem}>
-            <View style={[styles.statCircle, styles.shadowEffect]}>
-              <Text style={styles.statNumber}>7</Text>
+            <View
+              style={[
+                styles.statCircle,
+                styles.shadowEffect,
+                { backgroundColor: COLORS.green },
+              ]}
+            >
+              <Text style={[styles.statNumber, { color: COLORS.dark }]}>
+                {stats.delivered}
+              </Text>
             </View>
             <Text style={styles.statLabel}>Đã nhận</Text>
           </View>
 
           <View style={styles.statItem}>
-            <View style={[styles.statCircle, styles.shadowEffect]}>
-              <Text style={styles.statNumber}>5</Text>
+            <View
+              style={[
+                styles.statCircle,
+                styles.shadowEffect,
+                { backgroundColor: COLORS.orange },
+              ]}
+            >
+              <Text style={styles.statNumber}>{stats.pending}</Text>
             </View>
             <Text style={styles.statLabel}>Chờ nhận</Text>
           </View>
         </View>
 
+        {/* 4.5. Sản phẩm đã mua (Purchased Products Section) */}
+        <View style={styles.purchasedSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Sản phẩm đã mua</Text>
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/to-receive",
+                  params: { status: "history" },
+                })
+              }
+            >
+              <Text style={styles.seeAllText}>Xem tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <View style={{ padding: 20 }}>
+              <ActivityIndicator color={COLORS.blue} />
+            </View>
+          ) : purchasedProducts.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.purchasedScroll}
+            >
+              {purchasedProducts.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.purchasedCard}
+                  onPress={() => router.push(`/(shop)/product/${product.id}`)}
+                >
+                  <Image
+                    source={{ uri: getProductImageUrl(product.image) }}
+                    style={styles.purchasedImage}
+                  />
+                  <Text style={styles.purchasedName} numberOfLines={1}>
+                    {product.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          ) : (
+            <Text style={styles.emptyText}>Bạn chưa mua sản phẩm nào.</Text>
+          )}
+        </View>
+
         {/* 5. Nút hành động cuối trang */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.historyButton}
-          onPress={() => router.push({ pathname: "/to-receive", params: { status: "history" } })}
+          onPress={() =>
+            router.push({ pathname: "/to-receive", params: { status: "history" } })
+          }
         >
           <Text style={styles.historyButtonText}>Lịch sử mua hàng</Text>
         </TouchableOpacity>
-        
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
@@ -380,5 +558,50 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 18,
     fontWeight: "bold",
+  },
+  purchasedSection: {
+    marginBottom: 48,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: COLORS.dark,
+  },
+  seeAllText: {
+    color: COLORS.blue,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  purchasedScroll: {
+    gap: 16,
+  },
+  purchasedCard: {
+    width: 120,
+    alignItems: "center",
+  },
+  purchasedImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 20,
+    backgroundColor: COLORS.lightGray,
+    marginBottom: 8,
+  },
+  purchasedName: {
+    fontSize: 12,
+    color: COLORS.dark,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+  emptyText: {
+    textAlign: "center",
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    paddingVertical: 20,
   },
 });

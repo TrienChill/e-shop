@@ -3,7 +3,17 @@ import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { ArrowRight, Bell, Package, Play, Settings, Star, Ticket, Truck, Wallet } from "lucide-react-native";
+import {
+  ArrowRight,
+  Bell,
+  Package,
+  Play,
+  Settings,
+  Star,
+  Ticket,
+  Truck,
+  Wallet,
+} from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
   Dimensions,
@@ -65,7 +75,6 @@ const STORIES = [
 ];
 
 export default function ProfileScreen() {
-  const [activeOrderTab, setActiveOrderTab] = useState("Đang giao");
   const [profile, setProfile] = useState<any>(null);
 
   // Fetch profile data
@@ -96,7 +105,7 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
-    }, [fetchProfile])
+    }, [fetchProfile]),
   );
 
   // Hàm xử lý đăng xuất
@@ -192,7 +201,9 @@ export default function ProfileScreen() {
       >
         {/* Lời chào mừng */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeText}>Chào, {profile?.full_name || "Triển Chill"}!</Text>
+          <Text style={styles.welcomeText}>
+            Chào, {profile?.full_name || "Triển Chill"}!
+          </Text>
         </View>
 
         {/* Khung Thông báo (Announcement Card) */}
@@ -218,21 +229,23 @@ export default function ProfileScreen() {
             contentContainerStyle={styles.horizontalScroll}
           >
             {profile?.recent_views && profile.recent_views.length > 0 ? (
-              profile.recent_views.slice(0, 5).map((item: any, index: number) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.recentViewedItemContainer}
-                  activeOpacity={0.8}
-                  onPress={() => router.push(`/(shop)/product/${item.id}`)}
-                >
-                  <View style={styles.recentViewedItem}>
-                    <Image
-                      source={{ uri: getProductImageUrl(item.image) }}
-                      style={styles.recentViewedImage}
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))
+              profile.recent_views
+                .slice(0, 5)
+                .map((item: any, index: number) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.recentViewedItemContainer}
+                    activeOpacity={0.8}
+                    onPress={() => router.push(`/(shop)/product/${item.id}`)}
+                  >
+                    <View style={styles.recentViewedItem}>
+                      <Image
+                        source={{ uri: getProductImageUrl(item.image) }}
+                        style={styles.recentViewedImage}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))
             ) : (
               <Text style={{ color: COLOR.textSecondary, fontSize: 14 }}>
                 Duyệt sản phẩm để lưu lịch sử
