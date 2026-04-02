@@ -1,9 +1,11 @@
 import { supabase } from "@/src/lib/supabase";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft } from "lucide-react-native";
+import { ArrowLeft, PencilLine, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
+import ReviewModal from "@/src/components/modals/ReviewModal";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   StyleSheet,
@@ -20,6 +22,11 @@ export default function AllReviewsScreen() {
   const router = useRouter();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Review Edit states
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<any>(null);
 
   // Nhận params
   const params = useLocalSearchParams();
@@ -28,9 +35,8 @@ export default function AllReviewsScreen() {
   // Vì vậy ta dùng một biến dự phòng (fallback)
   const productId = params.productId || params.id;
   const productName = params.productName || "Sản phẩm";
-  useEffect(() => {
-    const fetchAllReviews = async () => {
-      // Log để kiểm tra giá trị thực tế ngay khi vào hàm
+
+  const fetchAllReviews = async () => {
       console.log("Giá trị productId dùng để query:", productId);
 
       if (!productId) {
@@ -40,15 +46,19 @@ export default function AllReviewsScreen() {
       }
 
       try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) setCurrentUser(userData.user);
+
         const { data, error } = await supabase
           .from("reviews")
           .select(
             `
             *,
-            profiles (full_name, avatar_url)
+            profiles (full_name, avatar_url),
+            orders (time_finished)
           `,
           )
-          .eq("product_id", productId) // Supabase sẽ tự ép kiểu nếu productId là string số
+          .eq("product_id", productId)
           .order("created_at", { ascending: false });
 
         if (error) throw error;
@@ -58,10 +68,58 @@ export default function AllReviewsScreen() {
       } finally {
         setLoading(false);
       }
-    };
+  };
 
+  useEffect(() => {
     fetchAllReviews();
   }, [productId]);
+
+  const handleDeleteReview = async (reviewId: string, orderItemId: number) => {
+    Alert.alert("Xác nhận xoá", "Bạn có chắc chắn muốn xoá đánh giá này?", [
+      { text: "Hủy", style: "cancel" },
+      {
+        text: "Xoá",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            const { error: deleteError } = await supabase.from("reviews").delete().eq("id", reviewId);
+            if (deleteError) throw deleteError;
+
+            // Update is_reviewed
+            const { error: updateError } = await supabase.from("order_items").update({ is_reviewed: false }).eq("id", orderItemId);
+            if (updateError) throw updateError;
+            
+            fetchAllReviews();
+            Alert.alert("Thành công", "Đã xoá đánh giá.");
+          } catch (err: any) {
+            Alert.alert("Lỗi", "Không thể xoá: " + err.message);
+          }
+        }
+      }
+    ]);
+  };
+
+  const handleEditSubmit = async (data: { rating: number; comment: string; images: string[] }) => {
+    if (!selectedReview) return;
+    try {
+      const { error } = await supabase.from("reviews").update({
+        rating: data.rating,
+        comment: data.comment,
+        images: data.images,
+        is_edited: true
+      }).eq("id", selectedReview.id);
+      
+      if (error) throw error;
+      
+      Alert.alert("Thành công", "Cập nhật đánh giá thành công!");
+      fetchAllReviews();
+    } catch (err: any) {
+      Alert.alert("Lỗi", "Không thể cập nhật: " + err.message);
+    } finally {
+      setModalVisible(false);
+      setSelectedReview(null);
+    }
+  };
 
   console.log("Dữ liệu nhận được từ Params:", { productId });
   if (loading) {
@@ -97,6 +155,14 @@ export default function AllReviewsScreen() {
               : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${item.profiles.avatar_url}` // Nếu dùng Supabase Storage
             : `https://i.pravatar.cc/100?u=${item.user_id}`; // Fallback ảnh mặc định theo User ID
 
+          // Check 30 days editable rule
+          const isOwnReview = currentUser?.id === item.user_id;
+          const timeFinished = item.orders?.time_finished || item.created_at;
+          const finishDateObj = new Date(timeFinished);
+          const diffTime = new Date().getTime() - finishDateObj.getTime();
+          const diffDays = Math.ceil(Math.abs(diffTime) / (1000 * 60 * 60 * 24));
+          const isEditable = isOwnReview && diffDays <= 30;
+
           return (
             <View style={styles.reviewItem}>
               <View style={styles.reviewHeader}>
@@ -104,13 +170,25 @@ export default function AllReviewsScreen() {
                 <Image source={{ uri: userAvatar }} style={styles.avatar} />
                 <View style={styles.reviewMeta}>
                   <Text style={styles.userName}>
-                    {item.profiles?.full_name || "Người dùng"}
+                    {isOwnReview ? "Bạn" : (item.profiles?.full_name || "Người dùng")}
                   </Text>
                   <Text style={styles.ratingText}>⭐ {item.rating}/5</Text>
                 </View>
-                <Text style={styles.date}>
-                  {new Date(item.created_at).toLocaleDateString("vi-VN")}
-                </Text>
+                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                  <Text style={styles.date}>
+                    {new Date(item.created_at).toLocaleDateString("vi-VN")}
+                  </Text>
+                  {isEditable && (
+                    <View style={{ flexDirection: 'row', gap: 12 }}>
+                      <TouchableOpacity onPress={() => { setSelectedReview(item); setModalVisible(true); }}>
+                        <PencilLine size={16} color="#3B82F6" />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteReview(item.id, item.order_item_id)}>
+                        <Trash2 size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
               <Text style={styles.comment}>{item.comment}</Text>
             </View>
@@ -119,6 +197,19 @@ export default function AllReviewsScreen() {
         ListEmptyComponent={
           <Text style={styles.emptyText}>Chưa có nhận xét nào.</Text>
         }
+      />
+      <ReviewModal
+        visible={isModalVisible}
+        onClose={() => setModalVisible(false)}
+        onSubmit={handleEditSubmit}
+        product={selectedReview ? {
+          name: productName as string,
+          variant: "",
+          image: "" // fallback image if not provided
+        } : null}
+        initialRating={selectedReview?.rating}
+        initialComment={selectedReview?.comment}
+        initialImages={selectedReview?.images}
       />
     </SafeAreaView>
   );

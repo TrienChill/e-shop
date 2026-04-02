@@ -1,188 +1,190 @@
 table_name,column_name,data_type,is_nullable
 Collection,id,bigint,NO
-Collection,created_at,timestamp with time zone,NO
 Collection,collection_name,text,YES
-applicable_vouchers,voucher_type,character varying,YES
-applicable_vouchers,code,text,YES
-applicable_vouchers,discount_type,character varying,YES
-applicable_vouchers,is_active,boolean,YES
-applicable_vouchers,expired_at,timestamp with time zone,YES
-applicable_vouchers,conditions,jsonb,YES
+Collection,created_at,timestamp with time zone,NO
 applicable_vouchers,max_discount,numeric,YES
 applicable_vouchers,discount_value,numeric,YES
 applicable_vouchers,id,uuid,YES
-banners,action_value,text,YES
-banners,id,uuid,NO
-banners,display_order,integer,YES
-banners,is_active,boolean,YES
+applicable_vouchers,discount_type,character varying,YES
+applicable_vouchers,voucher_type,character varying,YES
+applicable_vouchers,code,text,YES
+applicable_vouchers,expired_at,timestamp with time zone,YES
+applicable_vouchers,is_active,boolean,YES
+applicable_vouchers,conditions,jsonb,YES
 banners,start_date,timestamp with time zone,YES
 banners,end_date,timestamp with time zone,YES
 banners,created_at,timestamp with time zone,YES
 banners,updated_at,timestamp with time zone,YES
-banners,image_url,text,NO
-banners,title,text,YES
-banners,subtitle,text,YES
+banners,is_active,boolean,YES
+banners,id,uuid,NO
+banners,action_value,text,YES
 banners,action_type,text,NO
+banners,subtitle,text,YES
+banners,title,text,YES
+banners,image_url,text,NO
+banners,display_order,integer,YES
 cart_item_inventory_log,quantity_available,integer,NO
-cart_item_inventory_log,quantity_requested,integer,NO
-cart_item_inventory_log,product_id,integer,NO
-cart_item_inventory_log,cart_item_id,uuid,NO
-cart_item_inventory_log,id,uuid,NO
 cart_item_inventory_log,status,character varying,NO
+cart_item_inventory_log,id,uuid,NO
+cart_item_inventory_log,cart_item_id,uuid,NO
+cart_item_inventory_log,product_id,integer,NO
+cart_item_inventory_log,quantity_requested,integer,NO
 cart_item_inventory_log,checked_at,timestamp with time zone,YES
-cart_items,quantity,integer,YES
+cart_items,user_id,uuid,NO
 cart_items,size,text,YES
 cart_items,color,text,YES
 cart_items,id,uuid,NO
-cart_items,user_id,uuid,NO
 cart_items,product_id,bigint,NO
+cart_items,quantity,integer,YES
 cart_items,created_at,timestamp with time zone,YES
 cart_items,updated_at,timestamp with time zone,YES
 cart_items,is_selected,boolean,NO
 cart_items,shop_voucher_id,uuid,YES
 categories,id,bigint,NO
-categories,created_at,timestamp with time zone,YES
-categories,parent_id,bigint,YES
-categories,display_order,integer,YES
-categories,is_active,boolean,YES
+categories,image_url,text,YES
+categories,name_vi,text,YES
 categories,slug,text,YES
 categories,group,text,YES
-categories,image_url,text,YES
 categories,name,text,NO
-categories,name_vi,text,YES
+categories,is_active,boolean,YES
+categories,display_order,integer,YES
+categories,parent_id,bigint,YES
+categories,created_at,timestamp with time zone,YES
+conversations,created_at,timestamp with time zone,YES
 conversations,id,bigint,NO
 conversations,user_id,uuid,YES
 conversations,is_active,boolean,YES
-conversations,created_at,timestamp with time zone,YES
-discounts,id,bigint,NO
-discounts,value,numeric,NO
-discounts,start_date,timestamp with time zone,YES
-discounts,created_at,timestamp with time zone,YES
-discounts,is_active,boolean,YES
-discounts,code,text,NO
-discounts,max_uses,integer,YES
-discounts,end_date,timestamp with time zone,YES
-discounts,description,text,YES
 discounts,type,USER-DEFINED,NO
+discounts,max_uses,integer,YES
+discounts,is_active,boolean,YES
+discounts,created_at,timestamp with time zone,YES
+discounts,description,text,YES
+discounts,code,text,NO
+discounts,id,bigint,NO
+discounts,end_date,timestamp with time zone,YES
+discounts,start_date,timestamp with time zone,YES
+discounts,value,numeric,NO
+messages,content,text,NO
+messages,id,bigint,NO
 messages,conversation_id,bigint,YES
 messages,sender_id,uuid,YES
 messages,is_ai,boolean,YES
 messages,created_at,timestamp with time zone,YES
-messages,id,bigint,NO
-messages,content,text,NO
-order_items,is_reviewed,boolean,YES
+order_items,created_at,timestamp with time zone,YES
+order_items,id,bigint,NO
+order_items,selected_variant,jsonb,YES
+order_items,price_at_purchase,numeric,NO
 order_items,quantity,integer,NO
 order_items,product_id,bigint,YES
 order_items,order_id,bigint,YES
-order_items,id,bigint,NO
-order_items,price_at_purchase,numeric,NO
-order_items,selected_variant,jsonb,YES
-order_items,created_at,timestamp with time zone,YES
-order_vouchers,voucher_id,uuid,NO
-order_vouchers,discount_type,character varying,NO
-order_vouchers,id,uuid,NO
-order_vouchers,order_id,bigint,NO
+order_items,is_reviewed,boolean,YES
 order_vouchers,discount_amount,numeric,NO
-order_vouchers,applied_on_item_id,uuid,YES
+order_vouchers,order_id,bigint,NO
+order_vouchers,id,uuid,NO
+order_vouchers,discount_type,character varying,NO
 order_vouchers,created_at,timestamp with time zone,YES
+order_vouchers,applied_on_item_id,uuid,YES
+order_vouchers,voucher_id,uuid,NO
+orders,time_finished,timestamp with time zone,YES
+orders,created_at,timestamp with time zone,YES
 orders,total_amount,numeric,NO
-orders,address_id,uuid,YES
-orders,shipping_method_id,uuid,YES
-orders,user_id,uuid,YES
+orders,status,USER-DEFINED,YES
 orders,id,bigint,NO
+orders,user_id,uuid,YES
 orders,shipping_address,text,NO
 orders,phone_contact,text,NO
-orders,shipping_fee,numeric,YES
-orders,time_finished,timestamp with time zone,YES
-orders,processing_at,timestamp with time zone,YES
-orders,shipping_at,timestamp with time zone,YES
-orders,completed_at,timestamp with time zone,YES
-orders,platform_voucher_id,uuid,YES
-orders,platform_discount,numeric,YES
 orders,cancelled_at,timestamp with time zone,YES
 orders,receiver_name,text,YES
 orders,receiver_phone,text,YES
-orders,shop_discounts,jsonb,YES
-orders,created_at,timestamp with time zone,YES
 orders,full_shipping_address,text,YES
-orders,status,USER-DEFINED,YES
-posts,tags,ARRAY,YES
+orders,completed_at,timestamp with time zone,YES
+orders,shipping_at,timestamp with time zone,YES
+orders,processing_at,timestamp with time zone,YES
+orders,shipping_fee,numeric,YES
+orders,shipping_method_id,uuid,YES
+orders,address_id,uuid,YES
+orders,platform_voucher_id,uuid,YES
+orders,platform_discount,numeric,YES
+orders,shop_discounts,jsonb,YES
+posts,title,text,NO
 posts,updated_at,timestamp with time zone,YES
+posts,id,bigint,NO
+posts,cover_image,text,YES
+posts,is_published,boolean,YES
+posts,slug,text,YES
+posts,tags,ARRAY,YES
+posts,author_name,text,YES
+posts,content,text,YES
+posts,excerpt,text,YES
 posts,created_at,timestamp with time zone,YES
 posts,published_at,timestamp with time zone,YES
-posts,is_published,boolean,YES
 posts,related_product_ids,ARRAY,YES
-posts,id,bigint,NO
-posts,title,text,NO
-posts,slug,text,YES
-posts,excerpt,text,YES
-posts,author_name,text,YES
-posts,cover_image,text,YES
-posts,content,text,YES
-product_discounts,created_at,timestamp with time zone,YES
 product_discounts,product_id,bigint,NO
 product_discounts,discount_id,bigint,NO
-products,short_description,text,YES
-products,created_at,timestamp with time zone,YES
-products,name,text,NO
-products,description,text,YES
-products,is_active,boolean,YES
-products,category_id,bigint,YES
-products,price,numeric,NO
+product_discounts,created_at,timestamp with time zone,YES
 products,stock,integer,YES
-products,images,ARRAY,YES
-products,variants,jsonb,YES
-products,id,bigint,NO
-products,shipping_info,jsonb,YES
+products,created_at,timestamp with time zone,YES
 products,specifications,jsonb,YES
+products,shipping_info,jsonb,YES
 products,collection_id,bigint,YES
-profiles,avatar_url,text,YES
-profiles,full_name,text,YES
-profiles,updated_at,timestamp with time zone,YES
-profiles,recent_views,jsonb,YES
-profiles,phone,text,YES
-profiles,id,uuid,NO
+products,description,text,YES
+products,name,text,NO
+products,is_active,boolean,YES
+products,variants,jsonb,YES
+products,price,numeric,NO
+products,category_id,bigint,YES
+products,id,bigint,NO
+products,short_description,text,YES
+products,images,ARRAY,YES
 profiles,created_at,timestamp with time zone,YES
 profiles,role,USER-DEFINED,YES
-reviews,order_item_id,bigint,YES
-reviews,id,uuid,NO
-reviews,user_id,uuid,NO
+profiles,recent_views,jsonb,YES
+profiles,full_name,text,YES
+profiles,avatar_url,text,YES
+profiles,phone,text,YES
+profiles,id,uuid,NO
+profiles,updated_at,timestamp with time zone,YES
 reviews,product_id,bigint,NO
-reviews,order_id,bigint,NO
-reviews,rating,numeric,NO
+reviews,order_item_id,bigint,YES
 reviews,created_at,timestamp with time zone,NO
+reviews,rating,numeric,NO
+reviews,order_id,bigint,NO
+reviews,user_id,uuid,NO
+reviews,id,uuid,NO
+reviews,images,ARRAY,YES
 reviews,comment,text,YES
+reviews,is_edited,boolean,YES
+shipping_methods,min_time,text,NO
+shipping_methods,created_at,timestamp with time zone,YES
 shipping_methods,is_active,boolean,YES
 shipping_methods,max_time,text,NO
-shipping_methods,price,numeric,NO
 shipping_methods,unit,text,YES
-shipping_methods,id,uuid,NO
 shipping_methods,name,text,NO
+shipping_methods,id,uuid,NO
+shipping_methods,price,numeric,NO
 shipping_methods,code,text,NO
-shipping_methods,created_at,timestamp with time zone,YES
-shipping_methods,min_time,text,NO
+user_addresses,phone_number,text,NO
+user_addresses,updated_at,timestamp with time zone,YES
+user_addresses,ward_commune,text,YES
 user_addresses,created_at,timestamp with time zone,YES
-user_addresses,user_id,uuid,NO
 user_addresses,is_default,boolean,YES
+user_addresses,user_id,uuid,NO
 user_addresses,id,uuid,NO
 user_addresses,province_city,text,NO
 user_addresses,district,text,NO
 user_addresses,receiver_name,text,NO
-user_addresses,updated_at,timestamp with time zone,YES
 user_addresses,street_address,text,NO
-user_addresses,ward_commune,text,YES
-user_addresses,phone_number,text,NO
-vouchers,id,uuid,NO
-vouchers,code,text,NO
 vouchers,voucher_type,character varying,NO
+vouchers,discount_type,character varying,NO
+vouchers,code,text,NO
+vouchers,id,uuid,NO
+vouchers,discount_value,numeric,NO
 vouchers,max_discount,numeric,YES
 vouchers,conditions,jsonb,YES
 vouchers,expired_at,timestamp with time zone,YES
 vouchers,created_at,timestamp with time zone,YES
 vouchers,is_active,boolean,YES
-vouchers,discount_value,numeric,NO
-vouchers,discount_type,character varying,NO
+wishlist,id,uuid,NO
 wishlist,created_at,timestamp with time zone,NO
 wishlist,product_id,bigint,NO
 wishlist,user_id,uuid,NO
-wishlist,id,uuid,NO

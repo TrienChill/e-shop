@@ -290,7 +290,7 @@ export default function ToReceiveScreen() {
     setShowProductSelection(true);
   };
 
-  const onReviewSubmit = async (data: { rating: number; comment: string }) => {
+  const onReviewSubmit = async (data: { rating: number; comment: string; images: string[] }) => {
     try {
       if (!selectedReviewItem) return;
 
@@ -299,8 +299,8 @@ export default function ToReceiveScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Lưu vào bảng reviews
-      const { error: reviewError } = await supabase.from("reviews").insert([
+      // 1. Lưu vào bảng reviews (sử dụng upsert để tránh lỗi duplicate key)
+      const { error: reviewError } = await supabase.from("reviews").upsert([
         {
           user_id: user.id,
           product_id: selectedReviewItem.product_id,
@@ -308,8 +308,9 @@ export default function ToReceiveScreen() {
           order_item_id: selectedReviewItem.id, 
           rating: data.rating,
           comment: data.comment,
+          images: data.images,
         },
-      ]);
+      ], { onConflict: 'order_item_id' });
 
       if (reviewError) throw reviewError;
 

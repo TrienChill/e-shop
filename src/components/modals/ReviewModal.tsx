@@ -1,5 +1,8 @@
-import { Camera, Star, StarHalf, X } from "lucide-react-native";
+import { Camera, Star, StarHalf, X, Trash2 } from "lucide-react-native";
 import React, { useState } from "react";
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
+import { supabase } from "@/src/lib/supabase";
 import {
   Dimensions,
   Image,
@@ -28,12 +31,15 @@ const COLORS = {
 interface ReviewModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: { rating: number; comment: string }) => void;
+  onSubmit: (data: { rating: number; comment: string; images: string[] }) => void | Promise<void>;
   product: {
     name: string;
     variant: string;
     image: string;
   } | null;
+  initialRating?: number;
+  initialComment?: string;
+  initialImages?: string[];
 }
 
 export default function ReviewModal({
@@ -41,17 +47,94 @@ export default function ReviewModal({
   onClose,
   onSubmit,
   product,
+  initialRating,
+  initialComment,
+  initialImages,
 }: ReviewModalProps) {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
+  const [rating, setRating] = useState(initialRating || 0);
+  const [comment, setComment] = useState(initialComment || "");
+  const [localImages, setLocalImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [existingImages, setExistingImages] = useState<string[]>(initialImages || []);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Reset state mỗi khi modal hiển thị hoặc sản phẩm thay đổi
   React.useEffect(() => {
     if (visible) {
-      setRating(0);
-      setComment("");
+      setRating(initialRating || 0);
+      setComment(initialComment || "");
+      setLocalImages([]);
+      setExistingImages(initialImages || []);
+      setIsUploading(false);
     }
-  }, [visible, product?.name]); // Trigger reset khi mở hoặc đổi tên SP
+  }, [visible, initialRating, initialComment, initialImages, product?.name]);
+
+  const pickImages = async () => {
+    const totalCurrentImages = localImages.length + existingImages.length;
+    if (totalCurrentImages >= 3) {
+      alert("Bạn chỉ được tải lên tối đa 3 ảnh đánh giá!");
+      return;
+    }
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 3 - totalCurrentImages,
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets) {
+      setLocalImages((prev) => [...prev, ...result.assets.slice(0, 3 - totalCurrentImages)]);
+    }
+  };
+
+  const removeLocalImage = (index: number) => {
+    setLocalImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (rating === 0) return;
+    setIsUploading(true);
+
+    try {
+      const uploadPromises = localImages.map(async (asset, index) => {
+        const fileName = `${Date.now()}_${index}.jpg`;
+        const filePath = `review-images/${fileName}`;
+
+        const { data, error } = await supabase.storage
+          .from('images') // Tên bucket ảnh trên Supabase
+          .upload(filePath, decode(asset.base64!), {
+            contentType: 'image/jpeg',
+          });
+
+        if (error) {
+           console.error(error);
+           return null;
+        }
+
+        if (data) {
+          const { data: urlData } = supabase.storage
+            .from('images')
+            .getPublicUrl(filePath);
+          return urlData.publicUrl;
+        }
+      });
+
+      const uploadedUrls = (await Promise.all(uploadPromises)).filter(Boolean) as string[];
+      
+      const finalImages = [...existingImages, ...uploadedUrls];
+      await onSubmit({ rating, comment, images: finalImages });
+    } catch (err) {
+      console.error(err);
+      alert("Khổng thể đăng ảnh lúc này, vui lòng thử lại!");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleStarPress = (index: number, isHalf: boolean) => {
     const newRating = index + (isHalf ? 0.5 : 1);
@@ -145,26 +228,50 @@ export default function ReviewModal({
               />
             </View>
 
-            <TouchableOpacity style={styles.uploadBtn}>
-              <Camera size={24} color={COLORS.primary} />
-              <Text style={styles.uploadText}>Thêm hình ảnh thực tế</Text>
-            </TouchableOpacity>
+            {/* Hiển thị ảnh preview */}
+            {(existingImages.length > 0 || localImages.length > 0) && (
+              <ScrollView horizontal style={styles.previewScroll} showsHorizontalScrollIndicator={false}>
+                {existingImages.map((url, idx) => (
+                  <View key={`ex-${idx}`} style={styles.previewImageContainer}>
+                    <Image source={{ uri: url }} style={styles.previewImage} />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeExistingImage(idx)}>
+                      <X size={14} color={COLORS.white} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {localImages.map((asset, idx) => (
+                  <View key={`loc-${idx}`} style={styles.previewImageContainer}>
+                    <Image source={{ uri: asset.uri }} style={styles.previewImage} />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => removeLocalImage(idx)}>
+                      <X size={14} color={COLORS.white} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {(existingImages.length + localImages.length < 3) && (
+              <TouchableOpacity style={styles.uploadBtn} onPress={pickImages}>
+                <Camera size={24} color={COLORS.primary} />
+                <Text style={styles.uploadText}>Thêm hình ảnh thực tế (Tối đa 3)</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={[
                 styles.submitBtn,
-                rating === 0 && { backgroundColor: COLORS.lightGray },
+                (rating === 0 || isUploading) && { backgroundColor: COLORS.lightGray },
               ]}
-              onPress={() => onSubmit({ rating, comment })}
-              disabled={rating === 0}
+              onPress={handleSubmit}
+              disabled={rating === 0 || isUploading}
             >
               <Text
                 style={[
                   styles.submitBtnText,
-                  rating === 0 && { color: COLORS.textGray },
+                  (rating === 0 || isUploading) && { color: COLORS.textGray },
                 ]}
               >
-                Gửi đánh giá ngay
+                {isUploading ? "Đang xủ lý tải lên..." : "Gửi đánh giá ngay"}
               </Text>
             </TouchableOpacity>
 
@@ -319,5 +426,26 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: "800",
+  },
+  previewScroll: {
+    marginBottom: 20,
+    flexDirection: 'row',
+  },
+  previewImageContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  previewImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 12,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    padding: 4,
   },
 });
