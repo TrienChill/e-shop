@@ -1,3 +1,6 @@
+import { getPopularProducts, calculateDiscountedPrice } from "@/src/services/product";
+import { supabase } from "@/src/lib/supabase";
+import { useRouter } from "expo-router";
 import {
   Camera,
   Filter,
@@ -6,8 +9,8 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
-import { getPopularProducts } from "@/src/services/product";
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
@@ -19,45 +22,106 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
-// --- Dữ liệu giả định (Mock Data) ---
-const SEARCH_HISTORY = ["Váy đỏ", "Kính râm", "Quần màu Mustard", "Chân váy 80s"];
+// --- Dữ liệu mặc định nếu lịch sử rỗng ---
 const RECOMMENDATIONS = ["Chân váy", "Phụ kiện", "Áo thun đen", "Quần Jeans", "Giày trắng"];
+const STORAGE_KEY = "search_history";
 
 
 
-const SEARCH_RESULTS = [
-  { id: "101", name: "Tất len lông cừu hiện đại", price: 170000, image: "https://images.unsplash.com/photo-1582966298430-817810c95f3b?w=400" },
-  { id: "102", name: "Tất Cotton cao cấp", price: 170000, image: "https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=400" },
-  { id: "103", name: "Tất thể thao năng động", price: 170000, image: "https://images.unsplash.com/photo-1544648193-c51f456e94bc?w=400" },
-  { id: "104", name: "Tất nhiệt mùa đông", price: 175000, image: "https://images.unsplash.com/photo-1582966298430-817810c95f3b?w=400" },
-  { id: "105", name: "Tất thường ngày phong cách", price: 170000, image: "https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=400" },
-  { id: "106", name: "Tất lụa mềm mại", price: 190000, image: "https://images.unsplash.com/photo-1544648193-c51f456e94bc?w=400" },
-];
+// Danh sách mẫu cho lịch sử và gợi ý
 
 export default function SearchScreen() {
+  const router = useRouter();
   const [searchPhrase, setSearchPhrase] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [discoverProducts, setDiscoverProducts] = useState<any[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
+  
+  // Trạng thái cho Search thực tế
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
 
   useEffect(() => {
-    const fetchPopular = async () => {
-      const data = await getPopularProducts();
-      setDiscoverProducts(data);
+    const initData = async () => {
+      // Load sản phẩm phổ biến
+      const popularData = await getPopularProducts();
+      setDiscoverProducts(popularData);
+
+      // Load lịch sử từ storage
+      try {
+        const storedHistory = await AsyncStorage.getItem(STORAGE_KEY);
+        if (storedHistory) {
+          setHistory(JSON.parse(storedHistory));
+        }
+      } catch (err) {
+        console.error("Lỗi khi load lịch sử:", err);
+      }
     };
-    fetchPopular();
+    initData();
   }, []);
 
-  // Hàm xử lý tìm kiếm
-  const handleSearch = (text: string) => {
-    setSearchPhrase(text);
-    if (text.length > 0) {
-      setShowResults(true);
-    } else {
-      setShowResults(false);
+  const saveHistory = async (newHistory: string[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
+    } catch (err) {
+      console.error("Lỗi khi lưu lịch sử:", err);
+    }
+  };
+
+  const addToHistory = (query: string) => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery) return;
+
+    setHistory((prev) => {
+      // Xóa nếu đã tồn tại để đưa lên đầu, và lọc các từ trùng
+      const filtered = prev.filter((item) => item !== trimmedQuery);
+      const updated = [trimmedQuery, ...filtered].slice(0, 10); // Lưu tối đa 10 từ
+      saveHistory(updated);
+      return updated;
+    });
+  };
+
+  const deleteHistory = async () => {
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setHistory([]);
+    } catch (err) {
+      console.error("Lỗi khi xóa lịch sử:", err);
+    }
+  };
+
+  const performSearch = async (query: string) => {
+    if (!query.trim()) return;
+    Keyboard.dismiss();
+    setShowResults(true);
+    setLoadingSearch(true);
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_discounts (
+            discounts (*)
+          )
+        `)
+        .eq('is_active', true)
+        // Sử dụng cột fts (Full-Text Search) với cấu hình 'simple' và loại 'websearch'
+        // 'websearch' giúp xử lý an toàn các ký tự đặc biệt do người dùng nhập vào
+        .textSearch('fts', query.trim(), { config: 'simple', type: 'websearch' });
+      if (error) throw error;
+      
+      const processed = (data || []).map(calculateDiscountedPrice);
+      setSearchResults(processed);
+      addToHistory(query);
+    } catch (err) {
+      console.error("Lỗi khi tìm kiếm:", err);
+    } finally {
+      setLoadingSearch(false);
     }
   };
 
@@ -88,7 +152,9 @@ export default function SearchScreen() {
             placeholder="Tìm kiếm sản phẩm..."
             placeholderTextColor="#9CA3AF"
             value={searchPhrase}
-            onChangeText={handleSearch}
+            onChangeText={setSearchPhrase}
+            onSubmitEditing={() => performSearch(searchPhrase)}
+            returnKeyType="search"
           />
           <TouchableOpacity>
             <Camera size={20} color="#3B82F6" />
@@ -107,28 +173,30 @@ export default function SearchScreen() {
   const renderInitialView = () => (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Lịch sử tìm kiếm */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Lịch sử tìm kiếm</Text>
-          <TouchableOpacity style={styles.trashBtn}>
-            <Trash2 size={18} color="#F87171" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.tagWrapper}>
-          {SEARCH_HISTORY.map((tag) => (
-            <TouchableOpacity key={tag} style={styles.tag} onPress={() => handleSearch(tag)}>
-              <Text style={styles.tagText}>{tag}</Text>
+      {history.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Lịch sử tìm kiếm</Text>
+            <TouchableOpacity style={styles.trashBtn} onPress={deleteHistory}>
+              <Trash2 size={18} color="#F87171" />
             </TouchableOpacity>
-          ))}
+          </View>
+          <View style={styles.tagWrapper}>
+            {history.map((tag, idx) => (
+              <TouchableOpacity key={idx} style={styles.tag} onPress={() => { setSearchPhrase(tag); performSearch(tag); }}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Gợi ý */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Gợi ý cho bạn</Text>
         <View style={styles.tagWrapper}>
           {RECOMMENDATIONS.map((tag) => (
-            <TouchableOpacity key={tag} style={styles.tag} onPress={() => handleSearch(tag)}>
+            <TouchableOpacity key={tag} style={styles.tag} onPress={() => { setSearchPhrase(tag); performSearch(tag); }}>
               <Text style={styles.tagText}>{tag}</Text>
             </TouchableOpacity>
           ))}
@@ -140,11 +208,16 @@ export default function SearchScreen() {
         <Text style={[styles.sectionTitle, { fontSize: 22, fontWeight: '800', marginBottom: 20 }]}>Khám phá</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {discoverProducts.map((product) => (
-            <View key={product.id} style={styles.discoverCard}>
+            <TouchableOpacity 
+              key={product.id} 
+              style={styles.discoverCard}
+              activeOpacity={0.8}
+              onPress={() => router.push({ pathname: `/(shop)/product/[id]`, params: { id: product.id } } as any)}
+            >
               <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.discoverImg} />
               <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
               <Text style={styles.productPrice}>{(product.finalPrice || product.price || 0).toLocaleString('vi-VN')} đ</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
@@ -152,21 +225,44 @@ export default function SearchScreen() {
   );
 
   // --- Giao diện Kết quả tìm kiếm ---
-  const renderResultsView = () => (
-    <FlatList
-      data={SEARCH_RESULTS}
-      keyExtractor={(item) => item.id}
-      numColumns={2}
-      contentContainerStyle={styles.gridContainer}
-      renderItem={({ item }) => (
-        <View style={styles.resultCard}>
-          <Image source={{ uri: item.image }} style={styles.resultImg} />
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.productPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>
+  const renderResultsView = () => {
+    if (loadingSearch) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#3B82F6" />
+          <Text style={{ marginTop: 10, color: '#6B7280' }}>Đang tìm kiếm...</Text>
         </View>
-      )}
-    />
-  );
+      );
+    }
+    
+    if (searchResults.length === 0) {
+      return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: '#6B7280', fontSize: 16 }}>Không tìm thấy sản phẩm nào</Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={searchResults}
+        keyExtractor={(item) => item.id.toString()}
+        numColumns={2}
+        contentContainerStyle={styles.gridContainer}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={styles.resultCard}
+            activeOpacity={0.8}
+            onPress={() => router.push({ pathname: `/(shop)/product/[id]`, params: { id: item.id } } as any)}
+          >
+            <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.resultImg} />
+            <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+            <Text style={styles.productPrice}>{(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ</Text>
+          </TouchableOpacity>
+        )}
+      />
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
