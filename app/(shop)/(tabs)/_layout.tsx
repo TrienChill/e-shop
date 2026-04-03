@@ -23,77 +23,67 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   };
 
   const activeIndex = state.index;
-  const routes = ["index", "search", "ai-chat", "cart", "profile"];
+  const routes = ["index", "categories", "wishlist", "profile"];
 
   return (
     <View style={styles.bottomNavContainer}>
       <View style={styles.bottomNav}>
-        {/* Nút 1: HOME (index) */}
+        {/* Nút 1: HOME */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => onTabPress(routes[0], activeIndex === 0)}
+          onPress={() => onTabPress(routes[0], state.routeNames[activeIndex] === routes[0])}
+          activeOpacity={0.7}
         >
-          <View
-            style={[
-              styles.navIconWrapper,
-              activeIndex === 0 && styles.navIconActive,
-            ]}
-          >
+          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[0] && styles.navIconActive]}>
             <MaterialIcons
               name="home"
-              size={24}
-              color={activeIndex === 0 ? "#1a1a1a" : "#9ca3af"}
+              size={26}
+              color={state.routeNames[activeIndex] === routes[0] ? "#0055FF" : "#9ca3af"}
             />
           </View>
         </TouchableOpacity>
 
-        {/* Nút 2: SEARCH */}
+        {/* Nút 2: CATEGORIES */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => onTabPress(routes[1], activeIndex === 1)}
+          onPress={() => onTabPress(routes[1], state.routeNames[activeIndex] === routes[1])}
+          activeOpacity={0.7}
         >
-          <View
-            style={[
-              styles.navIconWrapper,
-              activeIndex === 1 && styles.navIconActive,
-            ]}
-          >
+          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[1] && styles.navIconActive]}>
             <MaterialIcons
-              name="search"
-              size={24}
-              color={activeIndex === 1 ? "#1a1a1a" : "#9ca3af"}
+              name="grid-view"
+              size={26}
+              color={state.routeNames[activeIndex] === routes[1] ? "#0055FF" : "#9ca3af"}
             />
           </View>
         </TouchableOpacity>
 
-        {/* Nút 3: AI STYLIST (Nút to ở giữa) */}
+        {/* Nút 3: WISHLIST */}
         <TouchableOpacity
-          style={styles.aiButtonContainer}
-          onPress={() => onTabPress(routes[2], activeIndex === 2)}
+          style={styles.navItem}
+          onPress={() => onTabPress(routes[2], state.routeNames[activeIndex] === routes[2])}
+          activeOpacity={0.7}
         >
-          <View style={styles.aiButton}>
-            <MaterialIcons name="auto-awesome" size={28} color="#fff" />
+          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[2] && styles.navIconActive]}>
+            <MaterialIcons
+              name="favorite-border"
+              size={26}
+              color={state.routeNames[activeIndex] === routes[2] ? "#0055FF" : "#9ca3af"}
+            />
           </View>
         </TouchableOpacity>
 
-        {/* Nút 4: TRỐNG (Sẽ làm sau) */}
-        <View style={styles.navItem} />
-
-        {/* Nút 5: PROFILE */}
+        {/* Nút 4: PROFILE */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => onTabPress(routes[4], activeIndex === 4)}
+          onPress={() => onTabPress(routes[3], state.routeNames[activeIndex] === routes[3])}
+          activeOpacity={0.7}
         >
-          <View
-            style={[
-              styles.navIconWrapper,
-              activeIndex === 4 && styles.navIconActive,
-            ]}
-          >
+          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[3] && styles.navIconActive]}>
             <MaterialIcons
               name="person-outline"
-              size={24}
-              color={activeIndex === 4 ? "#1a1a1a" : "#9ca3af"}
+              size={26}
+              color={state.routeNames[activeIndex] === routes[3] ? "#0055FF" : "#9ca3af"}
             />
           </View>
         </TouchableOpacity>
@@ -118,10 +108,13 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="search" />
-      <Tabs.Screen name="ai-chat" />
-      <Tabs.Screen name="cart" />
+      <Tabs.Screen name="categories" />
+      <Tabs.Screen name="wishlist" />
       <Tabs.Screen name="profile" />
+      {/* Các màn hình thuộc /tabs nhưng không hiển thị trên Bottom Bar */}
+      <Tabs.Screen name="search" options={{ href: null }} />
+      <Tabs.Screen name="ai-chat" options={{ href: null }} />
+      <Tabs.Screen name="cart" options={{ href: null }} />
     </Tabs>
   );
 }
@@ -137,20 +130,20 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderRadius: 99,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    width: Math.min(width - 32, 400),
+    backgroundColor: "#FFFFFF",
+    borderRadius: 35,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginHorizontal: 16,
     justifyContent: "space-between",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: "#0055FF",
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowRadius: 25,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(0,0,0,0.03)",
   },
   navItem: {
     flex: 1,
@@ -158,31 +151,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   navIconWrapper: {
-    padding: 8,
+    padding: 12,
     borderRadius: 20,
+    width: 50,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
   },
   navIconActive: {
-    backgroundColor: "rgba(26, 26, 26, 0.05)",
-  },
-  aiButtonContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -40,
-  },
-  aiButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#8b5cf6",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 4,
-    borderColor: "#ffffff",
-    shadowColor: "#8b5cf6",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: "rgba(0, 85, 255, 0.1)",
   },
 });
