@@ -108,7 +108,7 @@ export default function ProductDetailScreen() {
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / SCREEN_WIDTH);
-    
+
     if (index !== activeIndex) {
       setActiveIndex(index);
 
@@ -118,12 +118,12 @@ export default function ProductDetailScreen() {
         const matchedColorIndex = colorOptions.findIndex(
           (opt: any) => opt.image_index === index
         );
-        
+
         if (matchedColorIndex !== -1) {
           const matchedColor = colorOptions[matchedColorIndex];
           if (selectedColor?.color !== matchedColor.color) {
             setSelectedColor(matchedColor);
-            
+
             // Tự động cuộn dải màu sắc (color picker) vào vùng hiển thị
             if (colorScrollRef.current) {
               const itemWidth = 40; // width of color circle
@@ -387,10 +387,10 @@ export default function ProductDetailScreen() {
   const productImages =
     product.images && product.images.length > 0
       ? product.images.map((img: string) =>
-          img.startsWith("http")
-            ? img
-            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`,
-        )
+        img.startsWith("http")
+          ? img
+          : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`,
+      )
       : ["https://via.placeholder.com/600"];
 
   // 3. Hàm xử lý cuộn ảnh khi chọn màu
@@ -607,7 +607,7 @@ export default function ProductDetailScreen() {
                   {/* Kiểm tra và dịch tên màu */}
                   {selectedColor?.color
                     ? colorTranslations[selectedColor.color] ||
-                      selectedColor.color
+                    selectedColor.color
                     : ""}
                 </Text>
               </View>
@@ -858,7 +858,7 @@ export default function ProductDetailScreen() {
                   <Text style={styles.modalChipText}>
                     {selectedColor?.color
                       ? colorTranslations[selectedColor.color] ||
-                        selectedColor.color
+                      selectedColor.color
                       : "Chưa chọn màu"}
                   </Text>
                   <Text style={styles.modalChipText}>
