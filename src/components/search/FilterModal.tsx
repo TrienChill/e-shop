@@ -1,15 +1,16 @@
-import React, { useState } from "react";
+import { Check, X } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
+import { supabase } from "@/src/lib/supabase";
 import {
-  Modal,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
   Dimensions,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { X, Check } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
@@ -20,13 +21,7 @@ interface FilterModalProps {
   onApply: (filters: any) => void;
 }
 
-const CATEGORIES = [
-  { id: "1", name: "Váy", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=200" },
-  { id: "2", name: "Quần", image: "https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=200" },
-  { id: "3", name: "Chân váy", image: "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?w=200" },
-  { id: "4", name: "Quần short", image: "https://images.unsplash.com/photo-1591195853828-11db59a44f6b?w=200" },
-  { id: "5", name: "Áo khoác", image: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=200" },
-];
+
 
 const SIZES = ["XS", "S", "M", "L", "XL", "2XL"];
 const COLORS = [
@@ -46,14 +41,33 @@ const SORT_OPTIONS = [
 ];
 
 export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, onApply }) => {
-  const [selectedCats, setSelectedCats] = useState<string[]>(["1", "2"]);
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [sizeType, setSizeType] = useState<"clothes" | "shoes">("clothes");
   const [selectedSize, setSelectedSize] = useState("M");
   const [selectedColor, setSelectedColor] = useState("white");
   const [sortBy, setSortBy] = useState("popular");
 
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("categories")
+          .select("*")
+          .eq("is_active", true)
+          .order("display_order", { ascending: true });
+        
+        if (error) throw error;
+        setDbCategories(data || []);
+      } catch (err) {
+        console.error("Lỗi lấy danh mục:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+
   const toggleCategory = (id: string) => {
-    setSelectedCats(prev => 
+    setSelectedCats(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     );
   };
@@ -90,17 +104,17 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
           {/* Categories */}
           <View style={styles.section}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
-              {CATEGORIES.map(cat => (
-                <TouchableOpacity key={cat.id} onPress={() => toggleCategory(cat.id)} style={styles.catItem}>
+              {dbCategories.map(cat => (
+                <TouchableOpacity key={cat.id} onPress={() => toggleCategory(cat.id.toString())} style={styles.catItem}>
                   <View style={styles.imageWrapper}>
-                    <Image source={{ uri: cat.image }} style={styles.catImage} />
-                    {selectedCats.includes(cat.id) && (
+                    <Image source={{ uri: cat.image_url || 'https://via.placeholder.com/200' }} style={styles.catImage} />
+                    {selectedCats.includes(cat.id.toString()) && (
                       <View style={styles.badge}>
                         <Check size={10} color="#fff" strokeWidth={4} />
                       </View>
                     )}
                   </View>
-                  <Text style={styles.catName}>{cat.name}</Text>
+                  <Text style={styles.catName}>{cat.name_vi || cat.name}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -111,25 +125,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionLabel}>Kích cỡ</Text>
               <View style={styles.toggleContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setSizeType("clothes")}
                   style={[styles.toggleBtn, sizeType === "clothes" && styles.toggleBtnActive]}
                 >
                   <Text style={[styles.toggleText, sizeType === "clothes" && styles.toggleTextActive]}>Quần áo</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => setSizeType("shoes")}
-                  style={[styles.toggleBtn, sizeType === "shoes" && styles.toggleBtnActive]}
-                >
-                  <Text style={[styles.toggleText, sizeType === "shoes" && styles.toggleTextActive]}>Giày dép</Text>
-                </TouchableOpacity>
               </View>
             </View>
-            
+
             <View style={styles.sizeContainer}>
               {SIZES.map(size => (
-                <TouchableOpacity 
-                  key={size} 
+                <TouchableOpacity
+                  key={size}
                   onPress={() => setSelectedSize(size)}
                   style={[styles.sizeItem, selectedSize === size && styles.sizeItemActive]}
                 >
@@ -144,11 +152,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
             <Text style={styles.sectionLabel}>Màu sắc</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorList}>
               {COLORS.map(color => (
-                <TouchableOpacity 
-                  key={color.id} 
+                <TouchableOpacity
+                  key={color.id}
                   onPress={() => setSelectedColor(color.id)}
                   style={[
-                    styles.colorCircle, 
+                    styles.colorCircle,
                     { backgroundColor: color.hex },
                     color.border ? { borderWidth: 1, borderColor: color.border } : {}
                   ]}
@@ -183,8 +191,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
             <Text style={styles.sectionLabel}>Sắp xếp theo</Text>
             <View style={styles.sortWrapper}>
               {SORT_OPTIONS.map(opt => (
-                <TouchableOpacity 
-                  key={opt.id} 
+                <TouchableOpacity
+                  key={opt.id}
                   onPress={() => setSortBy(opt.id)}
                   style={[styles.sortBtn, sortBy === opt.id && styles.sortBtnActive]}
                 >
@@ -225,7 +233,7 @@ const styles = StyleSheet.create({
   section: { paddingHorizontal: 20, marginBottom: 30 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
   sectionLabel: { fontSize: 20, fontWeight: "800", color: "#000" },
-  
+
   // Categories
   catList: { paddingRight: 20 },
   catItem: { alignItems: "center", marginRight: 20 },

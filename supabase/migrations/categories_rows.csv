@@ -1,0 +1,15 @@
+id,name,image_url,created_at,name_vi,slug,parent_id,group,display_order,is_active
+1,Men,,2026-04-01 07:18:15.165872+00,Nam,nam,,men,1,true
+2,Women,,2026-04-01 07:18:15.165872+00,Nữ,nu,,women,2,true
+3,Unisex,,2026-04-01 07:18:15.165872+00,Unisex,unisex,,common,3,true
+4,Men Tops,,2026-04-01 07:24:20.122607+00,Áo Nam,ao-nam,1,men,1,true
+5,Men Bottoms,,2026-04-01 07:24:20.122607+00,Quần Nam,quan-nam,1,men,2,true
+6,Women Tops,,2026-04-01 07:24:20.122607+00,Áo Nữ,ao-nu,2,women,1,true
+7,Women Bottoms,,2026-04-01 07:24:20.122607+00,Quần Nữ,quan-nu,2,women,2,true
+8,T-Shirts,,2026-04-01 07:25:52.07163+00,Áo thun Nam,ao-thun-nam,4,men,1,true
+9,Shirts,,2026-04-01 07:25:52.07163+00,Áo sơ mi Nam,ao-so-mi-nam,4,men,2,true
+10,Hoodies,,2026-04-01 07:25:52.07163+00,Áo Hoodie Nam,ao-hoodie-nam,4,men,3,true
+11,Jeans,,2026-04-01 07:25:52.07163+00,Quần Jeans Nam,quan-jeans-nam,5,men,1,true
+12,Shorts,,2026-04-01 07:25:52.07163+00,Quần Shorts Nam,quan-shorts-nam,5,men,2,true
+13,Dresses,,2026-04-01 07:25:52.07163+00,Váy/Đầm Nữ,vay-dam-nu,6,women,1,true
+14,Blouses,,2026-04-01 07:25:52.07163+00,Áo kiểu Nữ,ao-kieu-nu,6,women,2,true
