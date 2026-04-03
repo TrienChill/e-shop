@@ -172,14 +172,21 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* ========== HEADER ========== */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconButton}>
-          <MaterialIcons name="menu" size={28} color="#1a1a1a" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>E-Shop</Text>
+
         <TouchableOpacity
-          style={styles.iconButton}
+          style={styles.searchBar}
+          activeOpacity={0.8}
+          onPress={() => router.push("/(shop)/(tabs)/search")}
+        >
+          <Text style={styles.searchText}>Tìm kiếm...</Text>
+          <MaterialIcons name="photo-camera" size={24} color="#0055FF" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.cartButton}
+          activeOpacity={0.7}
           onPress={() => router.push("/(shop)/(tabs)/cart")}
         >
           <MaterialIcons name="shopping-bag" size={28} color="#1a1a1a" />
@@ -479,22 +486,34 @@ const styles = StyleSheet.create({
   // Header
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    backgroundColor: "#fff",
+    gap: 12,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "900",
     color: "#1a1a1a",
-    letterSpacing: 0.5,
   },
-  iconButton: {
-    padding: 8,
+  searchBar: {
+    flex: 1,
+    height: 46,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 23,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    justifyContent: "space-between",
+  },
+  searchText: {
+    color: "#9CA3AF",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  cartButton: {
+    padding: 6,
     position: "relative",
   },
   // ... các styles cũ
