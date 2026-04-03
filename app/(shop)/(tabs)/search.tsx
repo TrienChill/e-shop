@@ -1,8 +1,10 @@
 import { getPopularProducts, calculateDiscountedPrice } from "@/src/services/product";
 import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
+import { FilterModal } from "@/src/components/search/FilterModal";
 import {
   Camera,
+
   Filter,
   Search as SearchIcon,
   Trash2,
@@ -45,6 +47,7 @@ export default function SearchScreen() {
   // Trạng thái cho Search thực tế
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
 
   useEffect(() => {
     const initData = async () => {
@@ -161,7 +164,7 @@ export default function SearchScreen() {
           </TouchableOpacity>
         </View>
         {showResults && (
-          <TouchableOpacity style={styles.filterBtn}>
+          <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)}>
             <Filter size={20} color="#000" />
           </TouchableOpacity>
         )}
@@ -268,6 +271,15 @@ export default function SearchScreen() {
     <SafeAreaView style={styles.container}>
       {renderHeader()}
       {showResults ? renderResultsView() : renderInitialView()}
+      
+      <FilterModal 
+        isVisible={isFilterVisible} 
+        onClose={() => setIsFilterVisible(false)}
+        onApply={(filters) => {
+          console.log("Áp dụng bộ lọc:", filters);
+          // TODO: Thực hiện lại performSearch với các điều kiện filters
+        }}
+      />
     </SafeAreaView>
   );
 }
