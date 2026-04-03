@@ -94,6 +94,7 @@ export default function ProductDetailScreen() {
 
   // 1. Tạo ref cho ScrollView ảnh
   const imageScrollRef = useRef<ScrollView>(null);
+  const colorScrollRef = useRef<ScrollView>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -106,9 +107,36 @@ export default function ProductDetailScreen() {
   // Hàm xử lý khi người dùng vuốt ảnh
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
-    // Tính toán index của ảnh dựa trên vị trí cuộn và chiều rộng màn hình
     const index = Math.round(scrollPosition / SCREEN_WIDTH);
-    setActiveIndex(index);
+    
+    if (index !== activeIndex) {
+      setActiveIndex(index);
+
+      // Đồng bộ màu sắc khi vuốt ảnh (LIFO/Swipe synchronization)
+      if (product?.variants?.options) {
+        const colorOptions = product.variants.options;
+        const matchedColorIndex = colorOptions.findIndex(
+          (opt: any) => opt.image_index === index
+        );
+        
+        if (matchedColorIndex !== -1) {
+          const matchedColor = colorOptions[matchedColorIndex];
+          if (selectedColor?.color !== matchedColor.color) {
+            setSelectedColor(matchedColor);
+            
+            // Tự động cuộn dải màu sắc (color picker) vào vùng hiển thị
+            if (colorScrollRef.current) {
+              const itemWidth = 40; // width of color circle
+              const gap = 12; // marginRight: 12 from TouchableOpacity style
+              colorScrollRef.current.scrollTo({
+                x: matchedColorIndex * (itemWidth + gap) - SCREEN_WIDTH / 2 + (itemWidth / 2),
+                animated: true
+              });
+            }
+          }
+        }
+      }
+    }
   };
 
   const hasSizes =
@@ -307,20 +335,22 @@ export default function ProductDetailScreen() {
     profiles (full_name, avatar_url)
   `,
           )
-          .eq("product_id", id)
-          .order("created_at", { ascending: false });
+          .eq("product_id", id);
 
         if (error) throw error;
 
-        setReviews(data || []);
-
-        // Tính điểm trung bình
         if (data && data.length > 0) {
-          const total = data.reduce((acc, curr) => acc + curr.rating, 0);
-          setAverageRating(parseFloat((total / data.length).toFixed(1)));
+          // Sắp xếp các bình luận mới nhất lên đầu
+          const sortedData = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setReviews(sortedData);
+
+          const total = sortedData.reduce((acc, curr) => acc + curr.rating, 0);
+          setAverageRating(parseFloat((total / sortedData.length).toFixed(1)));
+        } else {
+          setReviews([]);
         }
       } catch (error) {
-        console.error("Lỗi lấy đánh giá:", error);
+        console.error("Lỗi lấy đánh giá (chi tiết):", error);
       }
     };
 
@@ -583,6 +613,7 @@ export default function ProductDetailScreen() {
               </View>
               <ScrollView
                 horizontal
+                ref={colorScrollRef}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.variantList}
               >
