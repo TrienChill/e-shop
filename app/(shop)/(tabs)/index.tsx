@@ -379,7 +379,7 @@ const HomeScreen = () => {
             <Text style={styles.sectionTitle}>Sản phẩm mới</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
-              onPress={() => router.push("/(shop)/(tabs)/search")} // Chuyển sang trang tìm kiếm/lọc
+              onPress={() => router.push("/product/new-products" as any)}
             >
               <Text style={styles.seeAllText}>Chi tiết</Text>
               <MaterialIcons name="arrow-forward" size={16} color="#2563eb" />
@@ -456,7 +456,7 @@ const HomeScreen = () => {
             <Text style={styles.sectionTitle}>Nổi tiếng nhất</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
-              onPress={() => router.push("/(shop)/(tabs)/search")} // Link tới trang lọc hoặc xem tất cả
+              onPress={() => router.push("/product/popular-products" as any)}
             >
               <Text style={styles.seeAllText}>Chi tiết</Text>
               <MaterialIcons name="arrow-forward" size={16} color="#2563eb" />
