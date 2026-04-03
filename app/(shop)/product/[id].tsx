@@ -307,7 +307,8 @@ export default function ProductDetailScreen() {
     profiles (full_name, avatar_url)
   `,
           )
-          .eq("product_id", id);
+          .eq("product_id", id)
+          .order("created_at", { ascending: false });
 
         if (error) throw error;
 
@@ -404,6 +405,21 @@ export default function ProductDetailScreen() {
           </View>
         </View>
         <Text style={styles.reviewComment}>{review.comment}</Text>
+        {review.images && review.images.length > 0 && (
+          <ScrollView
+            horizontal
+            style={styles.imageGallery}
+            showsHorizontalScrollIndicator={false}
+          >
+            {review.images.map((img: string, idx: number) => (
+              <Image
+                key={idx}
+                source={{ uri: img }}
+                style={styles.reviewImageThumb}
+              />
+            ))}
+          </ScrollView>
+        )}
       </View>
     );
   }
@@ -1258,6 +1274,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7280",
     lineHeight: 19,
+  },
+  imageGallery: {
+    marginTop: 10,
+  },
+  reviewImageThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
   },
   viewAllBtn: {
     backgroundColor: "#3B82F6",

@@ -305,7 +305,15 @@ export default function ReviewsScreen() {
 
     const renderItem = ({ item }: { item: ReviewData }) => (
         <View style={styles.card}>
-            <View style={styles.cardContent}>
+            <TouchableOpacity 
+                style={styles.cardContent} 
+                activeOpacity={0.7}
+                onPress={() => {
+                    if (item.product_id) {
+                        router.push(`/(shop)/product/${item.product_id}` as any);
+                    }
+                }}
+            >
                 <Image source={{ uri: item.image }} style={styles.productImage} />
                 <View style={styles.productInfo}>
                     <Text style={styles.productName} numberOfLines={1}>{item.productName}</Text>
@@ -335,7 +343,7 @@ export default function ReviewsScreen() {
                         </View>
                     )}
                 </View>
-            </View>
+            </TouchableOpacity>
 
             {activeTab === "reviewed" && item.comment && (
                 <View style={styles.reviewContent}>

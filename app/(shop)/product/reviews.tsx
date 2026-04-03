@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -191,6 +192,17 @@ export default function AllReviewsScreen() {
                 </View>
               </View>
               <Text style={styles.comment}>{item.comment}</Text>
+              {item.images && item.images.length > 0 && (
+                <ScrollView 
+                  horizontal 
+                  style={styles.imageGallery} 
+                  showsHorizontalScrollIndicator={false}
+                >
+                  {item.images.map((img: string, idx: number) => (
+                    <Image key={idx} source={{ uri: img }} style={styles.reviewImageThumb} />
+                  ))}
+                </ScrollView>
+              )}
             </View>
           );
         }}
@@ -239,6 +251,16 @@ const styles = StyleSheet.create({
   ratingText: { color: "#FBBF24", marginBottom: 8 },
   comment: { color: "#4B5563", lineHeight: 20 },
   emptyText: { textAlign: "center", color: "#9CA3AF", marginTop: 20 },
+
+  imageGallery: {
+    marginTop: 12,
+  },
+  reviewImageThumb: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+  },
 
   // -- Thêm Styles mới cho Avatar --
   reviewHeader: {

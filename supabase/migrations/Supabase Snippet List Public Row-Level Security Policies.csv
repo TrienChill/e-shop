@@ -1,0 +1,51 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
+public,conversations,Users view own conversation,PERMISSIVE,{public},SELECT,"((auth.uid() = user_id) OR (auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,order_items,Users can insert order items,PERMISSIVE,{public},INSERT,null,true
+public,order_items,Users can update their own order items,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))","(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))"
+public,order_items,Users can view own order items,PERMISSIVE,{public},SELECT,"((auth.uid() IN ( SELECT orders.user_id
+   FROM orders
+  WHERE (orders.id = order_items.order_id))) OR (auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null
+public,products,Enable public read access for products,PERMISSIVE,{public},SELECT,true,null
+public,products,Products are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
+public,products,Staff/Admin can insert products,PERMISSIVE,{public},INSERT,null,"(auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))"
+public,products,Staff/Admin can update products,PERMISSIVE,{public},UPDATE,"(auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))",null
+public,discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,product_discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,vouchers,Everyone can view active vouchers,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,orders,Users can create orders,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,orders,Users can view own orders,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,cart_items,Users can delete own cart items,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,cart_items,Users can insert own cart items,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,cart_items,Users can update own cart items,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,cart_items,Users can view own cart items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,posts,Published posts are publicly readable,PERMISSIVE,{public},SELECT,(is_published = true),null
+public,reviews,Public reviews are viewable by everyone.,PERMISSIVE,{public},SELECT,true,null
+public,reviews,Users can delete their own reviews,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,reviews,Users can insert their own reviews,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,reviews,Users can insert their own reviews.,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,reviews,Users can update their own reviews,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,reviews,Users can view all reviews,PERMISSIVE,{public},SELECT,true,null
+public,wishlist,Users can delete from their own wishlist,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,wishlist,Users can insert into their own wishlist,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,wishlist,Users can view their own wishlist items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,banners,Banners are publicly readable,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,shipping_methods,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,user_addresses,Users can delete own addresses,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,user_addresses,Users can insert own addresses,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,user_addresses,Users can update own addresses,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
+public,user_addresses,Users can view own addresses,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
