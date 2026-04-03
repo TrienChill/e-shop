@@ -7,6 +7,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -18,8 +20,9 @@ import {
   getTopSellingProducts,
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
+import { getActiveBanners, Banner } from "@/src/services/banner";
 
 const { width } = Dimensions.get("window");
 
@@ -133,6 +136,69 @@ const HomeScreen = () => {
     loadData();
   }, []);
 
+  {
+    /* ========== BANNERS SECTION  ========== */
+  }
+  const [banners, setBanners] = useState<Banner[]>([]);
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      const data = await getActiveBanners();
+      setBanners(data);
+    };
+    fetchBanners();
+  }, []);
+
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  // Tạo danh sách banner để hỗ trợ Infinite Loop (thêm bản sao của phần tử đầu vào cuối)
+  const displayBanners =
+    banners.length > 1 ? [...banners, banners[0]] : banners;
+
+  // Tự động chuyển banner sau 5 giây
+  useEffect(() => {
+    if (banners.length <= 1) return;
+
+    const timer = setInterval(() => {
+      const nextIndex = activeBannerIndex + 1;
+
+      // Cuộn tới index tiếp theo (có thể là bản sao của phần tử đầu)
+      bannerScrollRef.current?.scrollTo({
+        x: nextIndex * (width - 32),
+        animated: true,
+      });
+
+      // Nếu đang ở bản sao (cuối mảng displayBanners)
+      if (nextIndex === banners.length) {
+        // Đợi animation cuộn xong rồi reset về 0 (không animation)
+        setTimeout(() => {
+          bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
+          setActiveBannerIndex(0);
+        }, 500); // 500ms thường là thời gian animation mặc định
+      } else {
+        setActiveBannerIndex(nextIndex);
+      }
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [activeBannerIndex, banners.length]);
+
+  const handleBannerScroll = (
+    event: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffset / (width - 32));
+
+    // Nếu cuộn thủ công tới phần tử cuối (bản sao), reset về 0 ngay lập tức
+    if (banners.length > 1 && index === banners.length) {
+      bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
+      setActiveBannerIndex(0);
+    } else {
+      setActiveBannerIndex(index);
+    }
+  };
+
   const [cartCount, setCartCount] = useState(0);
 
   // Hàm lấy tổng số lượng sản phẩm trong giỏ
@@ -204,21 +270,63 @@ const HomeScreen = () => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* ========== BANNER SECTION ========== */}
-        <View style={styles.bannerContainer}>
-          <View style={styles.bannerContent}>
-            <View style={styles.bannerTextContainer}>
-              <Text style={styles.bannerTitle}>Giảm giá</Text>
-              <Text style={styles.bannerSubtitle}>Giảm đến 50%</Text>
+        {banners.length > 0 && (
+          <View style={styles.bannerContainer}>
+            <ScrollView
+              ref={bannerScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={handleBannerScroll}
+              scrollEventThrottle={16}
+            >
+              {displayBanners.map((banner, index) => (
+                <TouchableOpacity
+                  key={`${banner.id}-${index}`}
+                  style={[styles.bannerContent, { width: width - 32 }]}
+                  activeOpacity={0.9}
+                  onPress={() => {
+                    if (banner.action_type === "product") {
+                      router.push(`/(shop)/product/${banner.action_value}`);
+                    } else if (banner.action_type === "category") {
+                      router.push({
+                        pathname: "/(shop)/(tabs)/search",
+                        params: { categoryId: banner.action_value },
+                      });
+                    }
+                  }}
+                >
+                  <View style={styles.bannerTextContainer}>
+                    <Text style={styles.bannerTitle}>{banner.title}</Text>
+                    <Text style={styles.bannerSubtitle}>{banner.subtitle}</Text>
+                  </View>
+                  <Image
+                    source={{
+                      uri: banner.image_url,
+                    }}
+                    style={styles.bannerImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Pagination Dots */}
+            <View style={styles.paginationContainer}>
+              {banners.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    (index === activeBannerIndex ||
+                      (index === 0 && activeBannerIndex === banners.length)) &&
+                      styles.paginationDotActive,
+                  ]}
+                />
+              ))}
             </View>
-            <Image
-              source={{
-                uri: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400",
-              }}
-              style={styles.bannerImage}
-              resizeMode="cover"
-            />
           </View>
-        </View>
+        )}
 
         {/* ========== TOP PRODUCTS SECTION ========== */}
         <View style={styles.section}>
@@ -481,6 +589,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     bottom: 0,
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+    gap: 6,
+  },
+  paginationDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#E5E7EB",
+  },
+  paginationDotActive: {
+    width: 20,
+    backgroundColor: "#ff6b35",
   },
 
   // Header

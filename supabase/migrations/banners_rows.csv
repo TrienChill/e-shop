@@ -1,0 +1,7 @@
+id,image_url,title,subtitle,action_type,action_value,display_order,is_active,start_date,end_date,created_at,updated_at
+144c1d01-ef5f-4a82-bb00-3352c4c134f3,https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&w=1000&q=80,New Sneakers,Check it out,product,27,2,true,,,2026-01-22 05:40:45.928315+00,2026-01-22 05:40:45.928315+00
+3370d9f7-d81b-444d-9be7-adf8c4b2a965,https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800,New Arrivals,Summer Collection,category,1,2,true,,,2026-01-21 02:52:02.717931+00,2026-01-21 02:52:02.717931+00
+41f476b5-9ff6-47c5-adc7-e692809212db,https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&w=1000&q=80,Free Shipping,On all orders,none,,3,true,,,2026-01-22 05:40:45.928315+00,2026-01-22 05:40:45.928315+00
+a443e2ba-4391-46e7-ae95-0e9afee37848,https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800,Flash Deal,Limited Time Offer,external_url,https://example.com/promo,3,true,,,2026-01-21 02:52:02.717931+00,2026-01-21 02:52:02.717931+00
+ad205ff8-2190-4f46-813d-351b840966f0,https://images.unsplash.com/photo-1607082349566-187342175e2f?w=800,Big Sale,Up to 50% Off,product,1,1,true,,,2026-01-21 02:52:02.717931+00,2026-01-21 02:52:02.717931+00
+c9e49c88-5430-45be-a40c-1518ba1867fa,https://images.unsplash.com/photo-1555529733-0e670560f7e1?auto=format&fit=crop&w=1000&q=80,Summer Sale,Up to 50% off,collection,21,1,true,,,2026-01-22 05:40:45.928315+00,2026-01-22 05:40:45.928315+00
