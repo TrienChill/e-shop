@@ -5,7 +5,8 @@ import {
   Trash2,
   X,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { getPopularProducts } from "@/src/services/product";
 import {
   Dimensions,
   FlatList,
@@ -26,26 +27,7 @@ const { width } = Dimensions.get("window");
 const SEARCH_HISTORY = ["Váy đỏ", "Kính râm", "Quần màu Mustard", "Chân váy 80s"];
 const RECOMMENDATIONS = ["Chân váy", "Phụ kiện", "Áo thun đen", "Quần Jeans", "Giày trắng"];
 
-const DISCOVER_PRODUCTS = [
-  {
-    id: "1",
-    name: "Váy mùa hè Cotton họa tiết hoa nhí",
-    price: 1250000,
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400",
-  },
-  {
-    id: "2",
-    name: "Kính râm Aviator cổ điển",
-    price: 320000,
-    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400",
-  },
-  {
-    id: "3",
-    name: "Áo len trắng dệt kim cao cấp",
-    price: 210000,
-    image: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400",
-  },
-];
+
 
 const SEARCH_RESULTS = [
   { id: "101", name: "Tất len lông cừu hiện đại", price: 170000, image: "https://images.unsplash.com/photo-1582966298430-817810c95f3b?w=400" },
@@ -59,6 +41,15 @@ const SEARCH_RESULTS = [
 export default function SearchScreen() {
   const [searchPhrase, setSearchPhrase] = useState("");
   const [showResults, setShowResults] = useState(false);
+  const [discoverProducts, setDiscoverProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPopular = async () => {
+      const data = await getPopularProducts();
+      setDiscoverProducts(data);
+    };
+    fetchPopular();
+  }, []);
 
   // Hàm xử lý tìm kiếm
   const handleSearch = (text: string) => {
@@ -148,11 +139,11 @@ export default function SearchScreen() {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { fontSize: 22, fontWeight: '800', marginBottom: 20 }]}>Khám phá</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {DISCOVER_PRODUCTS.map((product) => (
+          {discoverProducts.map((product) => (
             <View key={product.id} style={styles.discoverCard}>
-              <Image source={{ uri: product.image }} style={styles.discoverImg} />
+              <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.discoverImg} />
               <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-              <Text style={styles.productPrice}>{product.price.toLocaleString('vi-VN')} đ</Text>
+              <Text style={styles.productPrice}>{(product.finalPrice || product.price || 0).toLocaleString('vi-VN')} đ</Text>
             </View>
           ))}
         </ScrollView>
