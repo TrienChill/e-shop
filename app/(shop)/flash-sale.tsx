@@ -1,21 +1,23 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
+import { getFlashSaleProducts, getMostPopularProducts } from "@/src/services/product";
+import { Banner, getActiveBanners } from "@/src/services/banner";
+import { supabase } from "@/src/lib/supabase";
+import { useRouter } from "expo-router";
+import { ArrowRight, ChevronLeft, Clock, Heart } from "lucide-react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import React, { useEffect, useState, useRef } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
   Dimensions,
   FlatList,
+  Image,
   SafeAreaView,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { ChevronLeft, Clock, ArrowRight, Heart } from "lucide-react-native";
-import { PriceDisplay } from "@/src/components/common/PriceDisplay";
-import CommonHeader from "@/src/components/layout/Header";
-import { getFlashSaleProducts } from "@/src/services/product";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
@@ -115,8 +117,6 @@ const POPULAR_PRODUCTS = [
   },
 ];
 
-const DISCOUNT_LEVELS = ["Tất cả", "10%", "20%", "30%", "40%", "50%"];
-
 // ==================== SUB-COMPONENTS ====================
 
 const CountdownTimer = () => {
@@ -160,7 +160,7 @@ const CountdownTimer = () => {
   );
 };
 
-const DiscountTabs = ({ selected, onSelect }: { selected: string; onSelect: (val: string) => void }) => {
+const DiscountTabs = ({ selected, onSelect, levels }: { selected: string; onSelect: (val: string) => void, levels: string[] }) => {
   return (
     <ScrollView
       horizontal
@@ -168,7 +168,7 @@ const DiscountTabs = ({ selected, onSelect }: { selected: string; onSelect: (val
       style={styles.tabsContainer}
       contentContainerStyle={styles.tabsContent}
     >
-      {DISCOUNT_LEVELS.map((level) => (
+      {levels.map((level) => (
         <TouchableOpacity
           key={level}
           onPress={() => onSelect(level)}
@@ -248,14 +248,103 @@ export default function FlashSaleScreen() {
   const router = useRouter();
   const [selectedDiscount, setSelectedDiscount] = useState("Tất cả");
   const [flashSaleData, setFlashSaleData] = useState<any[]>([]);
+  const [discountLevels, setDiscountLevels] = useState<string[]>(["Tất cả"]);
+
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const bannerScrollRef = useRef<ScrollView>(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  const [popularProducts, setPopularProducts] = useState<any[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<any[]>([]);
+
+  const fetchWishlist = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase.from("wishlist").select("*").eq("user_id", user.id);
+      if (error) throw error;
+      setWishlistItems(data || []);
+    } catch (e) {}
+  };
+
+  const handleToggleFavoritePopular = async (productId: string, isCurrentlyFavorited: boolean) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để lưu sản phẩm yêu thích");
+        return;
+      }
+      if (isCurrentlyFavorited) {
+        await supabase.from("wishlist").delete().eq("user_id", user.id).eq("product_id", productId);
+      } else {
+        await supabase.from("wishlist").insert([{ user_id: user.id, product_id: productId }]);
+      }
+      fetchWishlist();
+    } catch (err: any) {
+      alert("Lỗi: " + err.message);
+    }
+  };
 
   useEffect(() => {
     const fetchFlashSale = async () => {
       const data = await getFlashSaleProducts();
       setFlashSaleData(data);
+
+      const levels = new Set<number>();
+      data.forEach((product: any) => {
+        const activeDiscount = product.product_discounts?.find(
+          (d: any) => d.is_active && d.discount_type === 'percentage'
+        );
+        if (activeDiscount && activeDiscount.discount_value) {
+          levels.add(activeDiscount.discount_value);
+        }
+      });
+      const sorted = Array.from(levels).sort((a, b) => a - b).map(v => `${v}%`);
+      setDiscountLevels(["Tất cả", ...sorted]);
+    };
+    const fetchBanners = async () => {
+      const bData = await getActiveBanners();
+      setBanners(bData);
+    };
+    const loadPopular = async () => {
+      const data = await getMostPopularProducts();
+      setPopularProducts(data);
     };
     fetchFlashSale();
+    fetchBanners();
+    loadPopular();
+    fetchWishlist();
   }, []);
+
+  const displayBanners = banners.length > 1 ? [...banners, banners[0]] : banners;
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const timer = setInterval(() => {
+      const nextIndex = activeBannerIndex + 1;
+      bannerScrollRef.current?.scrollTo({ x: nextIndex * (width - 48), animated: true });
+      if (nextIndex === banners.length) {
+        setTimeout(() => {
+          bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
+          setActiveBannerIndex(0);
+        }, 500);
+      } else {
+        setActiveBannerIndex(nextIndex);
+      }
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [activeBannerIndex, banners.length]);
+
+  const handleBannerScroll = (event: any) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const index = Math.round(contentOffset / (width - 48));
+    if (banners.length > 1 && index === banners.length) {
+      bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
+      setActiveBannerIndex(0);
+    } else {
+      setActiveBannerIndex(index);
+    }
+  };
 
   const filteredData = flashSaleData.filter((product) => {
     if (selectedDiscount === "Tất cả") return true;
@@ -271,7 +360,7 @@ export default function FlashSaleScreen() {
     <View style={styles.screenHeader}>
       {/* Background shape */}
       <View style={styles.headerBackground} />
-      
+
       <View style={styles.headerTopRow}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={28} color={COLORS.dark} />
@@ -284,31 +373,70 @@ export default function FlashSaleScreen() {
         <Text style={styles.screenSubtitle}>Chọn mức giảm giá của bạn</Text>
       </View>
 
-      <DiscountTabs selected={selectedDiscount} onSelect={setSelectedDiscount} />
+      <DiscountTabs selected={selectedDiscount} onSelect={setSelectedDiscount} levels={discountLevels} />
     </View>
   );
 
   const renderFooter = () => (
     <View style={styles.footerContainer}>
-      {/* Big Sale Banner */}
-      <View style={styles.bigSaleBanner}>
-        <View style={styles.bannerTextContent}>
-          <Text style={styles.bannerTitle}>Big Sale</Text>
-          <Text style={styles.bannerSubtitle}>Lên đến 50%</Text>
-          <TouchableOpacity style={styles.happeningBtn}>
-            <Text style={styles.happeningText}>Đang diễn ra</Text>
-          </TouchableOpacity>
+      {/* Banners Section */}
+      {banners.length > 0 && (
+        <View style={styles.bannerContainer}>
+          <ScrollView
+            ref={bannerScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleBannerScroll}
+            scrollEventThrottle={16}
+          >
+            {displayBanners.map((banner, index) => (
+              <TouchableOpacity
+                key={`${banner.id}-${index}`}
+                style={[styles.bannerContent, { width: width - 48 }]}
+                activeOpacity={0.9}
+                onPress={() => {
+                  if (banner.action_type === "product") {
+                    router.push(`/(shop)/product/${banner.action_value}`);
+                  } else if (banner.action_type === "category") {
+                    router.push({
+                      pathname: "/(shop)/(tabs)/search",
+                      params: { categoryId: banner.action_value },
+                    });
+                  }
+                }}
+              >
+                <View style={[styles.bannerTextContainer, styles.bannerTextContent]}>
+                  <Text style={styles.bannerTitle}>{banner.title}</Text>
+                  <Text style={styles.bannerSubtitle}>{banner.subtitle}</Text>
+                </View>
+                <Image
+                  source={{ uri: banner.image_url }}
+                  style={[styles.bannerImage, { height: 160 }]}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.paginationContainer}>
+            {banners.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.paginationDot,
+                  (index === activeBannerIndex || (index === 0 && activeBannerIndex === banners.length)) &&
+                  styles.paginationDotActive,
+                ]}
+              />
+            ))}
+          </View>
         </View>
-        <Image 
-          source={{ uri: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400" }} 
-          style={styles.bannerImage} 
-        />
-      </View>
+      )}
 
-      {/* Most Popular Section */}
+      {/*  Favorite Section */}
       <View style={styles.mostPopularSection}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Phổ biến nhất</Text>
+          <Text style={styles.sectionTitle}>Nổi tiếng nhất</Text>
           <TouchableOpacity style={styles.seeAllBtn}>
             <Text style={styles.seeAllText}>Xem tất cả</Text>
             <View style={styles.seeAllIcon}>
@@ -322,9 +450,45 @@ export default function FlashSaleScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.popularList}
         >
-          {POPULAR_PRODUCTS.map((item) => (
-            <PopularItemCard key={item.id} item={item} />
-          ))}
+          {popularProducts.map((item) => {
+            const isFavorited = wishlistItems.some(w => w.product_id === item.id);
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.popularCardGrid}
+                onPress={() => router.push(`/(shop)/product/${item.id}`)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.popularImageContainer}>
+                  <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.popularImageGrid} resizeMode="cover" />
+                  <TouchableOpacity style={styles.popularLabel} onPress={() => handleToggleFavoritePopular(item.id, isFavorited)}>
+                    <Heart size={14} color={isFavorited ? "#EF4444" : "#EF4444"} fill={isFavorited ? "#EF4444" : "rgba(255,255,255,1)"} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popularInfo}>
+                  <View style={styles.statsRow}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Heart size={12} color="#EF4444" fill="#EF4444" />
+                      <Text style={styles.heartText}>{item.heart_count || 0}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <MaterialIcons name="star" size={12} color="#f59e0b" />
+                      <Text style={styles.ratingText}> {item.average_rating || 0}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.popularNameGrid} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <PriceDisplay
+                    hasDiscount={item.hasDiscount}
+                    finalPrice={item.finalPrice}
+                    originalPrice={item.originalPrice}
+                    size="sm"
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
     </View>
@@ -333,7 +497,7 @@ export default function FlashSaleScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
+
       <FlatList
         data={filteredData}
         keyExtractor={(item) => item.id.toString()}
@@ -506,48 +670,27 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 24,
   },
-  bigSaleBanner: {
-    backgroundColor: "#FFD700", // Yellowish background for banner
-    borderRadius: 20,
-    height: 160,
-    flexDirection: "row",
-    overflow: "hidden",
-    marginBottom: 40,
-  },
-  bannerTextContent: {
-    flex: 1,
-    padding: 24,
-    justifyContent: "center",
-  },
-  bannerTitle: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: COLORS.dark,
-  },
-  bannerSubtitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: COLORS.dark,
-    marginTop: 4,
-  },
-  happeningBtn: {
-    backgroundColor: COLORS.blue,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: "flex-start",
-    marginTop: 12,
-  },
-  happeningText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  bannerImage: {
-    width: 140,
-    height: 160,
-    backgroundColor: COLORS.lightBlue,
-  },
+  bannerContent: { backgroundColor: "#ff6b35", borderRadius: 16, height: 160, flexDirection: "row", overflow: "hidden", position: "relative" },
+  bannerTextContent: { flex: 1, justifyContent: "center", paddingLeft: 24 },
+  bannerTitle: { fontSize: 24, fontWeight: "bold", color: "#fff", marginBottom: 4 },
+  bannerSubtitle: { fontSize: 14, color: "#fff", opacity: 0.9, marginBottom: 12 },
+  happeningBtn: { backgroundColor: "#fff", alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  happeningText: { color: "#ff6b35", fontWeight: "bold", fontSize: 12 },
+  bannerImage: { width: 140, height: 140, alignSelf: "flex-end" },
+
+  // Added styles for dynamic banner & popular items
+  bannerContainer: { marginBottom: 20 },
+  bannerTextContainer: { flex: 1, paddingLeft: 24, justifyContent: "center" },
+  paginationContainer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 12, gap: 8 },
+  paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#E5E7EB" },
+  paginationDotActive: { width: 24, backgroundColor: "#0055FF" },
+
+  popularCardGrid: { width: 160, backgroundColor: "#fff", borderRadius: 16, padding: 8, marginBottom: 16, marginRight: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 4 },
+  popularImageGrid: { width: "100%", height: 160, borderRadius: 12, backgroundColor: "#f5f5f5" },
+  statsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 8 },
+  heartText: { fontSize: 12, color: "#EF4444", fontWeight: "bold", marginLeft: 4 },
+  ratingText: { fontSize: 11, color: "#666" },
+  popularNameGrid: { fontSize: 14, fontWeight: "700", color: "#1e293b", marginTop: 6, marginBottom: 4, lineHeight: 20, paddingHorizontal: 4 },
 
   // Most Popular
   mostPopularSection: {
