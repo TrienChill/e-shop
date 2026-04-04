@@ -262,8 +262,11 @@ export default function ProductDetailScreen() {
         setSelectedSize(null);
         setSelectedColor(null);
 
-        // --- GHI LẠI VÀO JSONB COLUMN TRONG PROFILES ---
+        // --- GHI LẠI VÀO BẢNG VIEW HISTORY ---
         recordRecentView(data);
+        
+        // --- KIỂM TRA TRẠNG THÁI YÊU THÍCH ---
+        checkWishlistStatus();
       } catch (error) {
         console.error("Lỗi lấy chi tiết sản phẩm:", error);
       } finally {
@@ -273,6 +276,56 @@ export default function ProductDetailScreen() {
 
     if (id) fetchProductDetail();
   }, [id]);
+
+  const checkWishlistStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from("wishlist")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("product_id", id)
+        .single();
+      
+      if (data) setWishlist(true);
+    } catch (e) {
+      // Bỏ qua lỗi nếu không tìm thấy
+    }
+  };
+
+  const handleToggleFavorite = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để lưu sản phẩm yêu thích");
+        return;
+      }
+      
+      const prev = wishlist;
+      setWishlist(!prev); // Optimistic UI update
+
+      if (prev) {
+        // Đã thả tim -> Hủy tim
+        const { error } = await supabase
+          .from("wishlist")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("product_id", id);
+        if (error) throw error;
+      } else {
+        // Chưa thả tim -> Tim
+        const { error } = await supabase
+          .from("wishlist")
+          .insert([{ user_id: user.id, product_id: id }]);
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      console.error("Lỗi toggle wishlist:", err);
+      setWishlist((p) => !p); // Revert nếu có lỗi
+      alert("Lỗi: " + err.message);
+    }
+  };
 
   const recordRecentView = async (productData: any) => {
     try {
@@ -784,7 +837,7 @@ export default function ProductDetailScreen() {
           <TouchableOpacity
             style={styles.actionIcon}
             activeOpacity={0.7}
-            onPress={() => setWishlist((p) => !p)}
+            onPress={handleToggleFavorite}
           >
             <Heart
               size={22}
