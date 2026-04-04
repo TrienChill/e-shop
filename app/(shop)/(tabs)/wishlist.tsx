@@ -182,7 +182,7 @@ export default function WishlistScreen() {
           product:products (
           *,
           product_discounts (
-          discounts (*)
+            id, discount_type, discount_value, is_active, start_date, end_date
           )
           )
         `)
@@ -208,7 +208,7 @@ export default function WishlistScreen() {
       // Kết nối bảng sản phẩm và số lượt yêu thích từ bảng wishlist
       const { data, error } = await supabase
         .from("products")
-        .select(`*, product_discounts(discounts(*)), wishlist:wishlist(id)`);
+        .select(`*, product_discounts(id, discount_type, discount_value, is_active, start_date, end_date), wishlist:wishlist(id)`);
       if (error) throw error;
 
       const processed = (data || []).map((p: any) => ({

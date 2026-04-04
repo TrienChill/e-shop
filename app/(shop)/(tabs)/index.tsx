@@ -20,6 +20,7 @@ import {
   getLatestProducts,
   getMostPopularProducts,
   getTopSellingProducts,
+  getFlashSaleProducts,
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -134,6 +135,19 @@ const HomeScreen = () => {
       setPopularItems(data);
     };
     loadData();
+  }, []);
+
+  {
+    /* ========== FLASH SALE SECTION  ========== */
+  }
+  const [flashSaleProducts, setFlashSaleProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchFlashSale = async () => {
+      const data = await getFlashSaleProducts();
+      setFlashSaleProducts(data.slice(0, 4)); // Hiển thị 4 sản phẩm
+    };
+    fetchFlashSale();
   }, []);
 
   {
@@ -439,18 +453,19 @@ const HomeScreen = () => {
           </View>
 
           <View style={styles.flashSaleGrid}>
-            {FLASH_SALE_PRODUCTS.map((product) => (
+            {flashSaleProducts.map((product) => {
+              return (
               <View key={product.id} style={styles.flashSaleCard}>
                 <Image
-                  source={{ uri: product.image }}
+                  source={{ uri: product.images?.[0] || 'https://via.placeholder.com/150' }}
                   style={styles.flashSaleImage}
                   resizeMode="cover"
                 />
                 <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discount}</Text>
+                  <Text style={styles.discountText}>{product.discountBadgeText || "SALE"}</Text>
                 </View>
               </View>
-            ))}
+            )})}
           </View>
         </TouchableOpacity>
 

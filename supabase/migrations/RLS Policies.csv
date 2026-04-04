@@ -24,8 +24,6 @@ public,products,Staff/Admin can insert products,PERMISSIVE,{public},INSERT,null,
 public,products,Staff/Admin can update products,PERMISSIVE,{public},UPDATE,"(auth.uid() IN ( SELECT profiles.id
    FROM profiles
   WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))",null
-public,discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
-public,product_discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
 public,vouchers,Everyone can view active vouchers,PERMISSIVE,{public},SELECT,(is_active = true),null
 public,orders,Users can create orders,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
 public,orders,Users can view own orders,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
@@ -49,3 +47,7 @@ public,user_addresses,Users can delete own addresses,PERMISSIVE,{public},DELETE,
 public,user_addresses,Users can insert own addresses,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
 public,user_addresses,Users can update own addresses,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
 public,user_addresses,Users can view own addresses,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể cập nhật lịch sử của c,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể thêm lịch sử của chính h,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+public,product_view_history,Người dùng chỉ có thể xem lịch sử của chính h,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể xóa lịch sử của chính h,PERMISSIVE,{authenticated},DELETE,(auth.uid() = user_id),null

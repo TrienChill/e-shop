@@ -601,7 +601,7 @@ export default function CartScreen() {
           images,
           variants,
           product_discounts (
-            discounts (*)
+            id, discount_type, discount_value, is_active, start_date, end_date
           )
         )
       `,

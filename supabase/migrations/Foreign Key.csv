@@ -4,8 +4,6 @@ order_items,order_id,orders,id,order_items_order_id_fkey
 order_items,product_id,products,id,order_items_product_id_fkey
 messages,conversation_id,conversations,id,messages_conversation_id_fkey
 products,collection_id,Collection,id,products_collection_id_fkey
-product_discounts,product_id,products,id,product_discounts_product_id_fkey
-product_discounts,discount_id,discounts,id,product_discounts_discount_id_fkey
 cart_items,product_id,products,id,cart_items_product_id_fkey
 cart_items,shop_voucher_id,vouchers,id,cart_items_shop_voucher_id_fkey
 orders,platform_voucher_id,vouchers,id,orders_platform_voucher_id_fkey
@@ -24,3 +22,5 @@ orders,address_id,user_addresses,id,orders_address_id_fkey
 orders,shipping_method_id,shipping_methods,id,orders_shipping_method_id_fkey
 reviews,order_item_id,order_items,id,reviews_order_item_id_fkey
 product_variants,product_id,products,id,product_variants_product_id_fkey
+product_view_history,product_id,products,id,product_view_history_product_id_fkey
+product_discounts,product_id,products,id,product_discounts_product_id_fkey

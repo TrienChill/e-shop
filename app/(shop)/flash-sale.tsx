@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { ChevronLeft, Clock, ArrowRight, Heart } from "lucide-react-native";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import CommonHeader from "@/src/components/layout/Header";
+import { getFlashSaleProducts } from "@/src/services/product";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 48 - 16) / 2;
@@ -192,6 +193,9 @@ const DiscountTabs = ({ selected, onSelect }: { selected: string; onSelect: (val
 
 const ProductCard = ({ product }: { product: any }) => {
   const router = useRouter();
+
+  let discountBadgeText = product.discountBadgeText || "SALE";
+
   return (
     <TouchableOpacity
       style={styles.productCard}
@@ -199,9 +203,9 @@ const ProductCard = ({ product }: { product: any }) => {
       onPress={() => router.push(`/(shop)/product/${product.id}`)}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: product.image }} style={styles.productImage} />
+        <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/400' }} style={styles.productImage} />
         <View style={styles.discountBadge}>
-          <Text style={styles.discountBadgeText}>{product.discount}</Text>
+          <Text style={styles.discountBadgeText}>{discountBadgeText}</Text>
         </View>
       </View>
       <View style={styles.productInfo}>
@@ -209,7 +213,7 @@ const ProductCard = ({ product }: { product: any }) => {
           {product.name}
         </Text>
         <PriceDisplay
-          finalPrice={product.price}
+          finalPrice={product.finalPrice}
           originalPrice={product.originalPrice}
           hasDiscount={true}
           size="sm"
@@ -242,7 +246,26 @@ const PopularItemCard = ({ item }: { item: any }) => {
 
 export default function FlashSaleScreen() {
   const router = useRouter();
-  const [selectedDiscount, setSelectedDiscount] = useState("20%");
+  const [selectedDiscount, setSelectedDiscount] = useState("Tất cả");
+  const [flashSaleData, setFlashSaleData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchFlashSale = async () => {
+      const data = await getFlashSaleProducts();
+      setFlashSaleData(data);
+    };
+    fetchFlashSale();
+  }, []);
+
+  const filteredData = flashSaleData.filter((product) => {
+    if (selectedDiscount === "Tất cả") return true;
+    const level = parseInt(selectedDiscount); // e.g. "20%" -> 20
+    const activeDiscount = product.product_discounts?.find(
+      (d: any) => d.is_active && d.discount_type === 'percentage'
+    );
+    if (!activeDiscount) return false;
+    return activeDiscount.discount_value >= level;
+  });
 
   const renderHeader = () => (
     <View style={styles.screenHeader}>
@@ -312,8 +335,8 @@ export default function FlashSaleScreen() {
       <StatusBar barStyle="dark-content" />
       
       <FlatList
-        data={FLASH_SALE_PRODUCTS}
-        keyExtractor={(item) => item.id}
+        data={filteredData}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => <ProductCard product={item} />}
         numColumns={2}
         ListHeaderComponent={renderHeader()}

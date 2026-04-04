@@ -31,9 +31,7 @@ export const getTopSellingProducts = async () => {
         `
         *,
         product_discounts (
-          discounts (
-            id, type, value, is_active, start_date, end_date
-          )
+          id, discount_type, discount_value, is_active, start_date, end_date
         )
       `,
       )
@@ -77,6 +75,30 @@ export const getTopSellingProducts = async () => {
   }
 };
 
+// Lấy sản phẩm đang có Flash Sale (có discount active)
+export const getFlashSaleProducts = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        product_discounts (
+          id, discount_type, discount_value, is_active, start_date, end_date
+        )
+      `)
+      .eq("is_active", true);
+
+    if (error) throw error;
+
+    const processed = (data || []).map(calculateDiscountedPrice);
+    // Chỉ lấy những sản phẩm thực sự đang có giảm giá hợp lệ
+    return processed.filter(p => p.hasDiscount);
+  } catch (error) {
+    console.error("Lỗi lấy sản phẩm flash sale:", error);
+    return [];
+  }
+};
+
 // Lấy 10 sản phẩm mới nhất
 
 export const getLatestProducts = async () => {
@@ -86,7 +108,7 @@ export const getLatestProducts = async () => {
       `
       *,
       product_discounts (
-        discounts (*)
+        id, discount_type, discount_value, is_active, start_date, end_date
       )
     `,
     ) // Phải có đoạn join này để tránh undefined
@@ -124,7 +146,7 @@ export const getMostPopularProducts = async () => {
     .select(`
       *,
       product_discounts (
-        discounts (*)
+        id, discount_type, discount_value, is_active, start_date, end_date
       )
     `)
     .in("id", productIds);
@@ -152,7 +174,7 @@ export const getPopularProducts = async (currentProductId?: string) => {
       .select(`
         *,
         product_discounts (
-          discounts (*)
+          id, discount_type, discount_value, is_active, start_date, end_date
         )
       `)
       .eq("is_active", true)
@@ -227,7 +249,7 @@ export const calculateDiscountedPrice = (product: any) => {
   let finalPrice = product.price;
   let hasDiscount = false;
 
-  // Đảm bảo lấy được mảng discounts, kể cả khi Supabase trả về object đơn lẻ hoặc undefined
+  // Đảm bảo lấy được mảng discounts (bây giờ là product_discounts)
   const discountsArray = Array.isArray(product.product_discounts)
     ? product.product_discounts
     : product.product_discounts
@@ -235,25 +257,30 @@ export const calculateDiscountedPrice = (product: any) => {
       : [];
 
   // Tìm discount đang active
-  const activeDiscountObj = discountsArray.find((pd: any) => {
-    const d = pd.discounts;
+  const activeDiscountObj = discountsArray.find((d: any) => {
     if (!d) return false;
 
     const now = new Date();
-    const startDate = new Date(d.start_date);
-    const endDate = d.end_date ? new Date(d.end_date) : null;
+    // Khắc phục lỗi parse ngày trên React Native (chuỗi từ Supabase có dấu cách thay vì chữ T)
+    const safeStartDateStr = d.start_date ? d.start_date.replace(' ', 'T') : null;
+    const safeEndDateStr = d.end_date ? d.end_date.replace(' ', 'T') : null;
+
+    const startDate = safeStartDateStr ? new Date(safeStartDateStr) : new Date(0);
+    const endDate = safeEndDateStr ? new Date(safeEndDateStr) : null;
 
     return d.is_active && startDate <= now && (!endDate || endDate >= now);
   });
 
-  const activeDiscount = activeDiscountObj?.discounts;
+  let discountBadgeText = null;
 
-  if (activeDiscount) {
+  if (activeDiscountObj) {
     hasDiscount = true;
-    if (activeDiscount.type === "percentage") {
-      finalPrice = product.price - (product.price * activeDiscount.value) / 100;
+    if (activeDiscountObj.discount_type === "percentage") {
+      finalPrice = product.price - (product.price * activeDiscountObj.discount_value) / 100;
+      discountBadgeText = `-${activeDiscountObj.discount_value}%`;
     } else {
-      finalPrice = Math.max(0, product.price - activeDiscount.value);
+      finalPrice = Math.max(0, product.price - activeDiscountObj.discount_value);
+      discountBadgeText = `-${(activeDiscountObj.discount_value / 1000).toFixed(0)}k`;
     }
   }
 
@@ -262,5 +289,6 @@ export const calculateDiscountedPrice = (product: any) => {
     originalPrice: product.price,
     finalPrice: finalPrice,
     hasDiscount: hasDiscount,
+    discountBadgeText: discountBadgeText,
   };
 };

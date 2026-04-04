@@ -109,7 +109,7 @@ export default function SearchScreen() {
         .select(`
           *,
           product_discounts (
-            discounts (*)
+            id, discount_type, discount_value, is_active, start_date, end_date
           )
         `)
         .eq('is_active', true)
