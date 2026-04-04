@@ -1,19 +1,21 @@
 import {
   Dimensions,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import { supabase } from "@/src/lib/supabase";
+import { Banner, getActiveBanners } from "@/src/services/banner";
 import {
   getLatestProducts,
   getMostPopularProducts,
@@ -21,8 +23,6 @@ import {
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { PriceDisplay } from "@/src/components/common/PriceDisplay";
-import { getActiveBanners, Banner } from "@/src/services/banner";
 
 const { width } = Dimensions.get("window");
 
@@ -320,7 +320,7 @@ const HomeScreen = () => {
                     styles.paginationDot,
                     (index === activeBannerIndex ||
                       (index === 0 && activeBannerIndex === banners.length)) &&
-                      styles.paginationDotActive,
+                    styles.paginationDotActive,
                   ]}
                 />
               ))}
@@ -423,7 +423,11 @@ const HomeScreen = () => {
         </View>
 
         {/* ========== FLASH SALE SECTION ========== */}
-        <View style={styles.section}>
+        <TouchableOpacity
+          style={styles.section}
+          activeOpacity={0.9}
+          onPress={() => router.push("/(shop)/flash-sale")}
+        >
           <View style={styles.flashSaleHeader}>
             <View style={styles.flashSaleTitleContainer}>
               <MaterialIcons name="access-time" size={20} color="#ef4444" />
@@ -448,7 +452,7 @@ const HomeScreen = () => {
               </View>
             ))}
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* ========== MOST POPULAR SECTION ========== */}
         <View style={styles.section}>
