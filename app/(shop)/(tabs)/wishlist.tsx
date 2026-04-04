@@ -1,8 +1,9 @@
 import { supabase } from "@/src/lib/supabase";
 import { calculateDiscountedPrice } from "@/src/services/product";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { ArrowRight, Heart, ShoppingCart, Trash2 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,26 +17,34 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Mock data cho "Recently Viewed" và "Most Popular"
-const RECENTLY_VIEWED = [
-  { id: "r1", image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=200" },
-  { id: "r2", image: "https://images.unsplash.com/photo-1539109132382-381bb3f03045?w=200" },
-  { id: "r3", image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200" },
-  { id: "r4", image: "https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=200" },
-  { id: "r5", image: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200" },
-];
 
 export default function WishlistScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [wishlistItems, setWishlistItems] = useState<any[]>([]);
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
+  const [recentViews, setRecentViews] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetchWishlist();
-    fetchPopular();
+  const fetchRecentViews = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("recent_views")
+        .eq("id", user.id)
+        .single();
+        
+      if (!error && data?.recent_views) {
+        setRecentViews(data.recent_views.slice(0, 5));
+      }
+    } catch (error) {
+      console.error("Lỗi lấy sản phẩm đã xem:", error);
+    }
   }, []);
 
-  const fetchWishlist = async () => {
+  const fetchWishlist = useCallback(async () => {
     try {
       setLoading(true);
       // Giả sử chúng ta lấy wishlist của user hiện tại
@@ -50,10 +59,10 @@ export default function WishlistScreen() {
         .select(`
           id,
           product:products (
-            *,
-            product_discounts (
-              discounts (*)
-            )
+          *,
+          product_discounts (
+          discounts (*)
+          )
           )
         `)
         .eq("user_id", user.id);
@@ -71,9 +80,9 @@ export default function WishlistScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchPopular = async () => {
+  const fetchPopular = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("products")
@@ -84,7 +93,15 @@ export default function WishlistScreen() {
     } catch (error) {
       console.error("Lỗi lấy sản phẩm phổ biến:", error);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchWishlist();
+      fetchPopular();
+      fetchRecentViews();
+    }, [fetchWishlist, fetchPopular, fetchRecentViews])
+  );
 
   const removeFromWishlist = async (wishlistId: string) => {
     try {
@@ -97,21 +114,10 @@ export default function WishlistScreen() {
   };
 
   const renderRecentlyViewed = () => (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Đã xem gần đây</Text>
-        <TouchableOpacity style={styles.circleBtnActive} onPress={() => router.push("/(shop)/recently-viewed" as any)}>
-          <ArrowRight size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentList}>
-        {RECENTLY_VIEWED.map(item => (
-          <View key={item.id} style={styles.recentAvatarContainer}>
-            <Image source={{ uri: item.image }} style={styles.recentAvatar} />
-          </View>
-        ))}
-      </ScrollView>
-    </View>
+    <RecentlyViewedSection
+      items={recentViews}
+      onPressSeeAll={() => router.push("/(shop)/recently-viewed" as any)}
+    />
   );
 
   const renderWishlistItem = ({ item }: { item: any }) => (
@@ -245,17 +251,6 @@ const styles = StyleSheet.create({
   circleBtnActive: { backgroundColor: "#0055FF", width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
   circleBtnSmall: { backgroundColor: "#0055FF", width: 24, height: 24, borderRadius: 12, justifyContent: "center", alignItems: "center", marginLeft: 8 },
 
-  recentList: { paddingLeft: 20 },
-  recentAvatarContainer: {
-    marginRight: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    paddingBottom: 10
-  },
-  recentAvatar: { width: 70, height: 70, borderRadius: 35, borderWidth: 2, borderColor: "#fff" },
 
   listContent: { paddingBottom: 100 },
   productRow: {

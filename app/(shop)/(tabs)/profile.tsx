@@ -14,6 +14,7 @@ import {
   Truck,
   Wallet,
 } from "lucide-react-native";
+import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import React, { useCallback, useState } from "react";
 import {
   Dimensions,
@@ -150,12 +151,6 @@ export default function ProfileScreen() {
     return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
   };
 
-  const getProductImageUrl = (path: string | null) => {
-    if (!path) return "https://via.placeholder.com/150";
-    if (path.startsWith("http")) return path;
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-    return `${supabaseUrl}/storage/v1/object/public/product-images/${path}`;
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -221,38 +216,10 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* Danh sách sản phẩm đã xem gần đây (Lấy 5 cái từ profile.recent_views) */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Đã xem gần đây</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {profile?.recent_views && profile.recent_views.length > 0 ? (
-              profile.recent_views
-                .slice(0, 5)
-                .map((item: any, index: number) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.recentViewedItemContainer}
-                    activeOpacity={0.8}
-                    onPress={() => router.push(`/(shop)/product/${item.id}`)}
-                  >
-                    <View style={styles.recentViewedItem}>
-                      <Image
-                        source={{ uri: getProductImageUrl(item.image) }}
-                        style={styles.recentViewedImage}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                ))
-            ) : (
-              <Text style={{ color: COLOR.textSecondary, fontSize: 14 }}>
-                Duyệt sản phẩm để lưu lịch sử
-              </Text>
-            )}
-          </ScrollView>
-        </View>
+        <RecentlyViewedSection
+          items={profile?.recent_views?.slice(0, 5) || []}
+          onPressSeeAll={() => router.push("/(shop)/recently-viewed")}
+        />
 
         {/* Phần trạng thái Đơn hàng của tôi */}
         <View style={styles.section}>
@@ -482,6 +449,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLOR.dark,
     letterSpacing: -0.5,
+    fontFamily: "Outfit-Bold",
   },
   seeHistoryText: {
     fontSize: 14,
