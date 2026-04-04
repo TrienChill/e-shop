@@ -31,13 +31,24 @@ export default function WishlistScreen() {
       if (!user) return;
       
       const { data, error } = await supabase
-        .from("profiles")
-        .select("recent_views")
-        .eq("id", user.id)
-        .single();
+        .from("product_view_history")
+        .select(`
+          product:products (
+            id,
+            images
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("viewed_at", { ascending: false })
+        .limit(5); // Chỉ lấy 5 cái mới nhất
         
-      if (!error && data?.recent_views) {
-        setRecentViews(data.recent_views.slice(0, 5));
+      if (!error && data && data.length > 0) {
+        const sortedViews = data.map((item: any) => ({
+          id: item.product?.id,
+          image: item.product?.images?.[0] || "https://via.placeholder.com/150", 
+        })).filter((i: any) => i.id);
+
+        setRecentViews(sortedViews);
       }
     } catch (error) {
       console.error("Lỗi lấy sản phẩm đã xem:", error);

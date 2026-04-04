@@ -77,6 +77,7 @@ const STORIES = [
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
+  const [recentViews, setRecentViews] = useState<any[]>([]);
 
   // Fetch profile data
   const fetchProfile = useCallback(async () => {
@@ -103,10 +104,41 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  const fetchRecentViews = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from("product_view_history")
+        .select(`
+          product:products (
+            id,
+            images
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("viewed_at", { ascending: false })
+        .limit(5); // Chỉ lấy 5 cái mới nhất
+        
+      if (!error && data && data.length > 0) {
+        const sortedViews = data.map((item: any) => ({
+          id: item.product?.id,
+          image: item.product?.images?.[0] || "https://via.placeholder.com/150", 
+        })).filter((i: any) => i.id);
+
+        setRecentViews(sortedViews);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy sản phẩm đã xem:", error);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchProfile();
-    }, [fetchProfile]),
+      fetchRecentViews();
+    }, [fetchProfile, fetchRecentViews]),
   );
 
   // Hàm xử lý đăng xuất
@@ -215,9 +247,9 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Danh sách sản phẩm đã xem gần đây (Lấy 5 cái từ profile.recent_views) */}
+        {/* Danh sách sản phẩm đã xem gần đây (Lấy 5 cái từ state recentViews đọc từ bảng mới) */}
         <RecentlyViewedSection
-          items={profile?.recent_views?.slice(0, 5) || []}
+          items={recentViews}
           onPressSeeAll={() => router.push("/(shop)/recently-viewed")}
         />
 

@@ -1,5 +1,8 @@
 import CommonHeader from "@/src/components/layout/Header";
-import { router } from "expo-router";
+import PriceDisplay from "@/src/components/common/PriceDisplay";
+import { supabase } from "@/src/lib/supabase";
+import { calculateDiscountedPrice } from "@/src/services/product";
+import { router, useFocusEffect } from "expo-router";
 import {
   ChevronDown,
   ChevronLeft,
@@ -7,7 +10,7 @@ import {
   ChevronUp,
   CircleCheck,
 } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   Dimensions,
   FlatList,
@@ -18,6 +21,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 
 const { width } = Dimensions.get("window");
@@ -34,63 +38,71 @@ const COLORS = {
   shadow: "rgba(0, 0, 0, 0.05)",
 };
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  image: string;
-  viewedDate: Date;
-}
-
-const MOCK_DATA: Product[] = [
-  {
-    id: "1",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=500",
-    viewedDate: new Date(),
-  },
-  {
-    id: "2",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1539109132381-31a1b9d5923b?q=80&w=500",
-    viewedDate: new Date(),
-  },
-  {
-    id: "3",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?q=80&w=500",
-    viewedDate: new Date(new Date().setDate(new Date().getDate() - 1)),
-  },
-  {
-    id: "4",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1485230895905-ec4093e81ea2?q=80&w=500",
-    viewedDate: new Date(new Date().setDate(new Date().getDate() - 1)),
-  },
-  {
-    id: "5",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1529139513065-07b2c2390598?q=80&w=500",
-    viewedDate: new Date(2026, 3, 18), // 18 tháng 4
-  },
-  {
-    id: "6",
-    name: "Lorem ipsum dolor sit amet consectetur",
-    price: 17000,
-    image: "https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?q=80&w=500",
-    viewedDate: new Date(2026, 3, 18),
-  },
-];
 
 export default function RecentlyViewedScreen() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(new Date());
+  const [endDate, setEndDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 3, 1)); // Tháng 4, 2026
+  const [currentMonth, setCurrentMonth] = useState(new Date()); 
+  const [recentViews, setRecentViews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRecentViews();
+    }, [])
+  );
+
+  const fetchRecentViews = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from("product_view_history")
+        .select(`
+          viewed_at,
+          product:products (
+            id,
+            name,
+            images,
+            price,
+            product_discounts (
+              discounts (*)
+            )
+          )
+        `)
+        .eq("user_id", user.id)
+        .order("viewed_at", { ascending: false });
+        
+      if (!error && data && data.length > 0) {
+        const updatedRecentViews = data.map((item: any) => {
+          const prod = item.product;
+          if (!prod) return null;
+          
+          const realProj = calculateDiscountedPrice(prod);
+          return {
+            id: prod.id,
+            name: realProj.name,
+            image: realProj.images?.[0] || "https://via.placeholder.com/150",
+            price: realProj.finalPrice,
+            originalPrice: realProj.originalPrice,
+            hasDiscount: realProj.hasDiscount,
+            viewed_at: item.viewed_at,
+          };
+        }).filter(Boolean);
+
+        setRecentViews(updatedRecentViews);
+      } else {
+        setRecentViews([]);
+      }
+    } catch (error) {
+      console.error("Lỗi lấy sản phẩm đã xem:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const isToday = (date: Date) => {
     const today = new Date();
@@ -112,26 +124,53 @@ export default function RecentlyViewedScreen() {
   };
 
   const filteredProducts = useMemo(() => {
-    return MOCK_DATA.filter(
-      (p) =>
-        p.viewedDate.getDate() === selectedDate.getDate() &&
-        p.viewedDate.getMonth() === selectedDate.getMonth() &&
-        p.viewedDate.getFullYear() === selectedDate.getFullYear()
-    );
-  }, [selectedDate]);
+    return recentViews.filter((p) => {
+        const viewDate = p.viewed_at ? new Date(p.viewed_at) : new Date();
+        viewDate.setHours(0, 0, 0, 0);
 
-  const renderProductItem = ({ item }: { item: Product }) => (
-    <View style={styles.productCard}>
-      <Image source={{ uri: item.image }} style={styles.productImage} />
+        const s = new Date(startDate);
+        s.setHours(0, 0, 0, 0);
+
+        if (!endDate) {
+          return viewDate.getTime() === s.getTime();
+        }
+
+        const e = new Date(endDate);
+        e.setHours(0, 0, 0, 0);
+
+        const minD = s.getTime() <= e.getTime() ? s : e;
+        const maxD = s.getTime() > e.getTime() ? s : e;
+
+        return viewDate.getTime() >= minD.getTime() && viewDate.getTime() <= maxD.getTime();
+    });
+  }, [startDate, endDate, recentViews]);
+
+  const getProductImageUrl = (path: string | null) => {
+    if (!path) return "https://via.placeholder.com/150";
+    if (path.startsWith("http")) return path;
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/product-images/${path}`;
+  };
+
+  const renderProductItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.productCard}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/(shop)/product/${item.id}`)}
+    >
+      <Image source={{ uri: getProductImageUrl(item.image) }} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.productPrice}>
-          {item.price.toLocaleString("vi-VN")}đ
-        </Text>
+        <PriceDisplay 
+          originalPrice={item.originalPrice || item.price || 0}
+          finalPrice={item.price || 0}
+          hasDiscount={item.hasDiscount}
+          size="sm"
+        />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const getDaysInMonth = (year: number, month: number) => {
@@ -180,21 +219,61 @@ export default function RecentlyViewedScreen() {
 
         <View style={styles.daysGrid}>
           {days.map((day) => {
-            const isSelected = 
-                selectedDate.getDate() === day && 
-                selectedDate.getMonth() === month && 
-                selectedDate.getFullYear() === year;
+            const cellDate = new Date(year, month, day);
+            cellDate.setHours(0, 0, 0, 0);
+            
+            const time = cellDate.getTime();
+            
+            const s = new Date(startDate);
+            s.setHours(0, 0, 0, 0);
+            const startT = s.getTime();
+            
+            let endT = null;
+            if (endDate) {
+               const e = new Date(endDate);
+               e.setHours(0, 0, 0, 0);
+               endT = e.getTime();
+            }
+
+            let isSelected = false;
+            let isRange = false;
+
+            if (endT) {
+              const minT = Math.min(startT, endT);
+              const maxT = Math.max(startT, endT);
+              if (time === minT || time === maxT) isSelected = true;
+              else if (time > minT && time < maxT) isRange = true;
+            } else {
+              isSelected = time === startT;
+            }
             
             return (
               <TouchableOpacity
                 key={day}
-                style={[styles.dayCell, isSelected && styles.selectedDayCell]}
+                style={[
+                  styles.dayCell, 
+                  isSelected && styles.selectedDayCell,
+                  isRange && styles.rangeDayCell
+                ]}
                 onPress={() => {
                     const newDate = new Date(year, month, day);
-                    setSelectedDate(newDate);
+                    newDate.setHours(0,0,0,0);
+                    
+                    if (startDate && endDate) {
+                       setStartDate(newDate);
+                       setEndDate(null);
+                    } else if (startDate && !endDate) {
+                       setEndDate(newDate);
+                    } else {
+                       setStartDate(newDate);
+                    }
                 }}
               >
-                <Text style={[styles.dayText, isSelected && styles.selectedDayText]}>
+                <Text style={[
+                  styles.dayText, 
+                  isSelected && styles.selectedDayText,
+                  isRange && { color: COLORS.blue }
+                ]}>
                   {day < 10 ? `0${day}` : day}
                 </Text>
               </TouchableOpacity>
@@ -212,16 +291,15 @@ export default function RecentlyViewedScreen() {
     );
   };
 
-  const formatDateLabel = (date: Date) => {
-    if (isToday(date)) return "Hôm nay";
-    if (isYesterday(date)) return "Hôm qua";
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    const months = [
-        "tháng 1", "tháng 2", "tháng 3", "tháng 4", "tháng 5", "tháng 6",
-        "tháng 7", "tháng 8", "tháng 9", "tháng 10", "tháng 11", "tháng 12"
-    ];
-    return `${day} ${months[date.getMonth()]}`;
+  const formatDateLabel = () => {
+    if (!endDate) {
+      if (isToday(startDate)) return "Hôm nay";
+      if (isYesterday(startDate)) return "Hôm qua";
+      return `${startDate.getDate()} thg ${startDate.getMonth() + 1}`;
+    }
+    const start = startDate.getTime() <= endDate.getTime() ? startDate : endDate;
+    const end = startDate.getTime() > endDate.getTime() ? startDate : endDate;
+    return `${start.getDate()}/${start.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`;
   };
 
   return (
@@ -245,31 +323,30 @@ export default function RecentlyViewedScreen() {
           <TouchableOpacity
             style={[
               styles.pill,
-              isToday(selectedDate) && styles.activePill,
+              isToday(startDate) && !endDate && styles.activePill,
             ]}
-            onPress={() => setSelectedDate(new Date())}
+            onPress={() => { setStartDate(new Date()); setEndDate(null); }}
           >
             <Text
               style={[
                 styles.pillText,
-                isToday(selectedDate) && styles.activePillText,
+                isToday(startDate) && !endDate && styles.activePillText,
               ]}
             >
               Hôm nay
             </Text>
-            {isToday(selectedDate) && (
+            {isToday(startDate) && !endDate && (
               <CircleCheck size={18} color={COLORS.white} fill={COLORS.blue} />
             )}
           </TouchableOpacity>
 
-          {/* Nút Hôm qua hoặc Ngày đã chọn */}
-          {!isToday(selectedDate) ? (
+          {!isToday(startDate) || endDate ? (
             <TouchableOpacity
               style={[styles.pill, styles.selectedPill]}
               onPress={() => setIsCalendarOpen(true)}
             >
               <Text style={[styles.pillText, styles.activePillText]}>
-                {formatDateLabel(selectedDate)}
+                {formatDateLabel()}
               </Text>
               <CircleCheck size={18} color={COLORS.white} fill={COLORS.blue} />
             </TouchableOpacity>
@@ -279,7 +356,8 @@ export default function RecentlyViewedScreen() {
               onPress={() => {
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
-                setSelectedDate(yesterday);
+                setStartDate(yesterday);
+                setEndDate(null);
               }}
             >
               <Text style={styles.pillText}>Hôm qua</Text>
@@ -301,20 +379,26 @@ export default function RecentlyViewedScreen() {
 
       {isCalendarOpen && <Calendar />}
 
-      <FlatList
-        data={filteredProducts}
-        renderItem={renderProductItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        contentContainerStyle={styles.listContent}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Không tìm thấy sản phẩm nào đã xem.</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={COLORS.blue} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProductItem}
+          keyExtractor={(item) => String(item.id)}
+          numColumns={2}
+          contentContainerStyle={styles.listContent}
+          columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Không tìm thấy sản phẩm nào đã xem vào ngày này.</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -409,12 +493,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: "400",
   },
-  productPrice: {
-    marginTop: 6,
-    fontSize: 18,
-    fontWeight: "bold",
-    color: COLORS.dark,
-  },
+
   calendarContainer: {
     backgroundColor: COLORS.white,
     marginHorizontal: 24,
@@ -468,6 +547,9 @@ const styles = StyleSheet.create({
   },
   selectedDayCell: {
     backgroundColor: COLORS.blue,
+  },
+  rangeDayCell: {
+    backgroundColor: COLORS.lightBlue,
   },
   dayText: {
     fontSize: 14,

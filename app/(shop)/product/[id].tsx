@@ -281,42 +281,18 @@ export default function ProductDetailScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Lấy profile hiện tại (giả định có cột recent_views jsonb)
-      const { data: profile, error: fetchError } = await supabase
-        .from("profiles")
-        .select("recent_views")
-        .eq("id", user.id)
-        .single();
+      const { error } = await supabase
+        .from("product_view_history")
+        .upsert(
+          {
+            user_id: user.id,
+            product_id: productData.id,
+            viewed_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id, product_id" } // Upsert: thêm mới hoặc update dòng cũ
+        );
 
-      if (fetchError) throw fetchError;
-
-      let recentViews = Array.isArray(profile?.recent_views)
-        ? profile.recent_views
-        : [];
-
-      // 2. Logic LIFO: Đẩy link mới lên đầu, xóa bản ghi cũ cùng ID nếu có
-      const newView = {
-        id: productData.id,
-        name: productData.name,
-        image: productData.images?.[0] || "https://via.placeholder.com/150",
-      };
-
-      // Lọc bỏ sản phẩm cũ trùng ID (nếu có) để đưa lên đầu (LIFO)
-      recentViews = [
-        newView,
-        ...recentViews.filter((item: any) => item.id !== productData.id),
-      ];
-
-      // 3. Giới hạn tối đa 10 sản phẩm
-      recentViews = recentViews.slice(0, 10);
-
-      // 4. Cập nhật lại database
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ recent_views: recentViews })
-        .eq("id", user.id);
-
-      if (updateError) throw updateError;
+      if (error) throw error;
     } catch (error) {
       console.error("Lỗi khi lưu sản phẩm gần đây:", error);
     }
