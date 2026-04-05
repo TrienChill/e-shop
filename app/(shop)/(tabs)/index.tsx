@@ -1,4 +1,5 @@
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   NativeScrollEvent,
@@ -17,10 +18,11 @@ import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import { supabase } from "@/src/lib/supabase";
 import { Banner, getActiveBanners } from "@/src/services/banner";
 import {
+  getFlashSaleProducts,
+  getJustForYouProducts,
   getLatestProducts,
   getMostPopularProducts,
   getTopSellingProducts,
-  getFlashSaleProducts,
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -29,66 +31,9 @@ const { width } = Dimensions.get("window");
 
 // ==================== MOCK DATA ====================
 
-// Flash Sale Products
-const FLASH_SALE_PRODUCTS = [
-  {
-    id: "1",
-    image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400",
-    discount: "-20%",
-  },
-  {
-    id: "2",
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400",
-    discount: "-15%",
-  },
-  {
-    id: "3",
-    image: "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=400",
-    discount: "-30%",
-  },
-  {
-    id: "4",
-    image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400",
-    discount: "-25%",
-  },
-];
 
-// Just For You
-const JUST_FOR_YOU = [
-  {
-    id: "1",
-    name: "Cotton T-Shirt Classic",
-    originalPrice: 250000,
-    finalPrice: 200000,
-    hasDiscount: true,
-    image: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=400",
-  },
-  {
-    id: "2",
-    name: "Summer Floral Dress",
-    originalPrice: 450000,
-    finalPrice: 450000,
-    hasDiscount: false,
-    image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400",
-  },
-  {
-    id: "3",
-    name: "Denim Jacket Vintage",
-    originalPrice: 850000,
-    finalPrice: 650000,
-    hasDiscount: true,
-    image: "https://images.unsplash.com/photo-1596783074918-c84cb06531ca?w=400",
-  },
-  {
-    id: "4",
-    name: "Slim Fit Chinos",
-    originalPrice: 350000,
-    finalPrice: 350000,
-    hasDiscount: false,
-    image: "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400",
-  },
-];
 
+// Removed JUST_FOR_YOU mock data
 // ==================== COMPONENTS ====================
 
 const HomeScreen = () => {
@@ -149,6 +94,43 @@ const HomeScreen = () => {
     };
     fetchFlashSale();
   }, []);
+
+  {
+    /* ========== JUST FOR YOU SECTION  ========== */
+  }
+  const [justForYouItems, setJustForYouItems] = useState<any[]>([]);
+  const isLoadingMore = useRef(false);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+
+  useEffect(() => {
+    const fetchJustForYou = async () => {
+      const data = await getJustForYouProducts(1);
+      setJustForYouItems(data);
+    };
+    fetchJustForYou();
+  }, []);
+
+  const loadMoreJustForYou = async () => {
+    if (isLoadingMore.current || !hasMoreRef.current) return;
+    isLoadingMore.current = true;
+
+    const nextPage = pageRef.current + 1;
+    const moreData = await getJustForYouProducts(nextPage);
+
+    if (moreData.length === 0) {
+      hasMoreRef.current = false;
+    } else {
+      setJustForYouItems((prev) => {
+        const existIds = new Set(prev.map(i => i.id));
+        const filtered = moreData.filter(i => !existIds.has(i.id));
+        return [...prev, ...filtered];
+      });
+      pageRef.current = nextPage;
+    }
+
+    isLoadingMore.current = false;
+  };
 
   {
     /* ========== BANNERS SECTION  ========== */
@@ -282,7 +264,17 @@ const HomeScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={400}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          // Tải thêm nếu cách đáy 300px
+          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 300) {
+            loadMoreJustForYou();
+          }
+        }}
+      >
         {/* ========== BANNER SECTION ========== */}
         {banners.length > 0 && (
           <View style={styles.bannerContainer}>
@@ -455,17 +447,18 @@ const HomeScreen = () => {
           <View style={styles.flashSaleGrid}>
             {flashSaleProducts.map((product) => {
               return (
-              <View key={product.id} style={styles.flashSaleCard}>
-                <Image
-                  source={{ uri: product.images?.[0] || 'https://via.placeholder.com/150' }}
-                  style={styles.flashSaleImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{product.discountBadgeText || "SALE"}</Text>
+                <View key={product.id} style={styles.flashSaleCard}>
+                  <Image
+                    source={{ uri: product.images?.[0] || 'https://via.placeholder.com/150' }}
+                    style={styles.flashSaleImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>{product.discountBadgeText || "SALE"}</Text>
+                  </View>
                 </View>
-              </View>
-            )})}
+              )
+            })}
           </View>
         </TouchableOpacity>
 
@@ -539,10 +532,14 @@ const HomeScreen = () => {
           </View>
 
           <View style={styles.justForYouGrid}>
-            {JUST_FOR_YOU.map((item) => (
-              <View key={item.id} style={styles.justForYouCard}>
+            {justForYouItems.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.justForYouCard}
+                onPress={() => router.push(`/(shop)/product/${item.id}`)}
+              >
                 <Image
-                  source={{ uri: item.image }}
+                  source={{ uri: item.images?.[0] || item.image || "https://via.placeholder.com/400" }}
                   style={styles.justForYouImage}
                   resizeMode="cover"
                 />
@@ -555,9 +552,14 @@ const HomeScreen = () => {
                   originalPrice={item.originalPrice}
                   size="md"
                 />
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
+
+          {/* Vòng quay tải thêm nằm dưới lưới Just for you */}
+          {isLoadingMore.current && (
+            <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 20 }} />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

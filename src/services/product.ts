@@ -194,13 +194,123 @@ export const getPopularProducts = async (currentProductId?: string) => {
     // 4. Xáo trộn ngẫu nhiên để tạo sự mới mẻ mỗi lần load
     const shuffled = processed.sort(() => Math.random() - 0.5);
 
-    // 5. Trả về 4 sản phẩm
+// 5. Trả về 4 sản phẩm
     return shuffled.slice(0, 4);
   } catch (error) {
     console.error("Lỗi lấy sản phẩm phổ biến:", error);
     return [];
   }
 };
+
+// Lấy sản phẩm gợi ý "Dành cho bạn" (Collaborative Filtering, Content-based, Recency & Frequency)
+export const getJustForYouProducts = async (page: number = 1) => {
+  try {
+    // Nếu trang > 1, ngưng xài logic cá nhân hóa, bắt đầu tải đại trà các sản phẩm còn lại
+    if (page > 1) {
+      const limit = 8;
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          *,
+          product_discounts (
+            id, discount_type, discount_value, is_active, start_date, end_date
+          )
+        `)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .range((page - 1) * limit, page * limit - 1);
+        
+      if (error) throw error;
+      return (data || []).map(calculateDiscountedPrice);
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // Nếu chưa đăng nhập, trả về sản phẩm phổ biến ngẫu nhiên
+      return getPopularProducts();
+    }
+
+    let recommendedProductIds = new Set<string>();
+
+    // 1. Recency & Frequency: Ưu tiên sản phẩm bỏ quên trong giỏ và mới thêm vào wishlist
+    const [cartRes, wishlistRes] = await Promise.all([
+      supabase.from("cart_items").select("product_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(4),
+      supabase.from("wishlist").select("product_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(4)
+    ]);
+
+    const cartProductIds = (cartRes.data || []).map((item: any) => item.product_id);
+    const wishlistProductIds = (wishlistRes.data || []).map((item: any) => item.product_id);
+    const recentProductIds = [...new Set([...cartProductIds, ...wishlistProductIds])];
+
+    // Nhắc nhở: đưa các sản phẩm trong giỏ vào gợi ý luôn
+    recentProductIds.forEach((id: string) => recommendedProductIds.add(id));
+    
+    // 2. Content-based Filtering: Bạn thích cái này, có thể thích cái kia
+    // Lấy các category_id của danh sách recentProductIds
+    if (recentProductIds.length > 0) {
+      const { data: recentProducts } = await supabase
+        .from("products")
+        .select("category_id")
+        .in("id", recentProductIds.slice(0, 5)); // Limit in-clause to prevent long URI
+        
+      if (recentProducts && recentProducts.length > 0) {
+        const categoryIds = [...new Set(recentProducts.map((p: any) => p.category_id))];
+        const { data: similarProducts } = await supabase
+          .from("products")
+          .select("id")
+          .in("category_id", categoryIds)
+          .limit(10);
+          
+        similarProducts?.forEach((p: any) => recommendedProductIds.add(p.id));
+      }
+    }
+
+    // Convert Set sang Array
+    let finalIds = Array.from(recommendedProductIds);
+    
+    // Nếu quá ít, bù bằng sản phẩm nổi tiếng
+    if (finalIds.length < 4) {
+      const popularProducts = await getPopularProducts();
+      popularProducts.forEach((p: any) => {
+        if (!finalIds.includes(p.id)) {
+           finalIds.push(p.id);
+        }
+      });
+    }
+
+    // Lấy tối đa 8 sản phẩm
+    const selectedIds = finalIds.slice(0, 8);
+    
+    // Guard: Prevent empty ID array querying which might be malformed
+    if (selectedIds.length === 0) return [];
+
+    // Lấy chi tiết thông tin sản phẩm
+    const { data: recommendedData, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        product_discounts (
+          id, discount_type, discount_value, is_active, start_date, end_date
+        )
+      `)
+      .in("id", selectedIds)
+      .eq("is_active", true);
+
+    if (error) throw error;
+
+    const processed = (recommendedData || []).map(calculateDiscountedPrice);
+    
+    // Xóa ngẫu nhiên để có tính mới mẻ khi gọi nhiều lần
+    return processed.sort(() => Math.random() - 0.5);
+
+  } catch (error) {
+    console.error("Lỗi lấy sản phẩm Just For You:", error);
+    // Fallback toàn bộ nếu lỗi
+    return getPopularProducts();
+  }
+};
+
 
 // Dịch tên màu sắc sang tiếng Việt
 export const COLOR_TRANSLATIONS: Record<string, string> = {
