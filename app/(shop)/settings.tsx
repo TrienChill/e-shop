@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   ChevronRight,
 } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -94,29 +94,6 @@ const SettingsScreen = () => {
           />
         </View>
 
-        {/* Nhóm Cửa hàng */}
-        <SectionHeader title="Cửa hàng" />
-        <View style={styles.sectionContainer}>
-          <SettingItem
-            label="Quốc gia"
-            value="Việt Nam"
-            onPress={() => { }}
-          />
-          <SettingItem
-            label="Tiền tệ"
-            value="VNĐ"
-            onPress={() => { }}
-          />
-          <SettingItem
-            label="Kích cỡ"
-            value="UK"
-            onPress={() => { }}
-          />
-          <SettingItem
-            label="Điều khoản và Điều kiện"
-            onPress={() => { }}
-          />
-        </View>
 
         {/* Nhóm Tài khoản */}
         <SectionHeader title="Tài khoản" />
