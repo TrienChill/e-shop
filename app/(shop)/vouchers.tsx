@@ -1,30 +1,26 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  SafeAreaView,
-  StyleSheet,
-} from 'react-native';
+import { supabase } from '@/src/lib/supabase';
+import { router } from 'expo-router';
 import {
   ArrowLeft,
-  Settings,
-  LayoutGrid,
-  ShoppingBag,
-  Heart,
-  Star,
-  Cloud,
   CheckCircle2,
-  Ticket,
-  ChevronRight,
-  Smile,
+  Cloud,
+  Heart,
   Shirt,
+  ShoppingBag,
+  Smile,
+  Star,
+  Ticket
 } from 'lucide-react-native';
-import Svg, { Path, Circle, Rect, G, Defs, Mask } from 'react-native-svg';
-import { Link, router } from 'expo-router';
-import { supabase } from '@/src/lib/supabase';
+import React, { useState } from 'react';
+import CommonHeader from '@/src/components/layout/Header';
+import {
+  SafeAreaView,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
 
 // Types
 interface Voucher {
@@ -235,7 +231,6 @@ export default function VouchersScreen() {
             vouchers (
               id,
               code,
-              description,
               expired_at,
               discount_type,
               discount_value,
@@ -255,20 +250,20 @@ export default function VouchersScreen() {
             const today = new Date();
             const diffTime = expiryDate.getTime() - today.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
+
             const isExpiring = diffDays > 0 && diffDays <= 3;
             const validUntilStr = expiryDate.toLocaleDateString('vi-VN');
 
             // Gán icon
             let IconComponent = <Ticket size={24} color="#2563EB" />;
             if (v.voucher_type === 'freeship') IconComponent = <Cloud size={24} color="#2563EB" />;
-            
+
             return {
               id: item.id,
               title: v.code,
-              description: v.description || (v.discount_type === 'percentage' 
-                  ? `Giảm ${v.discount_value}% tổng đơn\nThu thập lúc ${new Date().toLocaleDateString('vi-VN')}` 
-                  : `Giảm ${v.discount_value.toLocaleString('vi-VN')}đ\nThu thập lúc ${new Date().toLocaleDateString('vi-VN')}`),
+              description: v.discount_type === 'percentage'
+                ? `Giảm ${v.discount_value}% tổng đơn\nThu thập hôm nay`
+                : `Giảm ${v.discount_value.toLocaleString('vi-VN')}đ\nThu thập hôm nay`,
               validUntil: validUntilStr,
               daysLeft: isExpiring ? diffDays : undefined,
               isCollected: true,
@@ -278,8 +273,8 @@ export default function VouchersScreen() {
           });
           setUserVouchers(formatted);
         } else {
-           // Không có voucher nào
-           setUserVouchers([]);
+          // Không có voucher nào
+          setUserVouchers([]);
         }
       } catch (error) {
         console.log('Lỗi fetch hoặc SQL migration chưa được chạy. Đang dùng mock data.', error);
@@ -336,36 +331,22 @@ export default function VouchersScreen() {
     },
   ];
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'TC';
-    const split = name.split(' ');
-    if (split.length > 1) return (split[0][0] + split[split.length - 1][0]).toUpperCase();
-    return name.substring(0, 2).toUpperCase();
-  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF' }}>
       {/* Header Info */}
-      <View style={{ paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{ width: 56, height: 56, backgroundColor: '#F1F5F9', borderRadius: 28, marginRight: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#F8FAFC' }}>
-             <Text style={{ color: '#94A3B8', fontWeight: 'bold', fontSize: 18 }}>
-                {getInitials(userProfile?.full_name)}
-             </Text>
-          </View>
+      <CommonHeader
+        renderLeft={() => (
           <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0F172A' }}>Kho Voucher</Text>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <TouchableOpacity style={{ width: 44, height: 44, backgroundColor: '#2563EB', borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#BFDBFE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 5 }}>
-            <LayoutGrid size={22} color="#FFF" />
-          </TouchableOpacity>
+        )}
+        renderRight={() => (
           <TouchableOpacity onPress={() => router.back()} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
             <View style={{ position: 'relative' }}>
               <ArrowLeft size={22} color="#2563EB" />
             </View>
           </TouchableOpacity>
-        </View>
-      </View>
+        )}
+      />
 
       {/* Tabs */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 24, marginVertical: 24 }}>
@@ -392,8 +373,8 @@ export default function VouchersScreen() {
         {activeTab === 'rewards' ? (
           <View>
             {userVouchers.map((voucher) => (
-              <VoucherTicket 
-                key={voucher.id} 
+              <VoucherTicket
+                key={voucher.id}
                 type={voucher.type}
                 header={
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
