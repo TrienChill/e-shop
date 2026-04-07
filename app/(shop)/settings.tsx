@@ -86,7 +86,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             label="Địa chỉ nhận hàng"
-            onPress={() => { }}
+            onPress={() => router.push("/edit-address")}
           />
           <SettingItem
             label="Phương thức thanh toán"
