@@ -1,4 +1,9 @@
 schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,user_vouchers,admin_all_user_vouchers,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
+public,user_vouchers,user_insert_own_vouchers,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,user_vouchers,user_view_own_vouchers,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
 public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
 public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
 public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null

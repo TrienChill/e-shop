@@ -16,6 +16,8 @@ reviews,product_id,products,id,reviews_product_id_fkey
 reviews,order_id,orders,id,reviews_order_id_fkey
 wishlist,product_id,products,id,wishlist_product_id_fkey
 categories,parent_id,categories,id,categories_parent_id_fkey
+user_vouchers,user_id,profiles,id,user_vouchers_user_id_fkey
+user_vouchers,voucher_id,vouchers,id,user_vouchers_voucher_id_fkey
 reviews,user_id,profiles,id,reviews_user_id_fkey
 user_addresses,user_id,profiles,id,user_addresses_user_id_fkey
 orders,address_id,user_addresses,id,orders_address_id_fkey

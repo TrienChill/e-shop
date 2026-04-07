@@ -1,4 +1,5 @@
 function_name,schema_name,return_type,argument_types
+collect_voucher,public,boolean,p_voucher_id uuid
 get_most_popular_products,public,SETOF products,
 handle_default_address,public,trigger,
 handle_new_user,public,trigger,

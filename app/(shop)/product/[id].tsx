@@ -82,10 +82,14 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Variants từ bảng product_variants
+  const [variants, setVariants] = useState<any[]>([]);
+  const [variantsLoaded, setVariantsLoaded] = useState(false);
+
   const [wishlist, setWishlist] = useState(false);
 
   // Lưu trữ màu đang được chọn
-  const [selectedColor, setSelectedColor] = useState<any>(null);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
 
   // Thêm State cho Pop-up và Số lượng
@@ -104,45 +108,44 @@ export default function ProductDetailScreen() {
 
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
 
-  // Hàm xử lý khi người dùng vuốt ảnh
+  // Đồng bộ màu sắc khi vuốt ảnh - đơn giản hóa, không còn image_index
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / SCREEN_WIDTH);
-
     if (index !== activeIndex) {
       setActiveIndex(index);
-
-      // Đồng bộ màu sắc khi vuốt ảnh (LIFO/Swipe synchronization)
-      if (product?.variants?.options) {
-        const colorOptions = product.variants.options;
-        const matchedColorIndex = colorOptions.findIndex(
-          (opt: any) => opt.image_index === index
-        );
-
-        if (matchedColorIndex !== -1) {
-          const matchedColor = colorOptions[matchedColorIndex];
-          if (selectedColor?.color !== matchedColor.color) {
-            setSelectedColor(matchedColor);
-
-            // Tự động cuộn dải màu sắc (color picker) vào vùng hiển thị
-            if (colorScrollRef.current) {
-              const itemWidth = 40; // width of color circle
-              const gap = 12; // marginRight: 12 from TouchableOpacity style
-              colorScrollRef.current.scrollTo({
-                x: matchedColorIndex * (itemWidth + gap) - SCREEN_WIDTH / 2 + (itemWidth / 2),
-                animated: true
-              });
-            }
-          }
-        }
-      }
     }
   };
 
-  const hasSizes =
-    product?.variants?.sizes && product.variants.sizes.length > 0;
-  const hasColors =
-    product?.variants?.options && product.variants.options.length > 0;
+  // --- Derived từ bảng product_variants ---
+  const uniqueColors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+  const sizesForColor = selectedColor
+    ? variants.filter((v) => v.color === selectedColor).map((v) => v.size).filter(Boolean)
+    : [...new Set(variants.map((v) => v.size).filter(Boolean))];
+
+  const hasSizes = sizesForColor.length > 0;
+  const hasColors = uniqueColors.length > 0;
+
+  // Stock của variant đang chọn
+  const selectedVariant = variants.find(
+    (v) => v.color === selectedColor && v.size === selectedSize
+  ) || variants.find((v) => v.color === selectedColor && !v.size)
+    || variants.find((v) => !v.color && v.size === selectedSize);
+
+  const availableStock = selectedVariant?.stock ?? 0;
+
+  // Tổng stock của sản phẩm
+  const totalStock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+
+  // Stock theo màu
+  const getColorStock = (color: string) =>
+    variants.filter((v) => v.color === color).reduce((sum, v) => sum + (v.stock || 0), 0);
+
+  // Stock theo size (trong màu đang chọn)
+  const getSizeStock = (size: string) => {
+    const v = variants.find((v) => v.size === size && (selectedColor ? v.color === selectedColor : true));
+    return v?.stock ?? 0;
+  };
 
   // Hàm xử lý Thêm vào giỏ từ màn hình chính
   const handleAddToBag = () => {
@@ -153,7 +156,11 @@ export default function ProductDetailScreen() {
       setModalVisible(true);
       return;
     }
-    // Đã chọn đủ ở ngoài -> Thêm vào với số lượng là 1 (hoặc quantity hiện tại)
+    if (availableStock === 0) {
+      alert('Sản phẩm này đã hết hàng!');
+      return;
+    }
+    // Đã chọn đủ ở ngoài -> Thêm vào với số lượng là 1
     addToCartService(1);
   };
 
@@ -192,8 +199,8 @@ export default function ProductDetailScreen() {
         .select("id, quantity")
         .eq("user_id", user.id)
         .eq("product_id", product.id)
-        .eq("size", selectedSize || null) // Khớp cột size - Dùng null nếu không có size
-        .eq("color", selectedColor?.color || null) // Khớp cột color - Dùng null nếu không có màu
+        .eq("size", selectedSize || null)
+        .eq("color", selectedColor || null)
         .maybeSingle();
 
       if (fetchError) throw fetchError;
@@ -219,7 +226,7 @@ export default function ProductDetailScreen() {
               product_id: product.id,
               quantity: selectedQty,
               size: selectedSize || null,
-              color: selectedColor?.color || null,
+              color: selectedColor || null,
               is_selected: true,
             },
           ]);
@@ -261,6 +268,7 @@ export default function ProductDetailScreen() {
         // Đảm bảo ban đầu là null
         setSelectedSize(null);
         setSelectedColor(null);
+        setQuantity(1);
 
         // --- GHI LẠI VÀO BẢNG VIEW HISTORY ---
         recordRecentView(data);
@@ -274,7 +282,26 @@ export default function ProductDetailScreen() {
       }
     };
 
-    if (id) fetchProductDetail();
+    const fetchVariants = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("product_variants")
+          .select("id, color, size, price, stock, sku")
+          .eq("product_id", id)
+          .order("color");
+        if (error) throw error;
+        setVariants(data || []);
+      } catch (error) {
+        console.error("Lỗi lấy variants:", error);
+      } finally {
+        setVariantsLoaded(true);
+      }
+    };
+
+    if (id) {
+      fetchProductDetail();
+      fetchVariants();
+    }
   }, [id]);
 
   const checkWishlistStatus = async () => {
@@ -422,20 +449,15 @@ export default function ProductDetailScreen() {
       )
       : ["https://via.placeholder.com/600"];
 
-  // 3. Hàm xử lý cuộn ảnh khi chọn màu
-  const handleSelectColor = (option: any) => {
-    if (selectedColor?.color === option.color) {
+  // 3. Hàm xử lý chọn màu
+  const handleSelectColor = (color: string) => {
+    if (selectedColor === color) {
       setSelectedColor(null);
+      setSelectedSize(null);
     } else {
-      setSelectedColor(option);
-
-      // Nếu có ref và có image_index hợp lệ, cuộn tới ảnh đó
-      if (imageScrollRef.current && option.image_index !== undefined) {
-        // Tính toán vị trí x cần cuộn đến (chiều rộng màn hình * index của ảnh)
-        const offset_x = option.image_index * SCREEN_WIDTH;
-        imageScrollRef.current.scrollTo({ x: offset_x, y: 0, animated: true });
-        setActiveIndex(option.image_index); // Cập nhật lại dấu chấm
-      }
+      setSelectedColor(color);
+      setSelectedSize(null); // Reset size khi đổi màu
+      setQuantity(1);
     }
   };
 
@@ -575,50 +597,62 @@ export default function ProductDetailScreen() {
 
         {/* ══════════════ 3. Kích cỡ & Màu sắc ══════════════ */}
         <View style={styles.section}>
-          {/* ---- Chọn Kích Cỡ (Sizes) ---- */}
-          {product.variants?.sizes && product.variants.sizes.length > 0 && (
+          {/* Hiển thị tổng tồn kho - chỉ hiện sau khi đã load xong */}
+          {!variantsLoaded ? (
+            <View style={styles.stockRow}>
+              <ActivityIndicator size="small" color="#3B82F6" />
+            </View>
+          ) : totalStock > 0 ? (
+            <View style={styles.stockRow}>
+              <View style={[styles.stockBadge, totalStock < 10 && styles.stockBadgeLow]}>
+                <Text style={[styles.stockBadgeText, totalStock < 10 && styles.stockBadgeTextLow]}>
+                  {totalStock < 10 ? `⚠ Còn ${totalStock} sản phẩm` : `✓ Còn hàng (${totalStock})`}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.stockRow}>
+              <View style={[styles.stockBadge, styles.stockBadgeOut]}>
+                <Text style={[styles.stockBadgeText, styles.stockBadgeTextOut]}>Hết hàng</Text>
+              </View>
+            </View>
+          )}
+
+          {/* ---- Chọn Màu Sắc (từ product_variants) ---- */}
+          {hasColors && (
             <View style={{ marginBottom: 20 }}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Kích cỡ</Text>
-                <Text style={styles.variantInfoText}>{selectedSize}</Text>
+                <Text style={styles.sectionTitle}>Màu sắc</Text>
+                <Text style={styles.variantInfoText}>{selectedColor || ''}</Text>
               </View>
               <ScrollView
                 horizontal
+                ref={colorScrollRef}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.variantList}
               >
-                {product.variants.sizes.map((size: string, index: number) => {
-                  const isSelected = selectedSize === size;
+                {uniqueColors.map((color: string, index: number) => {
+                  const isSelected = selectedColor === color;
+                  const colorStock = getColorStock(color);
+                  const isOutOfStock = colorStock === 0;
                   return (
                     <TouchableOpacity
                       key={index}
                       activeOpacity={0.8}
-                      onPress={() => {
-                        // Nếu size đang nhấn trùng với size đã chọn -> gán về null (hủy)
-                        // Nếu khác -> gán size mới
-                        setSelectedSize((prev) =>
-                          prev === size ? null : size,
-                        );
-                      }}
+                      onPress={() => !isOutOfStock && handleSelectColor(color)}
                       style={[
-                        styles.chip, // Dùng lại style chip có sẵn
-                        {
-                          borderWidth: 1,
-                          borderColor: isSelected ? "#3B82F6" : "#E5E7EB",
-                          backgroundColor: isSelected ? "#EFF6FF" : "#F9FAFB",
-                        },
+                        styles.colorChip,
+                        isSelected && styles.colorChipSelected,
+                        isOutOfStock && styles.chipDisabled,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.chipText,
-                          {
-                            color: isSelected ? "#3B82F6" : "#374151",
-                            fontWeight: isSelected ? "700" : "500",
-                          },
-                        ]}
-                      >
-                        {size}
+                      <Text style={[
+                        styles.colorChipText,
+                        isSelected && styles.colorChipTextSelected,
+                        isOutOfStock && styles.chipTextDisabled,
+                      ]}>{color}</Text>
+                      <Text style={styles.stockLabel}>
+                        {isOutOfStock ? 'Hết' : `${colorStock}`}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -627,48 +661,52 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          {/* ---- Chọn Màu Sắc (Colors/Options) ---- */}
-          {product.variants?.options && product.variants.options.length > 0 && (
-            <View>
+          {/* ---- Chọn Kích Cỡ (lọc theo màu đang chọn) ---- */}
+          {hasSizes && (
+            <View style={{ marginBottom: 20 }}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Màu sắc</Text>
-                <Text style={styles.variantInfoText}>
-                  {/* Kiểm tra và dịch tên màu */}
-                  {selectedColor?.color
-                    ? colorTranslations[selectedColor.color] ||
-                    selectedColor.color
-                    : ""}
-                </Text>
+                <Text style={styles.sectionTitle}>Kích cỡ</Text>
+                <Text style={styles.variantInfoText}>{selectedSize || ''}</Text>
               </View>
               <ScrollView
                 horizontal
-                ref={colorScrollRef}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.variantList}
               >
-                {product.variants.options.map((option: any, index: number) => {
-                  const isSelected = selectedColor?.color === option.color;
+                {sizesForColor.map((size: string, index: number) => {
+                  const isSelected = selectedSize === size;
+                  const sizeStock = getSizeStock(size);
+                  const isOutOfStock = sizeStock === 0;
                   return (
                     <TouchableOpacity
                       key={index}
                       activeOpacity={0.8}
-                      onPress={() => handleSelectColor(option)}
-                      // Trả về một hình tròn nhỏ hiển thị mã màu HEX
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: option.hex,
-                        marginRight: 12,
-                        borderWidth: isSelected ? 3 : 1,
-                        borderColor: isSelected ? "#3B82F6" : "#D1D5DB", // Viền xanh nếu đang chọn
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 3,
-                        elevation: 2,
-                      }}
-                    />
+                      onPress={() => !isOutOfStock && setSelectedSize((prev) => prev === size ? null : size)}
+                      style={[
+                        styles.chip,
+                        {
+                          borderWidth: 1,
+                          borderColor: isSelected ? "#3B82F6" : "#E5E7EB",
+                          backgroundColor: isSelected ? "#EFF6FF" : isOutOfStock ? "#F3F4F6" : "#F9FAFB",
+                        },
+                        isOutOfStock && styles.chipDisabled,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        { color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151",
+                          fontWeight: isSelected ? "700" : "500" },
+                      ]}>
+                        {size}
+                      </Text>
+                      {/* Nhãn stock nhỏ dưới size */}
+                      <Text style={[
+                        styles.chipStockLabel,
+                        isOutOfStock && { color: '#EF4444' }
+                      ]}>
+                        {isOutOfStock ? 'Hết' : sizeStock}
+                      </Text>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>
@@ -885,10 +923,7 @@ export default function ProductDetailScreen() {
                 />
                 <View style={styles.modalSelectedChips}>
                   <Text style={styles.modalChipText}>
-                    {selectedColor?.color
-                      ? colorTranslations[selectedColor.color] ||
-                      selectedColor.color
-                      : "Chưa chọn màu"}
+                    {selectedColor || "Chưa chọn màu"}
                   </Text>
                   <Text style={styles.modalChipText}>
                     {selectedSize ? selectedSize : "Chưa chọn size"}
@@ -909,83 +944,86 @@ export default function ProductDetailScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              {/* 2. Color Options */}
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Color Options</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {product?.variants?.options?.map(
-                    (option: any, index: number) => {
-                      const isSelected = selectedColor?.color === option.color;
+              {/* 2. Color Options (từ product_variants) */}
+              {hasColors && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Màu sắc</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {uniqueColors.map((color: string, index: number) => {
+                      const isSelected = selectedColor === color;
+                      const colorStock = getColorStock(color);
+                      const isOutOfStock = colorStock === 0;
                       return (
                         <TouchableOpacity
                           key={index}
                           activeOpacity={0.8}
-                          onPress={() => handleSelectColor(option)}
+                          onPress={() => !isOutOfStock && handleSelectColor(color)}
                           style={[
-                            styles.modalColorOption,
-                            { backgroundColor: option.hex },
-                            isSelected && styles.modalColorOptionSelected,
+                            styles.modalColorChip,
+                            isSelected && styles.modalColorChipSelected,
+                            isOutOfStock && styles.chipDisabled,
                           ]}
                         >
-                          {isSelected && (
-                            <View style={styles.checkMarkBadge}>
-                              <Text
-                                style={{
-                                  color: "#fff",
-                                  fontSize: 10,
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                ✓
-                              </Text>
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    },
-                  )}
-                </ScrollView>
-              </View>
-
-              {/* 3. Size Options */}
-              <View style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>Size</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {product?.variants?.sizes?.map(
-                    (size: string, index: number) => {
-                      const isSelected = selectedSize === size;
-                      return (
-                        <TouchableOpacity
-                          key={index}
-                          activeOpacity={0.8}
-                          onPress={() =>
-                            setSelectedSize((prev) =>
-                              prev === size ? null : size,
-                            )
-                          }
-                          style={[
-                            styles.modalSizeChip,
-                            isSelected && styles.modalSizeChipSelected,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.modalSizeText,
-                              isSelected && styles.modalSizeTextSelected,
-                            ]}
-                          >
-                            {size}
+                          <Text style={[
+                            styles.modalColorChipText,
+                            isSelected && { color: '#3B82F6', fontWeight: '700' },
+                            isOutOfStock && styles.chipTextDisabled,
+                          ]}>{color}</Text>
+                          <Text style={[styles.modalStockText, isOutOfStock && { color: '#EF4444' }]}>
+                            {isOutOfStock ? 'Hết hàng' : `Còn ${colorStock}`}
                           </Text>
                         </TouchableOpacity>
                       );
-                    },
-                  )}
-                </ScrollView>
-              </View>
+                    })}
+                  </ScrollView>
+                </View>
+              )}
 
-              {/* 4. Quantity Options */}
+              {/* 3. Size Options (lọc theo màu đang chọn) */}
+              {hasSizes && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Kích cỡ</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {sizesForColor.map((size: string, index: number) => {
+                      const isSelected = selectedSize === size;
+                      const sizeStock = getSizeStock(size);
+                      const isOutOfStock = sizeStock === 0;
+                      return (
+                        <TouchableOpacity
+                          key={index}
+                          activeOpacity={0.8}
+                          onPress={() => !isOutOfStock && setSelectedSize((prev) => prev === size ? null : size)}
+                          style={[
+                            styles.modalSizeChip,
+                            isSelected && styles.modalSizeChipSelected,
+                            isOutOfStock && styles.chipDisabled,
+                          ]}
+                        >
+                          <Text style={[
+                            styles.modalSizeText,
+                            isSelected && styles.modalSizeTextSelected,
+                            isOutOfStock && styles.chipTextDisabled,
+                          ]}>{size}</Text>
+                          <Text style={[styles.modalStockText, isOutOfStock && { color: '#EF4444' }]}>
+                            {isOutOfStock ? 'Hết' : sizeStock}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* 4. Quantity + Stock Info */}
               <View style={[styles.modalSection, styles.quantityRow]}>
-                <Text style={styles.modalSectionTitle}>Quantity</Text>
+                <View>
+                  <Text style={styles.modalSectionTitle}>Số lượng</Text>
+                  {selectedVariant && (
+                    <Text style={[styles.modalStockText, { marginTop: 2, color: availableStock < 5 ? '#F59E0B' : '#10B981' }]}>
+                      {availableStock === 0 ? 'Hết hàng' : `Còn lại: ${availableStock} cái`}
+                    </Text>
+                  )}
+                </View>
                 <View style={styles.quantityControls}>
                   <TouchableOpacity
                     style={styles.quantityBtn}
@@ -998,7 +1036,7 @@ export default function ProductDetailScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.quantityBtn}
-                    onPress={() => setQuantity((q) => q + 1)}
+                    onPress={() => setQuantity((q) => (availableStock > 0 && q < availableStock ? q + 1 : q))}
                   >
                     <Text style={styles.quantityBtnText}>+</Text>
                   </TouchableOpacity>
@@ -1613,5 +1651,101 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  // --- Stock & Variant Styles (mới) ---
+  stockRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  stockBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: '#ECFDF5',
+  },
+  stockBadgeLow: {
+    backgroundColor: '#FFFBEB',
+  },
+  stockBadgeOut: {
+    backgroundColor: '#FEF2F2',
+  },
+  stockBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  stockBadgeTextLow: {
+    color: '#F59E0B',
+  },
+  stockBadgeTextOut: {
+    color: '#EF4444',
+  },
+  colorChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    marginRight: 10,
+    alignItems: 'center',
+    minWidth: 64,
+  },
+  colorChipSelected: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  colorChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  colorChipTextSelected: {
+    color: '#3B82F6',
+    fontWeight: '700',
+  },
+  stockLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 3,
+  },
+  chipDisabled: {
+    opacity: 0.4,
+  },
+  chipTextDisabled: {
+    color: '#9CA3AF',
+  },
+  chipStockLabel: {
+    fontSize: 10,
+    color: '#6B7280',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  // Modal color chip (dạng text thay vì hình tròn)
+  modalColorChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    marginRight: 10,
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  modalColorChipSelected: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+  },
+  modalColorChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#374151',
+  },
+  modalStockText: {
+    fontSize: 12,
+    color: '#10B981',
+    marginTop: 3,
+    fontWeight: '500',
   },
 });

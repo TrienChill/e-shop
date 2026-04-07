@@ -173,15 +173,17 @@ const CartItemRow = ({
   onDecrease,
   isSelected,
   onToggleSelect,
+  onDelete,
 }: {
   item: CartItem;
   onIncrease: (id: string) => void;
   onDecrease: (id: string) => void;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 }) => (
   <View style={styles.cartRow}>
-    {/* Image (không còn nút xoá) */}
+    {/* Image */}
     <View style={styles.cartImageWrap}>
       <Image
         source={{ uri: item.image }}
@@ -192,9 +194,20 @@ const CartItemRow = ({
 
     {/* Details */}
     <View style={styles.cartDetails}>
-      <Text style={styles.cartName} numberOfLines={2}>
-        {item.name}
-      </Text>
+      <View style={styles.cartNameRow}>
+        <Text style={[styles.cartName, { flex: 1 }]} numberOfLines={2}>
+          {item.name}
+        </Text>
+        {/* Nút Xóa */}
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => onDelete(item.id)}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Trash2 size={16} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
 
       {/* Giá: dùng PriceDisplay để hiển thị giảm giá nếu có */}
       <PriceDisplay
@@ -773,6 +786,7 @@ export default function CartScreen() {
                 onDecrease={decrease}
                 isSelected={selectedIds.has(item.id)}
                 onToggleSelect={toggleSelect}
+                onDelete={deleteItem}
               />
             ))}
           </View>
@@ -1126,6 +1140,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cartDetails: { flex: 1, paddingVertical: 4, justifyContent: "space-between" },
+  cartNameRow: { position: "relative", paddingRight: 40 },
   cartName: { fontSize: 14, fontWeight: "500", color: C.text, lineHeight: 20 },
 
   // Checkbox
