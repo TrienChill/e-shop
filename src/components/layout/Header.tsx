@@ -1,9 +1,10 @@
 import React from "react";
-import { StyleSheet, View, ViewStyle } from "react-native";
+import { StyleSheet, View, ViewStyle, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface CommonHeaderProps {
   children?: React.ReactNode;
+  title?: string;
   renderLeft?: () => React.ReactNode;
   renderRight?: () => React.ReactNode;
   containerStyle?: ViewStyle;
@@ -14,6 +15,7 @@ interface CommonHeaderProps {
  * Following the design from Profile screen.
  */
 export const CommonHeader: React.FC<CommonHeaderProps> = ({
+  title,
   renderLeft,
   renderRight,
   containerStyle,
@@ -30,6 +32,11 @@ export const CommonHeader: React.FC<CommonHeaderProps> = ({
     >
       <View style={styles.header}>
         <View style={styles.headerLeft}>{renderLeft?.()}</View>
+        {title && (
+          <View style={styles.titleContainer}>
+            <Text style={styles.headerTitle}>{title}</Text>
+          </View>
+        )}
         <View style={styles.headerRight}>{renderRight?.()}</View>
       </View>
     </View>
@@ -55,17 +62,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    minHeight: 44,
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
   },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: 'flex-end',
     gap: 12,
+    flex: 1,
   },
+  titleContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: -1,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  }
 });
 
 export default CommonHeader;

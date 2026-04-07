@@ -90,7 +90,7 @@ const SettingsScreen = () => {
           />
           <SettingItem
             label="Phương thức thanh toán"
-            onPress={() => { }}
+            onPress={() => router.push("/payment-methods")}
           />
         </View>
 
