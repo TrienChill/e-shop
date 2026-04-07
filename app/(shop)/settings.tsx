@@ -1,5 +1,5 @@
 import CommonHeader from '@/src/components/layout/Header';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/src/lib/supabase';
 import { router } from 'expo-router';
 import {
   ArrowLeft,
@@ -50,8 +50,10 @@ const SectionHeader = ({ title }: { title: string }) => (
 
 const SettingsScreen = () => {
   const logout = async () => {
-    await AsyncStorage.removeItem('userToken');
-    router.replace('./auth/login');
+    const { error } = await supabase.auth.signOut();
+    if (!error) {
+      router.replace('/(auth)/login');
+    }
   };
 
   const appName = "E-Shop"; // Lấy từ hình ảnh 87
