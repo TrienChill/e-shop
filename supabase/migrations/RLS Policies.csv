@@ -1,5 +1,7 @@
 schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
 public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null
 public,conversations,Users view own conversation,PERMISSIVE,{public},SELECT,"((auth.uid() = user_id) OR (auth.uid() IN ( SELECT profiles.id
    FROM profiles
   WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
@@ -14,8 +16,6 @@ public,order_items,Users can view own order items,PERMISSIVE,{public},SELECT,"((
   WHERE (orders.id = order_items.order_id))) OR (auth.uid() IN ( SELECT profiles.id
    FROM profiles
   WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
-public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
-public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null
 public,products,Enable public read access for products,PERMISSIVE,{public},SELECT,true,null
 public,products,Products are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
 public,products,Staff/Admin can insert products,PERMISSIVE,{public},INSERT,null,"(auth.uid() IN ( SELECT profiles.id
@@ -51,3 +51,4 @@ public,product_view_history,Người dùng chỉ có thể cập nhật lịch s
 public,product_view_history,Người dùng chỉ có thể thêm lịch sử của chính h,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
 public,product_view_history,Người dùng chỉ có thể xem lịch sử của chính h,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
 public,product_view_history,Người dùng chỉ có thể xóa lịch sử của chính h,PERMISSIVE,{authenticated},DELETE,(auth.uid() = user_id),null
+public,product_discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null

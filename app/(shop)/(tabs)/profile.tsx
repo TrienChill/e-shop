@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
+import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import { supabase } from "@/src/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
@@ -7,14 +8,12 @@ import {
   ArrowRight,
   Bell,
   Package,
-  Play,
   Settings,
   Star,
   Ticket,
   Truck,
-  Wallet,
+  Wallet
 } from "lucide-react-native";
-import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import React, { useCallback, useState } from "react";
 import {
   Dimensions,
@@ -47,33 +46,7 @@ const COLOR = {
 // Dữ liệu mẫu cho "Đã xem gần đây" (Xóa vì dùng data thật từ profile.recent_views)
 // const RECENTLY_VIEWED = [...];
 
-// Dữ liệu mẫu cho "Khoảnh khắc" (Stories)
-const STORIES = [
-  {
-    id: 1,
-    image:
-      "https://images.unsplash.com/photo-1529139513477-42f4d94d8128?q=80&w=400&auto=format&fit=crop",
-    isLive: true,
-  },
-  {
-    id: 2,
-    image:
-      "https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=400&auto=format&fit=crop",
-    isLive: false,
-  },
-  {
-    id: 3,
-    image:
-      "https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=400&auto=format&fit=crop",
-    isLive: false,
-  },
-  {
-    id: 4,
-    image:
-      "https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?q=80&w=400&auto=format&fit=crop",
-    isLive: false,
-  },
-];
+
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
@@ -108,7 +81,7 @@ export default function ProfileScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       const { data, error } = await supabase
         .from("product_view_history")
         .select(`
@@ -120,11 +93,11 @@ export default function ProfileScreen() {
         .eq("user_id", user.id)
         .order("viewed_at", { ascending: false })
         .limit(5); // Chỉ lấy 5 cái mới nhất
-        
+
       if (!error && data && data.length > 0) {
         const sortedViews = data.map((item: any) => ({
           id: item.product?.id,
-          image: item.product?.images?.[0] || "https://via.placeholder.com/150", 
+          image: item.product?.images?.[0] || "https://via.placeholder.com/150",
         })).filter((i: any) => i.id);
 
         setRecentViews(sortedViews);
@@ -208,7 +181,7 @@ export default function ProfileScreen() {
         )}
         renderRight={() => (
           <>
-            <TouchableOpacity style={styles.iconButton}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/vouchers")} >
               <Ticket size={22} color={COLOR.dark} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
@@ -317,40 +290,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Phần Khoảnh khắc/Stories Video */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Khoảnh khắc</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-          >
-            {STORIES.map((story) => (
-              <TouchableOpacity
-                key={story.id}
-                style={styles.storyCard}
-                activeOpacity={0.9}
-              >
-                <Image
-                  source={{ uri: story.image }}
-                  style={styles.storyImage}
-                />
-                <View style={styles.storyOverlay}>
-                  {story.isLive && (
-                    <View style={styles.liveBadge}>
-                      <Text style={styles.liveText}>TRỰC TIẾP</Text>
-                    </View>
-                  )}
-                  <View style={styles.playIconOverlay}>
-                    <View style={styles.playBlurCircle}>
-                      <Play size={20} color="white" fill="white" />
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
 
         {/* Khoảng cách lề dưới cho ScrollView */}
         <View style={{ height: 100 }} />
