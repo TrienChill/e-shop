@@ -2,6 +2,8 @@ import { supabase } from '@/src/lib/supabase';
 import { router } from 'expo-router';
 import {
   ArrowLeft,
+  Settings,
+  LayoutGrid,
   CheckCircle2,
   Cloud,
   Heart,
@@ -340,11 +342,17 @@ export default function VouchersScreen() {
           <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0F172A' }}>Kho Voucher</Text>
         )}
         renderRight={() => (
-          <TouchableOpacity onPress={() => router.back()} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
-            <View style={{ position: 'relative' }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <TouchableOpacity style={{ width: 44, height: 44, backgroundColor: '#2563EB', borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#BFDBFE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 5 }}>
+              <LayoutGrid size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push("/settings")} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+              <Settings size={22} color="#2563EB" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.back()} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
               <ArrowLeft size={22} color="#2563EB" />
-            </View>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         )}
       />
 

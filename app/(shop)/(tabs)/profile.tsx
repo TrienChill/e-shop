@@ -188,7 +188,7 @@ export default function ProfileScreen() {
               <Bell size={22} color={COLOR.dark} />
               <View style={styles.filterBadge} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={logout}>
+            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/settings")}>
               <Settings size={22} color={COLOR.dark} />
             </TouchableOpacity>
           </>
