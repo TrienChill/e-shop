@@ -21,7 +21,7 @@ function debugLog(hypothesisId: string, location: string, message: string, data:
       data,
       timestamp: Date.now(),
     }),
-  }).catch(() => {});
+  }).catch(() => { });
   // #endregion
 }
 

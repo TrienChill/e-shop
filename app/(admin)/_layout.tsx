@@ -11,7 +11,12 @@ import {
   View,
 } from "react-native";
 
-function debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+function debugLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+) {
   // #region agent log
   fetch("http://127.0.0.1:7797/ingest/e442deb0-be17-422a-a916-36b6ffe053c6", {
     method: "POST",
@@ -36,12 +41,17 @@ export default function AdminLayout() {
   const { session, role, roleError, loading, userId, refreshRole } = useAuth();
 
   // Nếu là Mobile mà lỡ vào route admin -> Hiển thị dạng Stack bình thường
-  if (Platform.OS !== 'web') {
+  if (Platform.OS !== "web") {
     return <Slot />;
   }
 
   if (loading) {
-    debugLog("H4_guard_branch", "app/(admin)/_layout.tsx:loading", "guard:loading", { loading });
+    debugLog(
+      "H4_guard_branch",
+      "app/(admin)/_layout.tsx:loading",
+      "guard:loading",
+      { loading },
+    );
     return (
       <View style={styles.center}>
         <ActivityIndicator />
@@ -50,23 +60,35 @@ export default function AdminLayout() {
   }
 
   if (!session) {
-    debugLog("H4_guard_branch", "app/(admin)/_layout.tsx:noSession", "guard:redirectLogin", { hasSession: false });
+    debugLog(
+      "H4_guard_branch",
+      "app/(admin)/_layout.tsx:noSession",
+      "guard:redirectLogin",
+      { hasSession: false },
+    );
     return <Redirect href={"/(auth)/login" as any} />;
   }
 
   // If we cannot resolve role, show a diagnostic screen instead of redirecting
   // so you can see the auth UID and whether profiles lookup is failing.
   if (!role) {
-    debugLog("H4_guard_branch", "app/(admin)/_layout.tsx:noRole", "guard:noRole", {
-      userId,
-      role,
-      roleError,
-      hasSession: true,
-    });
+    debugLog(
+      "H4_guard_branch",
+      "app/(admin)/_layout.tsx:noRole",
+      "guard:noRole",
+      {
+        userId,
+        role,
+        roleError,
+        hasSession: true,
+      },
+    );
     return (
       <View style={styles.diagnosticWrap}>
         <View style={styles.diagnosticCard}>
-          <Text style={styles.diagnosticTitle}>Không lấy được quyền (role)</Text>
+          <Text style={styles.diagnosticTitle}>
+            Không lấy được quyền (role)
+          </Text>
           <Text style={styles.diagnosticText}>
             auth.uid(): <Text style={styles.mono}>{userId ?? "-"}</Text>
           </Text>
@@ -75,11 +97,13 @@ export default function AdminLayout() {
           </Text>
           {roleError ? (
             <Text style={[styles.diagnosticText, { color: "#B91C1C" }]}>
-              Lỗi query profiles.role: <Text style={styles.mono}>{roleError}</Text>
+              Lỗi query profiles.role:{" "}
+              <Text style={styles.mono}>{roleError}</Text>
             </Text>
           ) : (
             <Text style={styles.diagnosticText}>
-              Không có lỗi nhưng không tìm thấy dòng trong bảng profiles khớp với UID.
+              Không có lỗi nhưng không tìm thấy dòng trong bảng profiles khớp
+              với UID.
             </Text>
           )}
 
@@ -99,11 +123,16 @@ export default function AdminLayout() {
   }
 
   if (role !== "admin" && role !== "staff") {
-    debugLog("H4_guard_branch", "app/(admin)/_layout.tsx:roleNotAllowed", "guard:redirectShop", {
-      userId,
-      role,
-      hasSession: true,
-    });
+    debugLog(
+      "H4_guard_branch",
+      "app/(admin)/_layout.tsx:roleNotAllowed",
+      "guard:redirectShop",
+      {
+        userId,
+        role,
+        hasSession: true,
+      },
+    );
     return <Redirect href={"/(shop)/(tabs)" as any} />;
   }
 
@@ -121,6 +150,7 @@ export default function AdminLayout() {
           <>
             <SidebarLink href="/(admin)/revenue" label="Doanh thu" />
             <SidebarLink href="/(admin)/vouchers" label="Voucher" />
+            <SidebarLink href="/(admin)/dashboard" label="Bảng điều khiển" />
           </>
         ) : null}
       </View>
@@ -163,7 +193,12 @@ const styles = StyleSheet.create({
   },
   diagnosticTitle: { fontSize: 16, fontWeight: "800", marginBottom: 10 },
   diagnosticText: { fontSize: 13, color: "#374151", marginBottom: 8 },
-  mono: { fontFamily: Platform.select({ web: "monospace" as any, default: undefined }) },
+  mono: {
+    fontFamily: Platform.select({
+      web: "monospace" as any,
+      default: undefined,
+    }),
+  },
   retryBtn: {
     marginTop: 10,
     backgroundColor: "#2563EB",

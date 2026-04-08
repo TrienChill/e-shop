@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/src/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { UserRole } from "./types";
 
 function debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
@@ -20,7 +20,7 @@ function debugLog(hypothesisId: string, location: string, message: string, data:
       data,
       timestamp: Date.now(),
     }),
-  }).catch(() => {});
+  }).catch(() => { });
   // #endregion
 }
 
