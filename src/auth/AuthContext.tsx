@@ -1,28 +1,14 @@
 import { supabase } from "@/src/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  authLogger,
+  getCurrentPlatform,
+  isRoleAllowedOnPlatform,
+} from "./authLogger";
 import type { UserRole } from "./types";
 
-function debugLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
-  // #region agent log
-  fetch("http://127.0.0.1:7797/ingest/e442deb0-be17-422a-a916-36b6ffe053c6", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "763e45",
-    },
-    body: JSON.stringify({
-      sessionId: "763e45",
-      runId: "pre-fix",
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => { });
-  // #endregion
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type AuthState = {
   session: Session | null;
@@ -30,13 +16,20 @@ type AuthState = {
   role: UserRole | null;
   roleError: string | null;
   loading: boolean;
+  /** true nếu role vi phạm chính sách nền tảng (admin/staff trên mobile) */
+  isPlatformBlocked: boolean;
   refreshRole: () => Promise<void>;
 };
 
+// ─── Context ──────────────────────────────────────────────────────────────────
+
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+// ─── Role Fetcher ─────────────────────────────────────────────────────────────
+
 async function fetchMyRole(userId: string): Promise<UserRole | null> {
-  debugLog("H1_profiles_mismatch_or_missing", "src/auth/AuthContext.tsx:fetchMyRole", "fetchMyRole:start", { userId });
+  authLogger.roleFetchStart({ userId });
+
   const { data, error } = await supabase
     .from("profiles")
     .select("role")
@@ -44,22 +37,20 @@ async function fetchMyRole(userId: string): Promise<UserRole | null> {
     .maybeSingle();
 
   if (error) {
-    debugLog("H2_profiles_select_blocked", "src/auth/AuthContext.tsx:fetchMyRole", "fetchMyRole:error", {
+    authLogger.roleFetchError({
       userId,
-      errorMessage: error.message,
       errorCode: (error as any).code ?? null,
+      errorMessage: error.message,
     });
     throw error;
   }
 
   const nextRole = (data?.role as UserRole | null) ?? null;
-  debugLog("H1_profiles_mismatch_or_missing", "src/auth/AuthContext.tsx:fetchMyRole", "fetchMyRole:done", {
-    userId,
-    hasRow: Boolean(data),
-    role: nextRole,
-  });
+  authLogger.roleFetchSuccess({ userId, role: nextRole });
   return nextRole;
 }
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -68,6 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const userId = session?.user?.id ?? null;
+  const platform = getCurrentPlatform();
+
+  /**
+   * isPlatformBlocked = true khi:
+   *   - role là 'admin' hoặc 'staff'
+   *   - đang chạy trên mobile (không phải web)
+   */
+  const isPlatformBlocked = !isRoleAllowedOnPlatform(role, platform);
 
   const refreshRole = async () => {
     if (!userId) {
@@ -80,14 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRoleError(null);
   };
 
+  // ── Session Init ──────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      debugLog("H3_session_not_loaded", "src/auth/AuthContext.tsx:useEffect(getSession)", "getSession:done", {
-        hasSession: Boolean(session),
+      authLogger.sessionRestored({
         userId: session?.user?.id ?? null,
+        role: null, // role chưa được fetch tại thời điểm này
+        platform,
       });
       setSession(session);
       setLoading(false);
@@ -96,10 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      debugLog("H3_session_not_loaded", "src/auth/AuthContext.tsx:onAuthStateChange", "authStateChange", {
+      authLogger.authStateChange({
         event: _event,
-        hasSession: Boolean(session),
         userId: session?.user?.id ?? null,
+        platform,
       });
       setSession(session);
     });
@@ -108,10 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Role Sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Keep role in sync with auth state.
     setLoading(true);
     refreshRole()
       .catch((e) => {
@@ -122,6 +124,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  // ── Platform Block Logging ────────────────────────────────────────────────
+  useEffect(() => {
+    if (isPlatformBlocked && role && userId) {
+      authLogger.rolePolicyViolation({
+        userId,
+        role,
+        platform,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlatformBlocked, role, userId]);
+
+  // ─────────────────────────────────────────────────────────────────────────
   const value = useMemo<AuthState>(
     () => ({
       session,
@@ -129,17 +144,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role,
       roleError,
       loading,
+      isPlatformBlocked,
       refreshRole,
     }),
-    [session, userId, role, roleError, loading],
+    [session, userId, role, roleError, loading, isPlatformBlocked],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
-

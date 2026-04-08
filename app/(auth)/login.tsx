@@ -1,4 +1,11 @@
 import { supabase } from '@/src/lib/supabase';
+import {
+  authLogger,
+  getCurrentPlatform,
+  getRolePlatformErrorMessage,
+  isRoleAllowedOnPlatform,
+} from '@/src/auth/authLogger';
+import type { UserRole } from '@/src/auth/types';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -6,9 +13,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Linking // <-- Đã thêm Linking để mở trình duyệt xác thực
-  ,
-
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -50,19 +55,70 @@ const App = () => {
 
   // Xử lý đăng nhập bằng Email/Password
   async function handleLogin() {
+    const platform = getCurrentPlatform();
+    authLogger.loginAttempt({ email, platform });
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+
     if (error) {
+      setLoading(false);
+      // ── Ghi log lỗi đăng nhập ────────────────────────────────────────────
+      authLogger.loginError({
+        email,
+        reason: error.message,
+        errorCode: (error as any).code ?? null,
+        errorMessage: error.message,
+        platform,
+      });
+
       if (error.message.includes('Email not confirmed')) {
-        Alert.alert('Chưa xác thực email', 'Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.');
+        Alert.alert(
+          'Chưa xác thực email',
+          'Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.',
+        );
       } else {
         Alert.alert('Đăng nhập thất bại', error.message);
       }
-    } else {
-      router.replace('/');
+      return;
     }
+
+    // ── Đăng nhập Supabase thành công → kiểm tra role & platform ─────────
+    const userId = authData.user?.id;
+    if (userId) {
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        const role = (profileData?.role as UserRole | null) ?? null;
+
+        // ── Kiểm tra chính sách nền tảng ─────────────────────────────────
+        if (!isRoleAllowedOnPlatform(role, platform)) {
+          // admin / staff cố đăng nhập trên mobile → đăng xuất và báo lỗi
+          authLogger.rolePolicyViolation({ userId, role: role!, email, platform });
+          await supabase.auth.signOut();
+          setLoading(false);
+          Alert.alert(
+            'Không được phép đăng nhập',
+            getRolePlatformErrorMessage(role!),
+            [{ text: 'Đã hiểu', style: 'default' }],
+          );
+          return;
+        }
+
+        // ── Đăng nhập hợp lệ ─────────────────────────────────────────────
+        authLogger.loginSuccess({ userId, role, platform });
+      } catch {
+        // Nếu không fetch được role, vẫn cho qua (tránh block user hợp lệ)
+        authLogger.loginSuccess({ userId, role: null, platform });
+      }
+    }
+
+    setLoading(false);
+    router.replace('/');
   }
 
   // --- MỚI THÊM: Xử lý đăng nhập bằng Google/Facebook ---
