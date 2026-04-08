@@ -7,6 +7,7 @@ import {
   Dimensions,
   Image,
   Platform,
+  Alert,
 } from "react-native";
 import { 
   TrendingUp, 
@@ -15,57 +16,41 @@ import {
   Users, 
   Package, 
   Bell, 
-  Search,
-  MoreVertical,
-  ArrowUpRight
+  ArrowUpRight,
+  AlertCircle
 } from "lucide-react-native";
 import Svg, { Path, Defs, LinearGradient, Stop, Circle } from "react-native-svg";
-
-// --- Types ---
-interface KPICardProps {
-  title: string;
-  value: string;
-  change: string;
-  isPositive: boolean;
-  icon: React.ElementType; // Changed to ElementType to handle size/color better
-  color: string;
-  iconBg: string;
-}
-
-interface OrderItem {
-  id: string;
-  customer: string;
-  status: "Đang xử lý" | "Đã giao" | "Đã hủy";
-  amount: number;
-}
-
-// --- Mock Data ---
-const MOCK_REVENUE_DATA = [450, 320, 680, 500, 900, 750, 1200];
-const MOCK_DAYS = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-
-const RECENT_ORDERS: OrderItem[] = [
-  { id: "#ORD-8821", customer: "Trần Thế Quyền", status: "Đang xử lý", amount: 1250000 },
-  { id: "#ORD-8820", customer: "Nguyễn Văn A", status: "Đã giao", amount: 2400000 },
-  { id: "#ORD-8819", customer: "Lê Thị B", status: "Đã hủy", amount: 500000 },
-  { id: "#ORD-8818", customer: "Phạm Minh C", status: "Đã giao", amount: 1200000 },
-];
+import { 
+  getAdminDashboardStats, 
+  getRevenueChartData, 
+  getRecentOrders,
+  AdminStats,
+  ChartData
+} from "@/src/services/admin/stats";
 
 // --- Components ---
 
-const StatusBadge = ({ status }: { status: OrderItem["status"] }) => {
+const StatusBadge = ({ status }: { status: string }) => {
   let bgColor = "bg-blue-100";
   let textColor = "text-blue-600";
-  if (status === "Đã giao") { bgColor = "bg-green-100"; textColor = "text-green-600"; }
-  else if (status === "Đã hủy") { bgColor = "bg-red-100"; textColor = "text-red-600"; }
+  let label = status;
+
+  if (status === "completed" || status === "Đã giao") { 
+    bgColor = "bg-green-100"; textColor = "text-green-600"; label = "Đã giao";
+  } else if (status === "cancelled" || status === "Đã hủy") { 
+    bgColor = "bg-red-100"; textColor = "text-red-600"; label = "Đã hủy";
+  } else if (status === "pending" || status === "Đang xử lý") {
+    bgColor = "bg-amber-100"; textColor = "text-amber-600"; label = "Đang xử lý";
+  }
 
   return (
     <View className={`${bgColor} px-3 py-1 rounded-full`}>
-      <Text className={`${textColor} text-[10px] font-bold uppercase`}>{status}</Text>
+      <Text className={`${textColor} text-[10px] font-bold uppercase`}>{label}</Text>
     </View>
   );
 };
 
-const KPICard = ({ title, value, change, isPositive, icon: Icon, color, iconBg }: KPICardProps) => (
+const KPICard = ({ title, value, change, isPositive, icon: Icon, color, iconBg }: any) => (
   <View className="w-full sm:w-1/2 lg:w-1/4 p-2">
     <View className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 h-full justify-between">
       <View className="flex-row justify-between items-start mb-6">
@@ -99,26 +84,61 @@ const SkeletonCard = () => (
 
 export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [chartData, setChartData] = useState<ChartData[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1000);
-    return () => clearTimeout(timer);
+    loadDashboardData();
   }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const [s, c, o] = await Promise.all([
+        getAdminDashboardStats(),
+        getRevenueChartData(),
+        getRecentOrders(5)
+      ]);
+
+      setStats(s);
+      setChartData(c);
+      setRecentOrders(o);
+    } catch (err: any) {
+      console.log("DASHBOARD_ERROR_OBJECT:", err);
+      const msg = err?.message || "Lỗi mạng hoặc phân quyền Supabase";
+      const code = err?.code || "NoCode";
+      setError(`Lỗi: ${msg} (Mã: ${code})`);
+      
+      if (Platform.OS !== 'web') {
+        Alert.alert("Lỗi kết nối", msg);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const chartHeight = 220;
   const screenWidth = Dimensions.get("window").width;
-  // Adjust width for web sidebar (approx 260px)
   const contentWidth = Platform.OS === 'web' ? Math.max(screenWidth - 340, 600) : screenWidth - 48;
   const chartWidth = contentWidth;
-  const maxData = Math.max(...MOCK_REVENUE_DATA);
+  
+  const maxRevenue = useMemo(() => {
+    if (chartData.length === 0) return 1;
+    return Math.max(...chartData.map(d => d.revenue), 1000000);
+  }, [chartData]);
   
   const points = useMemo(() => {
-    return MOCK_REVENUE_DATA.map((val, i) => {
-      const x = (i / (MOCK_REVENUE_DATA.length - 1)) * chartWidth;
-      const y = chartHeight - (val / maxData) * (chartHeight - 60) - 30;
+    if (chartData.length === 0) return [];
+    return chartData.map((d, i) => {
+      const x = (i / (chartData.length - 1)) * chartWidth;
+      const y = chartHeight - (d.revenue / maxRevenue) * (chartHeight - 60) - 30;
       return { x, y };
     });
-  }, [chartWidth, maxData]);
+  }, [chartData, chartWidth, maxRevenue]);
 
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
@@ -134,8 +154,29 @@ export default function AdminDashboard() {
   }, [linePath, points]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN").format(amount) + "đ";
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(amount);
   };
+
+  if (error && !isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-gray-50 p-6">
+        <AlertCircle size={48} color="#ef4444" />
+        <Text className="text-gray-900 font-bold text-lg mt-4 text-center">Rất tiếc, đã xảy ra lỗi</Text>
+        <Text className="text-red-600 text-sm mt-2 text-center bg-red-50 p-4 rounded-xl border border-red-100">
+          {error}
+        </Text>
+        <TouchableOpacity 
+          className="mt-6 bg-indigo-600 px-8 py-3 rounded-2xl shadow-md"
+          onPress={loadDashboardData}
+        >
+          <Text className="text-white font-bold">Thử lại hệ thống</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <ScrollView 
@@ -150,7 +191,10 @@ export default function AdminDashboard() {
           <Text className="text-3xl font-black text-gray-900 tracking-tight">Tổng quan</Text>
         </View>
         <View className="flex-row items-center space-x-3">
-          <TouchableOpacity className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+          <TouchableOpacity 
+            className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100"
+            onPress={loadDashboardData}
+          >
             <Bell size={20} color="#1f2937" />
             <View className="absolute top-3 right-3 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white" />
           </TouchableOpacity>
@@ -169,13 +213,13 @@ export default function AdminDashboard() {
 
       {/* KPI Grid */}
       <View className="flex-row flex-wrap -mx-2 mb-6">
-        {isLoading ? (
+        {isLoading || !stats ? (
           [1, 2, 3, 4].map(i => <SkeletonCard key={i} />)
         ) : (
           <>
             <KPICard 
               title="Doanh thu"
-              value={formatCurrency(125000000)}
+              value={formatCurrency(stats.totalRevenue)}
               change="+12.5%"
               isPositive={true}
               icon={TrendingUp}
@@ -184,8 +228,8 @@ export default function AdminDashboard() {
             />
             <KPICard 
               title="Đơn hàng"
-              value="142"
-              change="+5.2%"
+              value={stats.newOrdersToday}
+              change="+0%"
               isPositive={true}
               icon={ShoppingBag}
               color="#f59e0b"
@@ -193,8 +237,8 @@ export default function AdminDashboard() {
             />
             <KPICard 
               title="Khách hàng"
-              value="1,204"
-              change="+18.7%"
+              value={stats.totalCustomers.toLocaleString()}
+              change="+0%"
               isPositive={true}
               icon={Users}
               color="#10b981"
@@ -202,8 +246,8 @@ export default function AdminDashboard() {
             />
             <KPICard 
               title="Tồn kho thấp"
-              value="08"
-              change="Cảnh báo"
+              value={stats.lowStockCount}
+              change="Cần chú ý"
               isPositive={false}
               icon={Package}
               color="#ef4444"
@@ -220,18 +264,18 @@ export default function AdminDashboard() {
           <View className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 h-full">
             <View className="flex-row justify-between items-center mb-8">
               <View>
-                <Text className="text-gray-900 font-black text-xl tracking-tight">Biểu đồ doanh thu</Text>
-                <Text className="text-gray-400 text-xs mt-1">Dữ liệu cập nhật trong 7 ngày qua</Text>
+                <Text className="text-gray-900 font-black text-xl tracking-tight">Doanh thu 7 ngày qua</Text>
+                <Text className="text-gray-400 text-xs mt-1">Dữ liệu thực tế từ Supabase</Text>
               </View>
               <View className="bg-indigo-50 px-4 py-2 rounded-xl">
-                <Text className="text-indigo-600 font-bold text-xs">Tuần này</Text>
+                <Text className="text-indigo-600 font-bold text-xs">Real-time</Text>
               </View>
             </View>
 
             <View className="items-center">
               {isLoading ? (
                  <View className="h-[220px] w-full bg-gray-50 rounded-3xl animate-pulse items-center justify-center">
-                    <Text className="text-gray-300 font-bold">Đang tải biểu đồ...</Text>
+                    <Text className="text-gray-300 font-bold">Đang tải...</Text>
                  </View>
               ) : (
                 <>
@@ -267,9 +311,9 @@ export default function AdminDashboard() {
                   </Svg>
                   
                   <View className="flex-row justify-between w-full mt-6 px-2">
-                    {MOCK_DAYS.map((day, i) => (
+                    {chartData.map((d, i) => (
                       <Text key={i} className="text-gray-400 text-[11px] font-black uppercase text-center flex-1">
-                        {day}
+                        {d.day}
                       </Text>
                     ))}
                   </View>
@@ -283,14 +327,14 @@ export default function AdminDashboard() {
         <View className="w-full lg:w-1/3 px-3 mb-6">
           <View className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
             <View className="flex-row justify-between items-center mb-8">
-              <Text className="text-gray-900 font-black text-xl tracking-tight">Đơn hàng mới</Text>
+              <Text className="text-gray-900 font-black text-xl tracking-tight">Đơn hàng mới nhất</Text>
               <TouchableOpacity>
                 <Text className="text-indigo-600 font-bold text-xs">Tất cả</Text>
               </TouchableOpacity>
             </View>
 
             {isLoading ? (
-              [1, 2, 3, 4].map(i => (
+              [1, 2, 3, 4, 5].map(i => (
                 <View key={i} className="mb-6 flex-row items-center animate-pulse">
                   <View className="w-12 h-12 bg-gray-100 rounded-2xl mr-4" />
                   <View className="flex-1">
@@ -300,29 +344,35 @@ export default function AdminDashboard() {
                 </View>
               ))
             ) : (
-              RECENT_ORDERS.map((order, index) => (
-                <View 
-                  key={order.id} 
-                  className="mb-5 flex-row items-center border-b border-gray-50 pb-5 last:border-0 last:pb-0"
-                >
-                  <View className="w-12 h-12 bg-indigo-50 rounded-2xl items-center justify-center mr-4">
-                    <Text className="text-indigo-600 font-black text-xs">#{index+1}</Text>
-                  </View>
-                  
-                  <View className="flex-1">
-                    <Text className="text-gray-900 font-bold text-sm" numberOfLines={1}>
-                      {order.customer}
-                    </Text>
-                    <Text className="text-gray-400 text-[11px] font-medium mt-0.5">
-                      {order.id} • {formatCurrency(order.amount)}
-                    </Text>
-                  </View>
+              recentOrders.length > 0 ? (
+                recentOrders.map((order, index) => (
+                  <View 
+                    key={order.id} 
+                    className="mb-5 flex-row items-center border-b border-gray-50 pb-5 last:border-0 last:pb-0"
+                  >
+                    <View className="w-12 h-12 bg-indigo-50 rounded-2xl items-center justify-center mr-4">
+                      <Text className="text-indigo-600 font-black text-xs">#{index+1}</Text>
+                    </View>
+                    
+                    <View className="flex-1">
+                      <Text className="text-gray-900 font-bold text-sm" numberOfLines={1}>
+                        {order.profiles?.full_name || "Guest"}
+                      </Text>
+                      <Text className="text-gray-400 text-[11px] font-medium mt-0.5">
+                        {formatCurrency(order.total_amount)}
+                      </Text>
+                    </View>
 
-                  <View className="items-end">
-                     <StatusBadge status={order.status} />
+                    <View className="items-end">
+                       <StatusBadge status={order.status} />
+                    </View>
                   </View>
+                ))
+              ) : (
+                <View className="py-10 items-center">
+                  <Text className="text-gray-400 italic">Trống</Text>
                 </View>
-              ))
+              )
             )}
           </View>
         </View>
