@@ -1,8 +1,10 @@
 import { listOrders, updateOrderStatus } from "@/src/services/admin/orders";
-import { Check, Clock, Package, Search, Settings, Truck, XCircle } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -43,6 +45,9 @@ export default function AdminOrdersScreen() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
 
   const fetchOrders = async () => {
     try {
@@ -70,6 +75,15 @@ export default function AdminOrdersScreen() {
     }
   };
 
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollTop(offsetY > 300);
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const filteredOrders = orders.filter((order) => {
     const query = searchQuery.toLowerCase();
 
@@ -94,152 +108,173 @@ export default function AdminOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Quản lý Đơn hàng</Text>
-          <Text style={styles.subtitle}>
-            Theo dõi và cập nhật trạng thái vận chuyển cho khách hàng.
-          </Text>
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Search size={20} color="#9CA3AF" />
-          <TextInput
-            placeholder="Tìm theo ID, tên hoặc SĐT..."
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
-
-      {/* TABS */}
-      <View style={styles.tabsContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
-          {STATUS_TABS.map((tab) => (
-            <Pressable
-              key={tab.id}
-              onPress={() => setActiveTab(tab.id)}
-              style={StyleSheet.flatten([
-                styles.tab,
-                activeTab === tab.id && styles.tabActive
-              ])}
-            >
-              <tab.icon size={16} color={activeTab === tab.id ? "#2563EB" : "#9CA3AF"} />
-              <Text style={StyleSheet.flatten([
-                styles.tabText,
-                activeTab === tab.id && styles.tabTextActive
-              ])}>
-                {tab.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* CONTENT */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <XCircle size={48} color="#EF4444" />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        <View style={styles.tableCard}>
-          {/* TABLE HEADER */}
-          <View style={styles.tableHeader}>
-            <Text style={StyleSheet.flatten([styles.columnId, styles.headerText])}>ID & Ngày</Text>
-            <Text style={StyleSheet.flatten([styles.columnCustomer, styles.headerText])}>Khách hàng</Text>
-            <Text style={StyleSheet.flatten([styles.columnAmount, styles.headerText, styles.textRight])}>Tổng tiền</Text>
-            <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textCenter])}>Trạng thái</Text>
-            <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Hành động</Text>
+      <ScrollView
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Quản lý Đơn hàng</Text>
+            <Text style={styles.subtitle}>
+              Theo dõi và cập nhật trạng thái vận chuyển cho khách hàng.
+            </Text>
           </View>
 
-          {/* TABLE BODY */}
-          <View>
-            {filteredOrders.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
-              </View>
-            ) : (
-              filteredOrders.map((order) => (
-                <View key={order.id} style={styles.row}>
-                  <View style={styles.columnId}>
-                    <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
-                    <Text style={styles.orderDate}>
-                      {new Date(order.created_at).toLocaleString("vi-VN")}
-                    </Text>
-                  </View>
+          <View style={styles.searchContainer}>
+            <Search size={20} color="#9CA3AF" />
+            <TextInput
+              placeholder="Tìm theo ID, tên hoặc SĐT..."
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+        </View>
 
-                  <View style={styles.columnCustomer}>
-                    <Text style={styles.customerName}>{order.receiver_name || "N/A"}</Text>
-                    <Text style={styles.customerPhone}>{order.phone_contact}</Text>
-                  </View>
+        {/* TABS */}
+        <View style={styles.tabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+            {STATUS_TABS.map((tab) => (
+              <Pressable
+                key={tab.id}
+                onPress={() => setActiveTab(tab.id)}
+                style={StyleSheet.flatten([
+                  styles.tab,
+                  activeTab === tab.id && styles.tabActive
+                ])}
+              >
+                <tab.icon size={16} color={activeTab === tab.id ? "#2563EB" : "#9CA3AF"} />
+                <Text style={StyleSheet.flatten([
+                  styles.tabText,
+                  activeTab === tab.id && styles.tabTextActive
+                ])}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
 
-                  <View style={styles.columnAmount}>
-                    <Text style={styles.amountText}>
-                      {order.total_amount?.toLocaleString("vi-VN")}₫
-                    </Text>
-                  </View>
+        {/* CONTENT */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563EB" />
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <XCircle size={48} color="#EF4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : (
+          <View style={styles.tableCard}>
+            {/* TABLE HEADER */}
+            <View style={styles.tableHeader}>
+              <Text style={StyleSheet.flatten([styles.columnId, styles.headerText])}>ID & Ngày</Text>
+              <Text style={StyleSheet.flatten([styles.columnCustomer, styles.headerText])}>Khách hàng</Text>
+              <Text style={StyleSheet.flatten([styles.columnAmount, styles.headerText, styles.textRight])}>Tổng tiền</Text>
+              <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textCenter])}>Trạng thái</Text>
+              <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Hành động</Text>
+            </View>
 
-                  <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
-                    <View
-                      style={StyleSheet.flatten([
-                        styles.statusBadge,
-                        { backgroundColor: `${STATUS_COLORS[order.status]}20` }
-                      ])}
-                    >
-                      <Text
-                        style={StyleSheet.flatten([
-                          styles.statusText,
-                          { color: STATUS_COLORS[order.status] }
-                        ])}
-                      >
-                        {STATUS_LABELS[order.status] || order.status}
+            {/* TABLE BODY */}
+            <View>
+              {filteredOrders.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
+                </View>
+              ) : (
+                filteredOrders.map((order) => (
+                  <View key={order.id} style={styles.row}>
+                    <View style={styles.columnId}>
+                      <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
+                      <Text style={styles.orderDate}>
+                        {new Date(order.created_at).toLocaleString("vi-VN")}
                       </Text>
                     </View>
-                  </View>
 
-                  <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
-                    {order.status === 'pending' && (
-                      <ActionButton
-                        onPress={() => handleUpdateStatus(order.id, 'processing')}
-                        label="Duyệt"
-                        color="#2563EB"
-                      />
-                    )}
-                    {order.status === 'processing' && (
-                      <ActionButton
-                        onPress={() => handleUpdateStatus(order.id, 'shipping')}
-                        label="Giao"
-                        color="#8B5CF6"
-                      />
-                    )}
-                    {order.status === 'shipping' && (
-                      <ActionButton
-                        onPress={() => handleUpdateStatus(order.id, 'completed')}
-                        label="Xong"
-                        color="#10B981"
-                      />
-                    )}
-                    {['pending', 'processing'].includes(order.status) && (
-                      <ActionButton
-                        onPress={() => handleUpdateStatus(order.id, 'cancelled')}
-                        label="Hủy"
-                        color="#EF4444"
-                        outline
-                      />
-                    )}
+                    <View style={styles.columnCustomer}>
+                      <Text style={styles.customerName}>{order.receiver_name || "N/A"}</Text>
+                      <Text style={styles.customerPhone}>{order.phone_contact}</Text>
+                    </View>
+
+                    <View style={styles.columnAmount}>
+                      <Text style={styles.amountText}>
+                        {order.total_amount?.toLocaleString("vi-VN")}₫
+                      </Text>
+                    </View>
+
+                    <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
+                      <View
+                        style={StyleSheet.flatten([
+                          styles.statusBadge,
+                          { backgroundColor: `${STATUS_COLORS[order.status]}20` }
+                        ])}
+                      >
+                        <Text
+                          style={StyleSheet.flatten([
+                            styles.statusText,
+                            { color: STATUS_COLORS[order.status] }
+                          ])}
+                        >
+                          {STATUS_LABELS[order.status] || order.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
+                      {order.status === 'pending' && (
+                        <ActionButton
+                          onPress={() => handleUpdateStatus(order.id, 'processing')}
+                          label="Duyệt"
+                          color="#2563EB"
+                        />
+                      )}
+                      {order.status === 'processing' && (
+                        <ActionButton
+                          onPress={() => handleUpdateStatus(order.id, 'shipping')}
+                          label="Giao"
+                          color="#8B5CF6"
+                        />
+                      )}
+                      {order.status === 'shipping' && (
+                        <ActionButton
+                          onPress={() => handleUpdateStatus(order.id, 'completed')}
+                          label="Xong"
+                          color="#10B981"
+                        />
+                      )}
+                      {['pending', 'processing'].includes(order.status) && (
+                        <ActionButton
+                          onPress={() => handleUpdateStatus(order.id, 'cancelled')}
+                          label="Hủy"
+                          color="#EF4444"
+                          outline
+                        />
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))
-            )}
+                ))
+              )}
+            </View>
           </View>
-        </View>
+        )}
+      </ScrollView>
+
+      {/* FLOAT SCROLL TOP BUTTON */}
+      {showScrollTop && (
+        <Pressable
+          onPress={scrollToTop}
+          style={({ hovered }: any) => [
+            styles.scrollTopButton,
+            hovered && styles.scrollTopButtonHover
+          ]}
+        >
+          <ArrowUp size={24} color="white" />
+        </Pressable>
       )}
     </View>
   );
@@ -267,7 +302,8 @@ function ActionButton({ onPress, label, color, outline = false }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 40 },
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  scrollContent: { padding: 40 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -456,5 +492,25 @@ const styles = StyleSheet.create({
   },
   mobilePlaceholder: {
     padding: 40,
+  },
+  scrollTopButton: {
+    position: "absolute",
+    bottom: 40,
+    right: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  scrollTopButtonHover: {
+    backgroundColor: "#374151",
+    transform: [{ translateY: -2 }]
   }
-});
+})

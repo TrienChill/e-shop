@@ -1,11 +1,14 @@
 import { deleteProduct, listAdminProducts } from "@/src/services/admin/products";
-import { Edit3, Package, Plus, Search, Trash2 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { ArrowUp, Edit3, Package, Plus, Search, Trash2 } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -16,6 +19,9 @@ export default function AdminProductsList() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  
+  const scrollRef = useRef<ScrollView>(null);
 
   const fetchProducts = async () => {
     try {
@@ -43,6 +49,15 @@ export default function AdminProductsList() {
     }
   };
 
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setShowScrollTop(offsetY > 300);
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const filteredProducts = products.filter((p) =>
     p.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -53,147 +68,169 @@ export default function AdminProductsList() {
 
   return (
     <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Quản lý Sản phẩm</Text>
-          <Text style={styles.subtitle}>
-            Chỉnh sửa thông tin, giá bán và quản lý tồn kho cho từng biến thể.
-          </Text>
-        </View>
-
-        <View style={styles.rightHeader}>
-          <View style={styles.searchContainer}>
-            <Search size={20} color="#9CA3AF" />
-            <TextInput
-              placeholder="Tìm theo tên sản phẩm..."
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          <Pressable 
-            style={({ hovered }: any) => [
-              styles.addButton,
-              hovered && styles.addButtonHover
-            ]}
-            onPress={() => alert("Chức năng thêm sản phẩm đang hoàn thiện")}
-          >
-            <Plus size={20} color="white" />
-            <Text style={styles.addButtonText}>Thêm mới</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* TABLE */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-        </View>
-      ) : (
-        <View style={styles.tableCard}>
-          {/* TABLE HEADER */}
-          <View style={styles.tableHeader}>
-            <Text style={StyleSheet.flatten([styles.columnProduct, styles.headerText])}>Sản phẩm</Text>
-            <Text style={StyleSheet.flatten([styles.columnCategory, styles.headerText])}>Phân loại</Text>
-            <Text style={StyleSheet.flatten([styles.columnPrice, styles.headerText, styles.textRight])}>Giá bán</Text>
-            <Text style={StyleSheet.flatten([styles.columnStock, styles.headerText, styles.textCenter])}>Kho</Text>
-            <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textCenter])}>Trạng thái</Text>
-            <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Thao tác</Text>
-          </View>
-
-          {/* TABLE BODY */}
+      <ScrollView
+        ref={scrollRef}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* HEADER */}
+        <View style={styles.header}>
           <View>
-            {filteredProducts.map((product) => {
-              const variants = product.product_variants || [];
-              const totalStock = variants.reduce((s: number, v: any) => s + (v.stock || 0), 0);
-              const prices = variants.map((v: any) => v.price).filter(Boolean);
-              const minPrice = prices.length ? Math.min(...prices) : product.price;
-              const maxPrice = prices.length ? Math.max(...prices) : product.price;
+            <Text style={styles.title}>Quản lý Sản phẩm</Text>
+            <Text style={styles.subtitle}>
+              Chỉnh sửa thông tin, giá bán và quản lý tồn kho cho từng biến thể.
+            </Text>
+          </View>
 
-              return (
-                <View key={product.id} style={styles.row}>
-                  <View style={StyleSheet.flatten([styles.columnProduct, styles.rowItem])}>
-                    <Image
-                      source={{ uri: product.images?.[0] || 'https://via.placeholder.com/100' }}
-                      style={styles.productImage}
-                    />
-                    <View style={styles.productInfo}>
-                      <Text style={styles.productName} numberOfLines={1}>
-                        {product.name}
-                      </Text>
-                      <Text style={styles.productId}>ID: {product.id}</Text>
-                    </View>
-                  </View>
+          <View style={styles.rightHeader}>
+            <View style={styles.searchContainer}>
+              <Search size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Tìm theo tên sản phẩm..."
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
 
-                  <View style={styles.columnCategory}>
-                    <View style={styles.variantBadge}>
-                      <Text style={styles.variantBadgeText}>
-                        {variants.length} biến thể
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.columnPrice}>
-                    <Text style={styles.priceText}>
-                      {minPrice === maxPrice 
-                        ? `${minPrice?.toLocaleString()}₫`
-                        : `${minPrice?.toLocaleString()} - ${maxPrice?.toLocaleString()}₫`}
-                    </Text>
-                  </View>
-
-                  <View style={StyleSheet.flatten([styles.columnStock, styles.itemsCenter])}>
-                    <Text style={StyleSheet.flatten([
-                      styles.stockText,
-                      totalStock < 10 && styles.lowStock
-                    ])}>
-                      {totalStock}
-                    </Text>
-                  </View>
-
-                  <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
-                    <View style={StyleSheet.flatten([
-                      styles.statusBadge,
-                      product.is_active ? styles.statusActive : styles.statusInactive
-                    ])}>
-                      <Text style={StyleSheet.flatten([
-                        styles.statusText,
-                        product.is_active ? styles.statusTextActive : styles.statusTextInactive
-                      ])}>
-                        {product.is_active ? 'ĐANG BÁN' : 'ẨN'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
-                    <Pressable style={({ hovered }: any) => StyleSheet.flatten([styles.iconButton, hovered && styles.editButtonHover])}>
-                      <Edit3 size={18} color="#2563EB" />
-                    </Pressable>
-                    <Pressable 
-                      style={({ hovered }: any) => StyleSheet.flatten([styles.iconButton, hovered && styles.deleteButtonHover])}
-                      onPress={() => handleDelete(product.id)}
-                    >
-                      <Trash2 size={18} color="#EF4444" />
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
+            <Pressable 
+              style={({ hovered }: any) => [
+                styles.addButton,
+                hovered && styles.addButtonHover
+              ]}
+              onPress={() => alert("Chức năng thêm sản phẩm đang hoàn thiện")}
+            >
+              <Plus size={20} color="white" />
+              <Text style={styles.addButtonText}>Thêm mới</Text>
+            </Pressable>
           </View>
         </View>
+
+        {/* TABLE */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563EB" />
+          </View>
+        ) : (
+          <View style={styles.tableCard}>
+            {/* TABLE HEADER */}
+            <View style={styles.tableHeader}>
+              <Text style={StyleSheet.flatten([styles.columnProduct, styles.headerText])}>Sản phẩm</Text>
+              <Text style={StyleSheet.flatten([styles.columnCategory, styles.headerText])}>Phân loại</Text>
+              <Text style={StyleSheet.flatten([styles.columnPrice, styles.headerText, styles.textRight])}>Giá bán</Text>
+              <Text style={StyleSheet.flatten([styles.columnStock, styles.headerText, styles.textCenter])}>Kho</Text>
+              <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textCenter])}>Trạng thái</Text>
+              <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Thao tác</Text>
+            </View>
+
+            {/* TABLE BODY */}
+            <View>
+              {filteredProducts.map((product) => {
+                const variants = product.product_variants || [];
+                const totalStock = variants.reduce((s: number, v: any) => s + (v.stock || 0), 0);
+                const prices = variants.map((v: any) => v.price).filter(Boolean);
+                const minPrice = prices.length ? Math.min(...prices) : product.price;
+                const maxPrice = prices.length ? Math.max(...prices) : product.price;
+
+                return (
+                  <View key={product.id} style={styles.row}>
+                    <View style={StyleSheet.flatten([styles.columnProduct, styles.rowItem])}>
+                      <Image
+                        source={{ uri: product.images?.[0] || 'https://via.placeholder.com/100' }}
+                        style={styles.productImage}
+                      />
+                      <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+                        <Text style={styles.productId}>ID: {product.id}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.columnCategory}>
+                      <View style={styles.variantBadge}>
+                        <Text style={styles.variantBadgeText}>
+                          {variants.length} biến thể
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.columnPrice}>
+                      <Text style={styles.priceText}>
+                        {minPrice === maxPrice 
+                          ? `${minPrice?.toLocaleString()}₫`
+                          : `${minPrice?.toLocaleString()} - ${maxPrice?.toLocaleString()}₫`}
+                      </Text>
+                    </View>
+
+                    <View style={StyleSheet.flatten([styles.columnStock, styles.itemsCenter])}>
+                      <Text style={StyleSheet.flatten([
+                        styles.stockText,
+                        totalStock < 10 && styles.lowStock
+                      ])}>
+                        {totalStock}
+                      </Text>
+                    </View>
+
+                    <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
+                      <View style={StyleSheet.flatten([
+                        styles.statusBadge,
+                        product.is_active ? styles.statusActive : styles.statusInactive
+                      ])}>
+                        <Text style={StyleSheet.flatten([
+                          styles.statusText,
+                          product.is_active ? styles.statusTextActive : styles.statusTextInactive
+                        ])}>
+                          {product.is_active ? 'ĐANG BÁN' : 'ẨN'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
+                      <Pressable style={({ hovered }: any) => StyleSheet.flatten([styles.iconButton, hovered && styles.editButtonHover])}>
+                        <Edit3 size={18} color="#2563EB" />
+                      </Pressable>
+                      <Pressable 
+                        style={({ hovered }: any) => StyleSheet.flatten([styles.iconButton, hovered && styles.deleteButtonHover])}
+                        onPress={() => handleDelete(product.id)}
+                      >
+                        <Trash2 size={18} color="#EF4444" />
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* FLOAT SCROLL TOP BUTTON */}
+      {showScrollTop && (
+        <Pressable 
+          onPress={scrollToTop}
+          style={({ hovered }: any) => [
+            styles.scrollTopButton,
+            hovered && styles.scrollTopButtonHover
+          ]}
+        >
+          <ArrowUp size={24} color="white" />
+        </Pressable>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 40 },
+  container: { flex: 1, backgroundColor: "#F9FAFB" },
+  scrollContent: { padding: 40 },
   p10: { padding: 40 },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "between" as any,
+    justifyContent: "space-between",
     marginBottom: 32,
   },
   title: {
@@ -391,6 +428,26 @@ const styles = StyleSheet.create({
   },
   deleteButtonHover: {
     backgroundColor: "#FEF2F2",
+  },
+  scrollTopButton: {
+    position: "absolute",
+    bottom: 40,
+    right: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  scrollTopButtonHover: {
+    backgroundColor: "#374151",
+    transform: [{ translateY: -2 }]
   }
 });
 
