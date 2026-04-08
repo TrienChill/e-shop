@@ -138,6 +138,7 @@ export default function CheckoutScreen() {
   // Thêm các state mới
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Tính tổng tiền dựa trên sản phẩm thực tế và phí ship
   const productsTotal = cartItems.reduce(
@@ -281,8 +282,11 @@ export default function CheckoutScreen() {
               price: p.price,
               quantity: item.quantity,
               image: getProductImageByColor(p, item.color),
+              // Hiển thị thì dùng TV, nhưng gửi đi/truy vấn thì dùng raw
               color: COLOR_TRANSLATIONS[item.color] || item.color,
               size: item.size,
+              rawColor: item.color,
+              rawSize: item.size,
             };
           });
           setCartItems(formattedItems);
@@ -347,7 +351,7 @@ export default function CheckoutScreen() {
           product_id: productId, // ID sản phẩm (PHẢI LÀ SỐ - bigint)
           quantity: item.quantity,
           price_at_purchase: item.price,
-          selected_variant: { color: item.color, size: item.size },
+          selected_variant: { color: item.rawColor, size: item.rawSize },
         };
       });
 
@@ -357,7 +361,51 @@ export default function CheckoutScreen() {
 
       if (itemsError) throw itemsError;
 
-      // 3. Xóa các món đã mua khỏi giỏ hàng
+      // 3. Cập nhật số lượng tồn kho (Stock) trong bảng product_variants
+      for (const item of cartItems) {
+        try {
+          // Tìm variant tương ứng
+          let query = supabase
+            .from("product_variants")
+            .select("id, stock")
+            .eq("product_id", item.product_id);
+
+          if (item.rawColor) query = query.eq("color", item.rawColor);
+          else query = query.is("color", null);
+
+          if (item.rawSize) query = query.eq("size", item.rawSize);
+          else query = query.is("size", null);
+
+          const { data: variant, error: vError } = await query.maybeSingle();
+
+
+          if (vError) {
+            console.error("[STOCK_CHECK] Lỗi tìm variant:", vError);
+            continue;
+          }
+
+          if (variant) {
+            // SỬ DỤNG RPC: Gọi function buy_product đã tạo trong database
+            const { error: rpcError } = await supabase.rpc("buy_product", {
+              variant_id: variant.id,
+              quantity_to_buy: item.quantity,
+            });
+
+            if (rpcError) {
+              console.error(`[STOCK_CHECK] Lỗi RPC buy_product cho ${item.name}:`, rpcError.message);
+              throw rpcError;
+            }
+
+          } else {
+            console.warn(`[STOCK_CHECK] KHÔNG tìm thấy variant cho sản phẩm: ${item.name}`);
+          }
+        } catch (stockErr: any) {
+          console.error("[STOCK_CHECK] Exception khi xử lý stock:", stockErr.message);
+          throw stockErr; // Đẩy lỗi ra ngoài để hiển thị Alert cho user
+        }
+      }
+
+      // 4. Xóa các món đã mua khỏi giỏ hàng
       const { error: deleteCartError } = await supabase
         .from("cart_items")
         .delete()
@@ -370,6 +418,7 @@ export default function CheckoutScreen() {
       setPaymentStatus("success");
     } catch (error: any) {
       console.error("Lỗi đặt hàng:", error.message);
+      setErrorMessage(error.message || "Đã có lỗi xảy ra");
       setPaymentStatus("error");
     }
   };
@@ -709,7 +758,7 @@ export default function CheckoutScreen() {
                         "/to-receive",
                       ) /* Điều hướng đến trang theo dõi đơn hàng */
                   }
-                  // onPress={() => setPaymentStatus("idle")}
+                // onPress={() => setPaymentStatus("idle")}
                 >
                   <Text style={styles.trackOrderText}>Theo dõi đơn hàng</Text>
                 </TouchableOpacity>
@@ -728,7 +777,7 @@ export default function CheckoutScreen() {
                 </View>
                 <Text style={styles.statusTitle}>Thanh toán thất bại</Text>
                 <Text style={styles.statusDesc}>
-                  Vui lòng đổi phương thức hoặc thử lại sau
+                  {errorMessage || "Vui lòng đổi phương thức hoặc thử lại sau"}
                 </Text>
                 <View style={styles.errorActions}>
                   <TouchableOpacity

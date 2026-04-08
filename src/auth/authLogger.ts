@@ -127,16 +127,16 @@ function buildEntry(
 }
 
 function printLog(entry: AuthLogEntry): void {
-  const prefix = `[AUTH][${entry.level}][${entry.event}]`;
-  const summary = `platform=${entry.platform} | userId=${entry.userId ?? '—'} | role=${entry.role ?? '—'}`;
+  // const prefix = `[AUTH][${entry.level}][${entry.event}]`;
+  // const summary = `platform=${entry.platform} | userId=${entry.userId ?? '—'} | role=${entry.role ?? '—'}`;
 
-  if (entry.level === 'ERROR') {
-    console.error(prefix, summary, entry.reason ?? entry.errorMessage ?? '', entry);
-  } else if (entry.level === 'WARN') {
-    console.warn(prefix, summary, entry.reason ?? '', entry);
-  } else {
-    console.log(prefix, summary, entry);
-  }
+  // if (entry.level === 'ERROR') {
+  //   console.error(prefix, summary, entry.reason ?? entry.errorMessage ?? '', entry);
+  // } else if (entry.level === 'WARN') {
+  //   console.warn(prefix, summary, entry.reason ?? '', entry);
+  // } else {
+  //   console.log(prefix, summary, entry);
+  // }
 }
 
 // ─── Public Logger API ────────────────────────────────────────────────────────
