@@ -16,12 +16,12 @@ import {
 import React, { useState } from 'react';
 import CommonHeader from '@/src/components/layout/Header';
 import {
-  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
   View
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
 
 // Types

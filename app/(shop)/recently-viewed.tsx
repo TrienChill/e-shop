@@ -15,7 +15,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
   View,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 const COLUMN_WIDTH = (width - 48 - 16) / 2;

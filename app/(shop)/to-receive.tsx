@@ -31,7 +31,6 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -39,12 +38,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-if (
-  Platform.OS === "android" &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+
 
 const COLORS = {
   primary: "#0055FF",

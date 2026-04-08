@@ -1,21 +1,19 @@
-import CommonHeader from '@/src/components/layout/Header';
-import { supabase } from '@/src/lib/supabase';
-import { router } from 'expo-router';
+import CommonHeader from "@/src/components/layout/Header";
+import { supabase } from "@/src/lib/supabase";
+import { router } from "expo-router";
+import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import React from "react";
 import {
-  ArrowLeft,
-  ChevronRight,
-} from 'lucide-react-native';
-import React from 'react';
-import {
+  Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 interface SettingItemProps {
   label: string;
@@ -24,7 +22,12 @@ interface SettingItemProps {
   isRed?: boolean;
 }
 
-const SettingItem: React.FC<SettingItemProps> = ({ label, value, onPress, isRed = false }) => {
+const SettingItem: React.FC<SettingItemProps> = ({
+  label,
+  value,
+  onPress,
+  isRed = false,
+}) => {
   return (
     <Pressable
       onPress={onPress}
@@ -36,7 +39,7 @@ const SettingItem: React.FC<SettingItemProps> = ({ label, value, onPress, isRed 
       <Text style={[styles.label, isRed && styles.redText]}>{label}</Text>
       <View style={styles.itemRight}>
         {value && <Text style={styles.value}>{value}</Text>}
-        <ChevronRight size={20} color={isRed ? '#F87171' : '#94A3B8'} />
+        <ChevronRight size={20} color={isRed ? "#F87171" : "#94A3B8"} />
       </View>
     </Pressable>
   );
@@ -52,22 +55,24 @@ const SettingsScreen = () => {
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) {
-      router.replace('/(auth)/login');
+      router.replace("/(auth)/login");
     }
   };
 
-  const appName = "E-Shop"; // Lấy từ hình ảnh 87
+  const appName = "E-Shop";
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      {/* StatusBar chỉ có ý nghĩa trên native */}
+      {Platform.OS !== "web" && <StatusBar barStyle="dark-content" />}
 
       <CommonHeader
-        renderLeft={() => (
-          <Text style={styles.headerTitle}>Cài đặt</Text>
-        )}
+        renderLeft={() => <Text style={styles.headerTitle}>Cài đặt</Text>}
         renderRight={() => (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <ArrowLeft size={22} color="#2563EB" />
           </TouchableOpacity>
         )}
@@ -94,23 +99,12 @@ const SettingsScreen = () => {
           />
         </View>
 
-
         {/* Nhóm Tài khoản */}
         <SectionHeader title="Tài khoản" />
         <View style={styles.sectionContainer}>
-          <SettingItem
-            label="Ngôn ngữ"
-            value="Tiếng Việt"
-            onPress={() => { }}
-          />
-          <SettingItem
-            label="Về E-Shop"
-            onPress={() => { }}
-          />
-          <SettingItem
-            label="Đăng xuất"
-            onPress={logout}
-          />
+          <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => {}} />
+          <SettingItem label="Về E-Shop" onPress={() => {}} />
+          <SettingItem label="Đăng xuất" onPress={logout} />
         </View>
 
         {/* Footer actions */}
@@ -132,20 +126,22 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
+    // Trên web cần đảm bảo chiếm toàn màn hình
+    ...(Platform.OS === "web" ? { minHeight: "100vh" as any } : {}),
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0F172A',
+    fontWeight: "bold",
+    color: "#0F172A",
   },
   backBtn: {
     width: 44,
     height: 44,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: "#EFF6FF",
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   scrollContent: {
     paddingBottom: 40,
@@ -157,36 +153,39 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#0F172A',
+    fontWeight: "bold",
+    color: "#0F172A",
   },
   sectionContainer: {
     paddingHorizontal: 24,
   },
   settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: "#F1F5F9",
   },
   pressedItem: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: "#F8FAFC",
     opacity: 0.7,
   },
   label: {
     fontSize: 16,
-    color: '#0F172A',
-    fontWeight: '500',
+    color: "#0F172A",
+    fontWeight: "500",
+    flex: 1, // chiếm không gian còn lại → đẩy itemRight sang phải
   },
   itemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 0, // không bị thu nhỏ → luôn hiển thị đủ icon
+    marginLeft: 8,
   },
   value: {
     fontSize: 16,
-    color: '#64748B',
+    color: "#64748B",
     marginRight: 8,
   },
   footer: {
@@ -198,24 +197,24 @@ const styles = StyleSheet.create({
   },
   deleteText: {
     fontSize: 15,
-    color: '#FCA3A3', // Màu đỏ nhạt như yêu cầu
-    fontWeight: '500',
+    color: "#FCA3A3",
+    fontWeight: "500",
   },
   versionInfo: {
     marginTop: 24,
   },
   brandName: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#0F172A',
+    fontWeight: "bold",
+    color: "#0F172A",
     marginBottom: 4,
   },
   versionText: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: "#94A3B8",
   },
   redText: {
-    color: '#FCA3A3',
+    color: "#FCA3A3",
   },
 });
 
