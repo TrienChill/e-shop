@@ -1,19 +1,17 @@
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { router } from "expo-router";
-import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 import React from "react";
 import {
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 interface SettingItemProps {
   label: string;
@@ -29,19 +27,20 @@ const SettingItem: React.FC<SettingItemProps> = ({
   isRed = false,
 }) => {
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.settingItem,
-        pressed && styles.pressedItem,
-      ]}
+      activeOpacity={0.6} // Tạo hiệu ứng mờ khi bấm vào
+      style={styles.settingItem}
     >
-      <Text style={[styles.label, isRed && styles.redText]}>{label}</Text>
+      <Text style={[styles.label, isRed && styles.redText]} numberOfLines={1}>
+        {label}
+      </Text>
+
       <View style={styles.itemRight}>
-        {value && <Text style={styles.value}>{value}</Text>}
-        <ChevronRight size={20} color={isRed ? "#F87171" : "#94A3B8"} />
+        {value ? <Text style={styles.value}>{value}</Text> : null}
+        <Text style={[styles.chevron, isRed && styles.chevronRed]}>{"\u203A"}</Text>
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 };
 
@@ -62,7 +61,7 @@ const SettingsScreen = () => {
   const appName = "E-Shop";
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* StatusBar chỉ có ý nghĩa trên native */}
       {Platform.OS !== "web" && <StatusBar barStyle="dark-content" />}
 
@@ -79,7 +78,7 @@ const SettingsScreen = () => {
       />
 
       <ScrollView
-        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }} // Bắt buộc thêm dòng này cho Native
         contentContainerStyle={styles.scrollContent}
       >
         {/* Nhóm Cá nhân */}
@@ -102,8 +101,8 @@ const SettingsScreen = () => {
         {/* Nhóm Tài khoản */}
         <SectionHeader title="Tài khoản" />
         <View style={styles.sectionContainer}>
-          <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => {}} />
-          <SettingItem label="Về E-Shop" onPress={() => {}} />
+          <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => { }} />
+          <SettingItem label="Về E-Shop" onPress={() => { }} />
           <SettingItem label="Đăng xuất" onPress={logout} />
         </View>
 
@@ -119,7 +118,7 @@ const SettingsScreen = () => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -160,6 +159,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   settingItem: {
+    width: "100%", // Thêm dòng này để bọc thép layout
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -180,8 +180,17 @@ const styles = StyleSheet.create({
   itemRight: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 0, // không bị thu nhỏ → luôn hiển thị đủ icon
+    flexShrink: 0,
     marginLeft: 8,
+  },
+  chevron: {
+    fontSize: 22,
+    color: "#94A3B8",
+    fontWeight: "300",
+    lineHeight: 26,
+  },
+  chevronRed: {
+    color: "#F87171",
   },
   value: {
     fontSize: 16,
