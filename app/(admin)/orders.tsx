@@ -72,7 +72,7 @@ export default function AdminOrdersScreen() {
 
   const filteredOrders = orders.filter((order) => {
     const query = searchQuery.toLowerCase();
-    
+
     // Ép kiểu ID thành String và chống lỗi null cho Name/Phone
     const matchId = String(order.id || "").toLowerCase().includes(query);
     const matchName = String(order.receiver_name || "").toLowerCase().includes(query);
@@ -80,7 +80,7 @@ export default function AdminOrdersScreen() {
 
     const matchesSearch = matchId || matchName || matchPhone;
     const matchesTab = activeTab === "all" || order.status === activeTab;
-    
+
     return matchesTab && matchesSearch;
   });
 
@@ -169,7 +169,7 @@ export default function AdminOrdersScreen() {
               filteredOrders.map((order) => (
                 <View key={order.id} style={styles.row}>
                   <View style={styles.columnId}>
-                    <Text style={styles.orderId}>#{order.id.slice(-8)}</Text>
+                    <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
                     <Text style={styles.orderDate}>
                       {new Date(order.created_at).toLocaleString("vi-VN")}
                     </Text>
@@ -187,13 +187,13 @@ export default function AdminOrdersScreen() {
                   </View>
 
                   <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
-                    <View 
+                    <View
                       style={StyleSheet.flatten([
                         styles.statusBadge,
                         { backgroundColor: `${STATUS_COLORS[order.status]}20` }
                       ])}
                     >
-                      <Text 
+                      <Text
                         style={StyleSheet.flatten([
                           styles.statusText,
                           { color: STATUS_COLORS[order.status] }
@@ -206,34 +206,34 @@ export default function AdminOrdersScreen() {
 
                   <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
                     {order.status === 'pending' && (
-                        <ActionButton 
-                          onPress={() => handleUpdateStatus(order.id, 'processing')}
-                          label="Duyệt"
-                          color="#2563EB"
-                        />
-                      )}
-                      {order.status === 'processing' && (
-                        <ActionButton 
-                          onPress={() => handleUpdateStatus(order.id, 'shipping')}
-                          label="Giao"
-                          color="#8B5CF6"
-                        />
-                      )}
-                      {order.status === 'shipping' && (
-                        <ActionButton 
-                          onPress={() => handleUpdateStatus(order.id, 'completed')}
-                          label="Xong"
-                          color="#10B981"
-                        />
-                      )}
-                      {['pending', 'processing'].includes(order.status) && (
-                        <ActionButton 
-                          onPress={() => handleUpdateStatus(order.id, 'cancelled')}
-                          label="Hủy"
-                          color="#EF4444"
-                          outline
-                        />
-                      )}
+                      <ActionButton
+                        onPress={() => handleUpdateStatus(order.id, 'processing')}
+                        label="Duyệt"
+                        color="#2563EB"
+                      />
+                    )}
+                    {order.status === 'processing' && (
+                      <ActionButton
+                        onPress={() => handleUpdateStatus(order.id, 'shipping')}
+                        label="Giao"
+                        color="#8B5CF6"
+                      />
+                    )}
+                    {order.status === 'shipping' && (
+                      <ActionButton
+                        onPress={() => handleUpdateStatus(order.id, 'completed')}
+                        label="Xong"
+                        color="#10B981"
+                      />
+                    )}
+                    {['pending', 'processing'].includes(order.status) && (
+                      <ActionButton
+                        onPress={() => handleUpdateStatus(order.id, 'cancelled')}
+                        label="Hủy"
+                        color="#EF4444"
+                        outline
+                      />
+                    )}
                   </View>
                 </View>
               ))
@@ -251,7 +251,7 @@ function ActionButton({ onPress, label, color, outline = false }: any) {
       onPress={onPress}
       style={({ hovered }: any) => StyleSheet.flatten([
         styles.actionButton,
-        { 
+        {
           backgroundColor: outline ? 'transparent' : color,
           borderWidth: outline ? 1 : 0,
           borderColor: color,
