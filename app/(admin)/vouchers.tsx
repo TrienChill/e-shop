@@ -1,7 +1,8 @@
 import { useAuth } from "@/src/auth/AuthContext";
 import { listAllVouchers, setVoucherActive, type VoucherRow } from "@/src/services/admin/vouchers";
+import { RefreshCcw } from "lucide-react-native";
 import React from "react";
-import { Platform } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 export default function AdminVouchersScreen() {
   const { role } = useAuth();
@@ -23,79 +24,163 @@ export default function AdminVouchersScreen() {
   }, [refresh]);
 
   if (role !== "admin") {
-    return Platform.OS === "web" ? (
-      <div className="p-6 rounded-2xl bg-white border border-gray-200">
-        <h1 className="text-lg font-bold">Voucher</h1>
-        <p className="mt-2 text-gray-600">Bạn không có quyền quản lý voucher.</p>
-      </div>
-    ) : null;
+    return (
+      <View style={styles.permissionCard}>
+        <Text style={styles.title}>Voucher</Text>
+        <Text style={styles.permissionText}>Bạn không có quyền quản lý voucher.</Text>
+      </View>
+    );
   }
 
-  if (Platform.OS !== "web") return null;
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Voucher</h1>
-        <button
-          className="px-4 py-2 rounded-xl bg-gray-900 text-white text-sm font-bold"
-          onClick={() => refresh()}
+    <View style={styles.container}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.titleLarge}>Quản lý Voucher</Text>
+        <Pressable
+          style={({ hovered }: any) => StyleSheet.flatten([styles.refreshButton, hovered && styles.refreshButtonHover])}
+          onPress={() => refresh()}
         >
-          Refresh
-        </button>
-      </div>
+          <RefreshCcw size={16} color="white" />
+          <Text style={styles.refreshText}>Làm mới</Text>
+        </Pressable>
+      </View>
 
       {error ? (
-        <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-100">{error}</div>
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-600">
-            <tr>
-              <th className="text-left px-4 py-3">Code</th>
-              <th className="text-left px-4 py-3">Type</th>
-              <th className="text-right px-4 py-3">Value</th>
-              <th className="text-left px-4 py-3">Expired</th>
-              <th className="text-left px-4 py-3">Active</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td className="px-4 py-3" colSpan={5}>
-                  Loading...
-                </td>
-              </tr>
-            ) : (
-              rows.map((v) => (
-                <tr key={v.id} className="border-t border-gray-100">
-                  <td className="px-4 py-3 font-mono text-xs">{v.code ?? "-"}</td>
-                  <td className="px-4 py-3">{v.voucher_type ?? "-"}</td>
-                  <td className="px-4 py-3 text-right">{v.discount_value ?? "-"}</td>
-                  <td className="px-4 py-3">{v.expired_at ? new Date(v.expired_at).toLocaleString() : "-"}</td>
-                  <td className="px-4 py-3">
-                    <button
-                      className={
-                        "px-3 py-1 rounded-full text-xs font-bold border " +
-                        (v.is_active ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-700 border-gray-200")
-                      }
-                      onClick={() =>
-                        setVoucherActive(v.id, !v.is_active)
-                          .then(() => refresh())
-                          .catch((e) => setError((e as Error).message))
-                      }
-                    >
-                      {v.is_active ? "Active" : "Inactive"}
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {/* TABLE */}
+      <View style={styles.tableCard}>
+        {/* HEADER */}
+        <View style={styles.tableHeader}>
+          <Text style={StyleSheet.flatten([styles.columnCode, styles.headerText])}>Mã Code</Text>
+          <Text style={StyleSheet.flatten([styles.columnType, styles.headerText])}>Loại</Text>
+          <Text style={StyleSheet.flatten([styles.columnValue, styles.headerText, styles.textRight])}>Giá trị</Text>
+          <Text style={StyleSheet.flatten([styles.columnExpired, styles.headerText, styles.textCenter])}>Hết hạn</Text>
+          <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textRight])}>Trạng thái</Text>
+        </View>
+
+        {/* BODY */}
+        <View>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#2563EB" />
+            </View>
+          ) : rows.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Không có voucher nào.</Text>
+            </View>
+          ) : (
+            rows.map((v) => (
+              <View key={v.id} style={styles.row}>
+                <Text style={styles.columnCodeText}>{v.code ?? "-"}</Text>
+                <Text style={styles.columnTypeText}>{v.voucher_type ?? "-"}</Text>
+                <Text style={styles.columnValueText}>
+                  {v.discount_value?.toLocaleString() ?? "0"}{v.discount_type === 'percentage' ? '%' : '₫'}
+                </Text>
+                <Text style={styles.columnExpiredText}>
+                  {v.expired_at ? new Date(v.expired_at).toLocaleString("vi-VN") : "-"}
+                </Text>
+                <View style={styles.columnStatusContainer}>
+                  <Pressable
+                    style={StyleSheet.flatten([
+                      styles.statusBadge,
+                      v.is_active ? styles.statusActive : styles.statusInactive
+                    ])}
+                    onPress={() =>
+                      setVoucherActive(v.id, !v.is_active)
+                        .then(() => refresh())
+                        .catch((e) => setError((e as Error).message))
+                    }
+                  >
+                    <Text style={StyleSheet.flatten([styles.statusText, v.is_active ? styles.statusTextActive : styles.statusTextInactive])}>
+                      {v.is_active ? "Đang chạy" : "Tạm dừng"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, gap: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  titleLarge: { fontSize: 24, fontWeight: "900", color: "#111827" },
+  refreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: "#111827",
+    gap: 8,
+  },
+  refreshButtonHover: { opacity: 0.8 },
+  refreshText: { color: "white", fontSize: 14, fontWeight: "700" },
+  permissionCard: { padding: 24, borderRadius: 16, backgroundColor: "white", borderWidth: 1, borderColor: "#E5E7EB" },
+  title: { fontSize: 18, fontWeight: "700" },
+  permissionText: { marginTop: 8, color: "#4B5563" },
+  errorCard: { padding: 16, borderRadius: 12, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FEE2E2" },
+  errorText: { color: "#B91C1C", fontWeight: "500" },
+  tableCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  headerText: { fontWeight: "700", color: "#4B5563", fontSize: 13 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  columnCode: { flex: 1.5 },
+  columnType: { flex: 1 },
+  columnValue: { flex: 1 },
+  columnExpired: { flex: 1.5 },
+  columnStatus: { flex: 1 },
+  columnCodeText: { flex: 1.5, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: "700", color: "#2563EB", textTransform: "uppercase" },
+  columnTypeText: { flex: 1, color: "#374151" },
+  columnValueText: { flex: 1, textAlign: "right", fontWeight: "700", color: "#111827" },
+  columnExpiredText: { flex: 1.5, textAlign: "center", fontSize: 12, color: "#6B7280" },
+  columnStatusContainer: { flex: 1, alignItems: "flex-end" },
+  textRight: { textAlign: "right" },
+  textCenter: { textAlign: "center" },
+  loadingContainer: { padding: 80, alignItems: "center" },
+  emptyContainer: { padding: 80, alignItems: "center" },
+  emptyText: { color: "#9CA3AF" },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  statusActive: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" },
+  statusInactive: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
+  statusText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
+  statusTextActive: { color: "#15803D" },
+  statusTextInactive: { color: "#6B7280" }
+});
+
+
 

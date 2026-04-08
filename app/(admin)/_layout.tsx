@@ -1,6 +1,16 @@
-// app/(admin)/_layout.tsx
 import { useAuth } from "@/src/auth/AuthContext";
-import { Link, Redirect, Slot } from "expo-router";
+import { Link, Redirect, Slot, usePathname } from "expo-router";
+import {
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Settings,
+  ShieldCheck,
+  ShoppingBag,
+  Store,
+  Ticket,
+  TrendingUp,
+} from "lucide-react-native";
 import React from "react";
 import {
   ActivityIndicator,
@@ -11,163 +21,114 @@ import {
   View,
 } from "react-native";
 
-function debugLog(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-) {
-  // #region agent log
-  fetch("http://127.0.0.1:7797/ingest/e442deb0-be17-422a-a916-36b6ffe053c6", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "763e45",
-    },
-    body: JSON.stringify({
-      sessionId: "763e45",
-      runId: "pre-fix",
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
-
 export default function AdminLayout() {
-  const { session, role, roleError, loading, userId, refreshRole } = useAuth();
+  const { session, role, roleError, loading, userId, refreshRole, signOut } = useAuth();
+  const pathname = usePathname();
 
-  // Nếu là Mobile mà lỡ vào route admin -> Hiển thị dạng Stack bình thường
+  // Mobile fallback
   if (Platform.OS !== "web") {
     return <Slot />;
   }
 
   if (loading) {
-    debugLog(
-      "H4_guard_branch",
-      "app/(admin)/_layout.tsx:loading",
-      "guard:loading",
-      { loading },
-    );
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
 
   if (!session) {
-    debugLog(
-      "H4_guard_branch",
-      "app/(admin)/_layout.tsx:noSession",
-      "guard:redirectLogin",
-      { hasSession: false },
-    );
     return <Redirect href={"/(auth)/login" as any} />;
   }
 
-  // If we cannot resolve role, show a diagnostic screen instead of redirecting
-  // so you can see the auth UID and whether profiles lookup is failing.
-  if (!role) {
-    debugLog(
-      "H4_guard_branch",
-      "app/(admin)/_layout.tsx:noRole",
-      "guard:noRole",
-      {
-        userId,
-        role,
-        roleError,
-        hasSession: true,
-      },
-    );
-    return (
-      <View style={styles.diagnosticWrap}>
-        <View style={styles.diagnosticCard}>
-          <Text style={styles.diagnosticTitle}>
-            Không lấy được quyền (role)
-          </Text>
-          <Text style={styles.diagnosticText}>
-            auth.uid(): <Text style={styles.mono}>{userId ?? "-"}</Text>
-          </Text>
-          <Text style={styles.diagnosticText}>
-            role hiện tại: <Text style={styles.mono}>{String(role)}</Text>
-          </Text>
-          {roleError ? (
-            <Text style={[styles.diagnosticText, { color: "#B91C1C" }]}>
-              Lỗi query profiles.role:{" "}
-              <Text style={styles.mono}>{roleError}</Text>
-            </Text>
-          ) : (
-            <Text style={styles.diagnosticText}>
-              Không có lỗi nhưng không tìm thấy dòng trong bảng profiles khớp
-              với UID.
-            </Text>
-          )}
-
-          <Pressable style={styles.retryBtn} onPress={() => refreshRole()}>
-            <Text style={styles.retryBtnText}>Thử lại</Text>
-          </Pressable>
-
-          <Pressable
-            style={[styles.retryBtn, { backgroundColor: "#111827" }]}
-            onPress={() => (window.location.href = "/(shop)/(tabs)" as any)}
-          >
-            <Text style={styles.retryBtnText}>Về app user</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  if (role !== "admin" && role !== "staff") {
-    debugLog(
-      "H4_guard_branch",
-      "app/(admin)/_layout.tsx:roleNotAllowed",
-      "guard:redirectShop",
-      {
-        userId,
-        role,
-        hasSession: true,
-      },
-    );
+  if (!role || (role !== "admin" && role !== "staff")) {
     return <Redirect href={"/(shop)/(tabs)" as any} />;
   }
 
-  // Giao diện Admin Dashboard trên Web
+  const menuItems = [
+    { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+    { href: "/(admin)/orders", label: "Đơn hàng", icon: ShoppingBag },
+    { href: "/(admin)/products", label: "Sản phẩm", icon: Package },
+    { href: "/(admin)/vouchers", label: "Mã giảm giá", icon: Ticket },
+    { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
+  ];
+
+  if (role === "admin") {
+    menuItems.push({
+      href: "/(admin)/users",
+      label: "Phân quyền",
+      icon: ShieldCheck,
+    });
+  }
+
   return (
     <View style={styles.container}>
-      {/* SIDEBAR BÊN TRÁI */}
+      {/* SIDEBAR */}
       <View style={styles.sidebar}>
-        <Text style={styles.sidebarTitle}>Backoffice</Text>
+        <View style={styles.sidebarHeader}>
+          <View style={styles.logoBadge}>
+            <Store size={20} color="white" />
+          </View>
+          <Text style={styles.sidebarTitle}>E-Shop Admin</Text>
+        </View>
 
-        <SidebarLink href="/(admin)/products" label="Sản phẩm" />
-        <SidebarLink href="/(admin)/orders" label="Đơn hàng" />
+        <View style={styles.menu}>
+          {menuItems.map((item) => {
+            const isActive = pathname.startsWith(item.href);
+            return (
+              <SidebarLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                active={isActive}
+              />
+            );
+          })}
+        </View>
 
-        {role === "admin" ? (
-          <>
-            <SidebarLink href="/(admin)/revenue" label="Doanh thu" />
-            <SidebarLink href="/(admin)/vouchers" label="Voucher" />
-            <SidebarLink href="/(admin)/dashboard" label="Bảng điều khiển" />
-          </>
-        ) : null}
+        <View style={styles.sidebarFooter}>
+          <Pressable style={styles.footerLink} onPress={() => signOut()}>
+            <LogOut size={18} color="#9CA3AF" />
+            <Text style={styles.footerLinkText}>Đăng xuất</Text>
+          </Pressable>
+
+          <Link href="/(shop)/(tabs)" asChild>
+            <Pressable style={styles.footerLink}>
+              <Store size={18} color="#9CA3AF" />
+              <Text style={styles.footerLinkText}>Về cửa hàng</Text>
+            </Pressable>
+          </Link>
+        </View>
       </View>
 
-      {/* NỘI DUNG CHÍNH BÊN PHẢI */}
+      {/* MAIN CONTENT */}
       <View style={styles.content}>
-        <Slot /> {/* Các màn hình con (dashboard, products...) sẽ hiện ở đây */}
+        <Slot />
       </View>
     </View>
   );
 }
 
-function SidebarLink({ href, label }: { href: string; label: string }) {
+function SidebarLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: any;
+  active: boolean;
+}) {
   return (
     <Link href={href as any} asChild>
-      <Pressable style={styles.menuItem}>
-        <Text style={styles.menuItemText}>{label}</Text>
+      <Pressable style={StyleSheet.flatten([styles.menuItem, active && styles.menuItemActive])}>
+        <Icon size={20} color={active ? "#FFF" : "#9CA3AF"} />
+        <Text style={StyleSheet.flatten([styles.menuItemText, active && styles.menuItemTextActive])}>
+          {label}
+        </Text>
       </Pressable>
     </Link>
   );
@@ -175,54 +136,73 @@ function SidebarLink({ href, label }: { href: string; label: string }) {
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  diagnosticWrap: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
+  container: { flex: 1, flexDirection: "row", backgroundColor: "#F9FAFB" },
+  sidebar: {
+    width: 280,
+    backgroundColor: "#111827",
+    padding: 24,
+    justifyContent: "space-between",
+  },
+  sidebarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 40,
+    gap: 12,
+  },
+  logoBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#2563EB",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
-  diagnosticCard: {
-    width: "100%",
-    maxWidth: 720,
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  diagnosticTitle: { fontSize: 16, fontWeight: "800", marginBottom: 10 },
-  diagnosticText: { fontSize: 13, color: "#374151", marginBottom: 8 },
-  mono: {
-    fontFamily: Platform.select({
-      web: "monospace" as any,
-      default: undefined,
-    }),
-  },
-  retryBtn: {
-    marginTop: 10,
-    backgroundColor: "#2563EB",
-    paddingVertical: 10,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  retryBtnText: { color: "white", fontWeight: "800" },
-  container: { flex: 1, flexDirection: "row", height: "100%" },
-  sidebar: { width: 260, backgroundColor: "#111827", padding: 20 },
   sidebarTitle: {
     color: "white",
-    fontSize: 14,
-    fontWeight: "700",
-    opacity: 0.9,
-    marginBottom: 16,
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: -0.5,
   },
-  content: { flex: 1, backgroundColor: "#F9FAFB", padding: 20 },
+  menu: { flex: 1, gap: 4 },
   menuItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.06)",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 12,
   },
-  menuItemText: { color: "white", fontSize: 14, fontWeight: "700" },
+  menuItemActive: {
+    backgroundColor: "#2563EB",
+  },
+  menuItemText: {
+    color: "#9CA3AF",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  menuItemTextActive: {
+    color: "white",
+  },
+  sidebarFooter: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.1)",
+    paddingTop: 20,
+    gap: 16,
+  },
+  footerLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 8,
+  },
+  footerLinkText: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  content: {
+    flex: 1,
+    padding: 40,
+  },
 });
+

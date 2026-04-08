@@ -19,6 +19,7 @@ type AuthState = {
   /** true nếu role vi phạm chính sách nền tảng (admin/staff trên mobile) */
   isPlatformBlocked: boolean;
   refreshRole: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -136,6 +137,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlatformBlocked, role, userId]);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   const value = useMemo<AuthState>(
     () => ({
@@ -146,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loading,
       isPlatformBlocked,
       refreshRole,
+      signOut,
     }),
     [session, userId, role, roleError, loading, isPlatformBlocked],
   );

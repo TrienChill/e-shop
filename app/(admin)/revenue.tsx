@@ -1,7 +1,7 @@
 import { useAuth } from "@/src/auth/AuthContext";
 import { getRevenueSummary } from "@/src/services/admin/revenue";
 import React from "react";
-import { Platform } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 export default function AdminRevenueScreen() {
   const { role } = useAuth();
@@ -27,37 +27,72 @@ export default function AdminRevenueScreen() {
   }, []);
 
   if (role !== "admin") {
-    return Platform.OS === "web" ? (
-      <div className="p-6 rounded-2xl bg-white border border-gray-200">
-        <h1 className="text-lg font-bold">Doanh thu</h1>
-        <p className="mt-2 text-gray-600">Bạn không có quyền xem doanh thu.</p>
-      </div>
-    ) : null;
+    return (
+      <View style={styles.permissionCard}>
+        <Text style={styles.title}>Doanh thu</Text>
+        <Text style={styles.permissionText}>Bạn không có quyền xem doanh thu.</Text>
+      </View>
+    );
   }
 
-  if (Platform.OS !== "web") return null;
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Doanh thu (30 ngày gần đây)</h1>
-      </div>
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Doanh thu (30 ngày gần đây)</Text>
+      </View>
 
       {error ? (
-        <div className="p-4 rounded-xl bg-red-50 text-red-700 border border-red-100">{error}</div>
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-6 rounded-2xl bg-white border border-gray-200">
-          <div className="text-sm text-gray-500">Total revenue</div>
-          <div className="mt-2 text-2xl font-bold">{loading ? "..." : totalRevenue.toLocaleString()}</div>
-        </div>
-        <div className="p-6 rounded-2xl bg-white border border-gray-200">
-          <div className="text-sm text-gray-500">Completed orders</div>
-          <div className="mt-2 text-2xl font-bold">{loading ? "..." : ordersCount.toLocaleString()}</div>
-        </div>
-      </div>
-    </div>
+      <View style={styles.statsGrid}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Tổng doanh thu</Text>
+          <Text style={StyleSheet.flatten([styles.statValue, styles.textBlue])}>
+            {loading ? <ActivityIndicator size="small" color="#2563EB" /> : `${totalRevenue.toLocaleString()}₫`}
+          </Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Đơn hàng hoàn thành</Text>
+          <Text style={StyleSheet.flatten([styles.statValue, styles.textDark])}>
+            {loading ? <ActivityIndicator size="small" color="#111827" /> : ordersCount.toLocaleString()}
+          </Text>
+        </View>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { gap: 16 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  title: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  permissionCard: { padding: 24, borderRadius: 16, backgroundColor: "white", borderWidth: 1, borderColor: "#E5E7EB" },
+  permissionText: { marginTop: 8, color: "#4B5563" },
+  errorCard: { padding: 16, borderRadius: 12, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FEE2E2" },
+  errorText: { color: "#B91C1C", fontWeight: "500" },
+  statsGrid: { flexDirection: "row", gap: 16 },
+  statCard: {
+    flex: 1,
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    // shadow-sm
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
+  statValue: { fontSize: 24, fontWeight: "800", marginTop: 8 },
+  textBlue: { color: "#2563EB" },
+  textDark: { color: "#111827" }
+});
+
+
 

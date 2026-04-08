@@ -1,13 +1,15 @@
 function_name,schema_name,return_type,argument_types
+buy_product,public,void,"variant_id uuid, quantity_to_buy integer"
 collect_voucher,public,boolean,p_voucher_id uuid
 get_most_popular_products,public,SETOF products,
+get_revenue_summary,public,"TABLE(total_revenue numeric, orders_count bigint)","p_from timestamp with time zone, p_to timestamp with time zone"
 handle_default_address,public,trigger,
 handle_new_user,public,trigger,
 immutable_unaccent,public,text,text
 process_checkout,public,bigint,"p_user_id uuid, p_shipping_address text, p_phone_contact text, p_total_amount numeric, p_platform_discount numeric, p_platform_voucher_id uuid, p_shop_discounts jsonb"
 rls_auto_enable,public,event_trigger,
-unaccent,public,text,"regdictionary, text"
 unaccent,public,text,text
+unaccent,public,text,"regdictionary, text"
 unaccent_init,public,internal,internal
 unaccent_lexize,public,internal,"internal, internal, internal, internal"
 update_order_timestamps,public,trigger,

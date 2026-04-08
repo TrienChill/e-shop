@@ -8,6 +8,8 @@ import {
   Image,
   Platform,
   Alert,
+  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { 
   TrendingUp, 
@@ -31,53 +33,53 @@ import {
 // --- Components ---
 
 const StatusBadge = ({ status }: { status: string }) => {
-  let bgColor = "bg-blue-100";
-  let textColor = "text-blue-600";
+  let bgColor = "#EFF6FF";
+  let textColor = "#2563EB";
   let label = status;
 
   if (status === "completed" || status === "Đã giao") { 
-    bgColor = "bg-green-100"; textColor = "text-green-600"; label = "Đã giao";
+    bgColor = "#DCFCE7"; textColor = "#15803D"; label = "Đã giao";
   } else if (status === "cancelled" || status === "Đã hủy") { 
-    bgColor = "bg-red-100"; textColor = "text-red-600"; label = "Đã hủy";
+    bgColor = "#FEE2E2"; textColor = "#B91C1C"; label = "Đã hủy";
   } else if (status === "pending" || status === "Đang xử lý") {
-    bgColor = "bg-amber-100"; textColor = "text-amber-600"; label = "Đang xử lý";
+    bgColor = "#FEF3C7"; textColor = "#B45309"; label = "Đang xử lý";
   }
 
   return (
-    <View className={`${bgColor} px-3 py-1 rounded-full`}>
-      <Text className={`${textColor} text-[10px] font-bold uppercase`}>{label}</Text>
+    <View style={StyleSheet.flatten([styles.statusBadge, { backgroundColor: bgColor }])}>
+      <Text style={StyleSheet.flatten([styles.statusBadgeText, { color: textColor }])}>{label}</Text>
     </View>
   );
 };
 
 const KPICard = ({ title, value, change, isPositive, icon: Icon, color, iconBg }: any) => (
-  <View className="w-full sm:w-1/2 lg:w-1/4 p-2">
-    <View className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 h-full justify-between">
-      <View className="flex-row justify-between items-start mb-6">
-        <View className={`p-3 rounded-2xl ${iconBg}`}>
+  <View style={styles.kpiCardWrapper}>
+    <View style={styles.kpiCard}>
+      <View style={styles.kpiHeader}>
+        <View style={StyleSheet.flatten([styles.iconContainer, { backgroundColor: iconBg }])}>
           <Icon size={22} color={color} strokeWidth={2.5} />
         </View>
-        <View className={`flex-row items-center px-2 py-1 rounded-lg ${isPositive ? 'bg-green-50' : 'bg-red-50'}`}>
+        <View style={StyleSheet.flatten([styles.changeBadge, { backgroundColor: isPositive ? '#F0FDF4' : '#FEF2F2' }])}>
           {isPositive ? <TrendingUp size={12} color="#10b981" /> : <TrendingDown size={12} color="#ef4444" />}
-          <Text className={`ml-1 text-[10px] font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+          <Text style={StyleSheet.flatten([styles.changeText, { color: isPositive ? '#10b981' : '#ef4444' }])}>
             {change}
           </Text>
         </View>
       </View>
       <View>
-        <Text className="text-gray-400 text-xs font-medium mb-1 uppercase tracking-wider">{title}</Text>
-        <Text className="text-gray-900 text-2xl font-black">{value}</Text>
+        <Text style={styles.kpiTitle}>{title}</Text>
+        <Text style={styles.kpiValue}>{value}</Text>
       </View>
     </View>
   </View>
 );
 
 const SkeletonCard = () => (
-  <View className="w-full sm:w-1/2 lg:w-1/4 p-2">
-    <View className="bg-white p-6 rounded-[24px] shadow-sm border border-gray-100 h-full animate-pulse">
-      <View className="h-10 w-10 bg-gray-100 rounded-2xl mb-6" />
-      <View className="h-4 w-20 bg-gray-100 rounded mb-2" />
-      <View className="h-8 w-32 bg-gray-100 rounded" />
+  <View style={styles.kpiCardWrapper}>
+    <View style={StyleSheet.flatten([styles.kpiCard, styles.skeleton])}>
+      <View style={styles.skeletonIcon} />
+      <View style={styles.skeletonTitle} />
+      <View style={styles.skeletonValue} />
     </View>
   </View>
 );
@@ -162,17 +164,15 @@ export default function AdminDashboard() {
 
   if (error && !isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50 p-6">
+      <View style={styles.errorFull}>
         <AlertCircle size={48} color="#ef4444" />
-        <Text className="text-gray-900 font-bold text-lg mt-4 text-center">Rất tiếc, đã xảy ra lỗi</Text>
-        <Text className="text-red-600 text-sm mt-2 text-center bg-red-50 p-4 rounded-xl border border-red-100">
-          {error}
-        </Text>
+        <Text style={styles.errorTitle}>Rất tiếc, đã xảy ra lỗi</Text>
+        <Text style={styles.errorMsg}>{error}</Text>
         <TouchableOpacity 
-          className="mt-6 bg-indigo-600 px-8 py-3 rounded-2xl shadow-md"
+          style={styles.retryButton}
           onPress={loadDashboardData}
         >
-          <Text className="text-white font-bold">Thử lại hệ thống</Text>
+          <Text style={styles.retryText}>Thử lại hệ thống</Text>
         </TouchableOpacity>
       </View>
     );
@@ -180,39 +180,39 @@ export default function AdminDashboard() {
 
   return (
     <ScrollView 
-      className="flex-1 bg-gray-50/50"
+      style={styles.root}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ padding: 24 }}
+      contentContainerStyle={styles.rootContent}
     >
       {/* Top Bar */}
-      <View className="flex-row justify-between items-center mb-8">
+      <View style={styles.topBar}>
         <View>
-          <Text className="text-gray-400 text-sm font-medium">Hệ thống quản trị</Text>
-          <Text className="text-3xl font-black text-gray-900 tracking-tight">Tổng quan</Text>
+          <Text style={styles.topBarLabel}>Hệ thống quản trị</Text>
+          <Text style={styles.topBarTitle}>Tổng quan</Text>
         </View>
-        <View className="flex-row items-center space-x-3">
+        <View style={styles.topBarActions}>
           <TouchableOpacity 
-            className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100"
+            style={styles.iconButton}
             onPress={loadDashboardData}
           >
             <Bell size={20} color="#1f2937" />
-            <View className="absolute top-3 right-3 w-2 h-2 bg-indigo-500 rounded-full border-2 border-white" />
+            <View style={styles.notificationBadge} />
           </TouchableOpacity>
-          <TouchableOpacity className="flex-row items-center bg-white p-1 pr-4 rounded-full shadow-sm border border-gray-100">
+          <TouchableOpacity style={styles.profileButton}>
             <Image 
               source={{ uri: "https://i.pravatar.cc/150?u=admin" }} 
-              className="w-10 h-10 rounded-full mr-3"
+              style={styles.profileImage}
             />
-            <View className="hidden sm:flex">
-              <Text className="text-gray-900 font-bold text-xs">Admin</Text>
-              <Text className="text-gray-400 text-[10px]">Quản trị viên</Text>
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>Admin</Text>
+              <Text style={styles.profileRole}>Quản trị viên</Text>
             </View>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* KPI Grid */}
-      <View className="flex-row flex-wrap -mx-2 mb-6">
+      <View style={styles.kpiGrid}>
         {isLoading || !stats ? (
           [1, 2, 3, 4].map(i => <SkeletonCard key={i} />)
         ) : (
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
               isPositive={true}
               icon={TrendingUp}
               color="#6366f1"
-              iconBg="bg-indigo-50"
+              iconBg="#EEF2FF"
             />
             <KPICard 
               title="Đơn hàng"
@@ -233,7 +233,7 @@ export default function AdminDashboard() {
               isPositive={true}
               icon={ShoppingBag}
               color="#f59e0b"
-              iconBg="bg-amber-50"
+              iconBg="#FFFBEB"
             />
             <KPICard 
               title="Khách hàng"
@@ -242,7 +242,7 @@ export default function AdminDashboard() {
               isPositive={true}
               icon={Users}
               color="#10b981"
-              iconBg="bg-emerald-50"
+              iconBg="#ECFDF5"
             />
             <KPICard 
               title="Tồn kho thấp"
@@ -251,39 +251,39 @@ export default function AdminDashboard() {
               isPositive={false}
               icon={Package}
               color="#ef4444"
-              iconBg="bg-rose-50"
+              iconBg="#FEF2F2"
             />
           </>
         )}
       </View>
 
-      {/* Main Content Sections: Grid for Desktop */}
-      <View className="flex-row flex-wrap -mx-3">
+      {/* Main Content Sections */}
+      <View style={styles.mainGrid}>
         {/* Left Col: Chart */}
-        <View className="w-full lg:w-2/3 px-3 mb-6">
-          <View className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 h-full">
-            <View className="flex-row justify-between items-center mb-8">
+        <View style={styles.chartCol}>
+          <View style={styles.whiteCard}>
+            <View style={styles.cardHeader}>
               <View>
-                <Text className="text-gray-900 font-black text-xl tracking-tight">Doanh thu 7 ngày qua</Text>
-                <Text className="text-gray-400 text-xs mt-1">Dữ liệu thực tế từ Supabase</Text>
+                <Text style={styles.cardTitle}>Doanh thu 7 ngày qua</Text>
+                <Text style={styles.cardSubtitle}>Dữ liệu thực tế từ Supabase</Text>
               </View>
-              <View className="bg-indigo-50 px-4 py-2 rounded-xl">
-                <Text className="text-indigo-600 font-bold text-xs">Real-time</Text>
+              <View style={styles.realtimeBadge}>
+                <Text style={styles.realtimeText}>Real-time</Text>
               </View>
             </View>
 
-            <View className="items-center">
+            <View style={styles.chartWrapper}>
               {isLoading ? (
-                 <View className="h-[220px] w-full bg-gray-50 rounded-3xl animate-pulse items-center justify-center">
-                    <Text className="text-gray-300 font-bold">Đang tải...</Text>
+                 <View style={styles.chartSkeleton}>
+                    <Text style={styles.skeletonText}>Đang tải...</Text>
                  </View>
               ) : (
                 <>
                   <Svg width={chartWidth} height={chartHeight}>
                     <Defs>
                       <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor="#6366f1" stopOpacity="0.15" />
-                        <Stop offset="1" stopColor="#6366f1" stopOpacity="0" />
+                        <Stop offset="0" stopColor="#6366f1" stopOpacity={0.15} />
+                        <Stop offset="1" stopColor="#6366f1" stopOpacity={0} />
                       </LinearGradient>
                     </Defs>
                     
@@ -292,7 +292,7 @@ export default function AdminDashboard() {
                       d={linePath}
                       fill="none"
                       stroke="#6366f1"
-                      strokeWidth="4"
+                      strokeWidth={4}
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
@@ -302,17 +302,17 @@ export default function AdminDashboard() {
                         key={i}
                         cx={p.x}
                         cy={p.y}
-                        r="6"
+                        r={6}
                         fill="#fff"
                         stroke="#6366f1"
-                        strokeWidth="3"
+                        strokeWidth={3}
                       />
                     ))}
                   </Svg>
                   
-                  <View className="flex-row justify-between w-full mt-6 px-2">
+                  <View style={styles.chartLabels}>
                     {chartData.map((d, i) => (
-                      <Text key={i} className="text-gray-400 text-[11px] font-black uppercase text-center flex-1">
+                      <Text key={i} style={styles.chartLabel}>
                         {d.day}
                       </Text>
                     ))}
@@ -324,22 +324,22 @@ export default function AdminDashboard() {
         </View>
 
         {/* Right Col: Orders */}
-        <View className="w-full lg:w-1/3 px-3 mb-6">
-          <View className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
-            <View className="flex-row justify-between items-center mb-8">
-              <Text className="text-gray-900 font-black text-xl tracking-tight">Đơn hàng mới nhất</Text>
+        <View style={styles.ordersCol}>
+          <View style={styles.whiteCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Đơn hàng mới nhất</Text>
               <TouchableOpacity>
-                <Text className="text-indigo-600 font-bold text-xs">Tất cả</Text>
+                <Text style={styles.seeAllText}>Tất cả</Text>
               </TouchableOpacity>
             </View>
 
             {isLoading ? (
               [1, 2, 3, 4, 5].map(i => (
-                <View key={i} className="mb-6 flex-row items-center animate-pulse">
-                  <View className="w-12 h-12 bg-gray-100 rounded-2xl mr-4" />
-                  <View className="flex-1">
-                    <View className="h-4 w-24 bg-gray-100 rounded mb-2" />
-                    <View className="h-3 w-16 bg-gray-100 rounded" />
+                <View key={i} style={styles.orderItemSkeleton}>
+                  <View style={styles.orderIconSkeleton} />
+                  <View style={styles.orderTextSkeleton}>
+                    <View style={styles.skeletonLineShort} />
+                    <View style={styles.skeletonLineMini} />
                   </View>
                 </View>
               ))
@@ -348,29 +348,29 @@ export default function AdminDashboard() {
                 recentOrders.map((order, index) => (
                   <View 
                     key={order.id} 
-                    className="mb-5 flex-row items-center border-b border-gray-50 pb-5 last:border-0 last:pb-0"
+                    style={styles.orderItem}
                   >
-                    <View className="w-12 h-12 bg-indigo-50 rounded-2xl items-center justify-center mr-4">
-                      <Text className="text-indigo-600 font-black text-xs">#{index+1}</Text>
+                    <View style={styles.orderIcon}>
+                      <Text style={styles.orderIndexText}>#{index+1}</Text>
                     </View>
                     
-                    <View className="flex-1">
-                      <Text className="text-gray-900 font-bold text-sm" numberOfLines={1}>
+                    <View style={styles.orderInfo}>
+                      <Text style={styles.orderCustomerName} numberOfLines={1}>
                         {order.profiles?.full_name || "Guest"}
                       </Text>
-                      <Text className="text-gray-400 text-[11px] font-medium mt-0.5">
+                      <Text style={styles.orderAmount}>
                         {formatCurrency(order.total_amount)}
                       </Text>
                     </View>
 
-                    <View className="items-end">
+                    <View style={styles.orderStatus}>
                        <StatusBadge status={order.status} />
                     </View>
                   </View>
                 ))
               ) : (
-                <View className="py-10 items-center">
-                  <Text className="text-gray-400 italic">Trống</Text>
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Trống</Text>
                 </View>
               )
             )}
@@ -380,3 +380,133 @@ export default function AdminDashboard() {
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "rgba(249, 250, 251, 0.5)" },
+  rootContent: { padding: 24 },
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  topBarLabel: { color: "#9ca3af", fontSize: 14, fontWeight: "500" },
+  topBarTitle: { color: "#111827", fontSize: 30, fontWeight: "900", letterSpacing: -0.5 },
+  topBarActions: { flexDirection: "row", alignItems: "center", gap: 12 },
+  iconButton: {
+    backgroundColor: "white",
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    width: 8,
+    height: 8,
+    backgroundColor: "#6366f1",
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  profileButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    padding: 4,
+    paddingRight: 16,
+    borderRadius: 9999,
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  profileImage: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
+  profileInfo: { display: Platform.OS === 'web' ? 'flex' : 'none' },
+  profileName: { color: "#111827", fontWeight: "700", fontSize: 12 },
+  profileRole: { color: "#9ca3af", fontSize: 10 },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -8, marginBottom: 24 },
+  kpiCardWrapper: { width: Platform.OS === 'web' ? "25%" : "100%", padding: 8 },
+  kpiCard: {
+    backgroundColor: "white",
+    padding: 24,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+    justifyContent: "space-between",
+    minHeight: 160,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  kpiHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 },
+  iconContainer: { padding: 12, borderRadius: 16 },
+  changeBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  changeText: { marginLeft: 4, fontSize: 10, fontWeight: "700" },
+  kpiTitle: { color: "#9ca3af", fontSize: 12, fontWeight: "500", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
+  kpiValue: { color: "#111827", fontSize: 24, fontWeight: "900" },
+  mainGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -12 },
+  chartCol: { width: Platform.OS === 'web' ? "66.666%" : "100%", paddingHorizontal: 12, marginBottom: 24 },
+  ordersCol: { width: Platform.OS === 'web' ? "33.333%" : "100%", paddingHorizontal: 12, marginBottom: 24 },
+  whiteCard: {
+    backgroundColor: "white",
+    padding: 32,
+    borderRadius: 32,
+    borderWidth: 1,
+    borderColor: "#f3f4f6",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 32 },
+  cardTitle: { color: "#111827", fontWeight: "900", fontSize: 20, letterSpacing: -0.5 },
+  cardSubtitle: { color: "#9ca3af", fontSize: 12, marginTop: 4 },
+  realtimeBadge: { backgroundColor: "#EEF2FF", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  realtimeText: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
+  chartWrapper: { alignItems: "center" },
+  chartSkeleton: { height: 220, width: "100%", backgroundColor: "#f9fafb", borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  skeletonText: { color: "#d1d5db", fontWeight: "700" },
+  chartLabels: { flexDirection: "row", justifyContent: "space-between", width: "100%", marginTop: 24, paddingHorizontal: 8 },
+  chartLabel: { color: "#9ca3af", fontSize: 11, fontWeight: "900", textTransform: "uppercase", textAlign: "center", flex: 1 },
+  seeAllText: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
+  orderItem: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#f9fafb", paddingBottom: 20, marginBottom: 20 },
+  orderIcon: { width: 48, height: 48, backgroundColor: "#EEF2FF", borderRadius: 16, alignItems: "center", justifyContent: "center", marginRight: 16 },
+  orderIndexText: { color: "#6366f1", fontWeight: "900", fontSize: 12 },
+  orderInfo: { flex: 1 },
+  orderCustomerName: { color: "#111827", fontWeight: "700", fontSize: 14 },
+  orderAmount: { color: "#9ca3af", fontSize: 11, fontWeight: "500", marginTop: 2 },
+  orderStatus: { alignItems: "flex-end" },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 9999 },
+  statusBadgeText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
+  emptyContainer: { paddingVertical: 40, alignItems: "center" },
+  emptyText: { color: "#9ca3af", fontStyle: "italic" },
+  errorFull: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb", padding: 24 },
+  errorTitle: { color: "#111827", fontWeight: "700", fontSize: 18, marginTop: 16 },
+  errorMsg: { color: "#ef4444", fontSize: 14, marginTop: 8, textAlign: "center", backgroundColor: "#fef2f2", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#fee2e2" },
+  retryButton: { marginTop: 24, backgroundColor: "#6366f1", paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16 },
+  retryText: { color: "white", fontWeight: "700" },
+  skeleton: { opacity: 0.5 },
+  skeletonIcon: { height: 40, width: 40, backgroundColor: "#f3f4f6", borderRadius: 16, marginBottom: 24 },
+  skeletonTitle: { height: 16, width: 80, backgroundColor: "#f3f4f6", borderRadius: 4, marginBottom: 8 },
+  skeletonValue: { height: 32, width: 120, backgroundColor: "#f3f4f6", borderRadius: 4 },
+  orderItemSkeleton: { marginBottom: 24, flexDirection: "row", alignItems: "center" },
+  orderIconSkeleton: { width: 48, height: 48, backgroundColor: "#f3f4f6", borderRadius: 16, marginRight: 16 },
+  orderTextSkeleton: { flex: 1 },
+  skeletonLineShort: { height: 16, width: 96, backgroundColor: "#f3f4f6", borderRadius: 4, marginBottom: 8 },
+  skeletonLineMini: { height: 12, width: 64, backgroundColor: "#f3f4f6", borderRadius: 4 },
+});
+
