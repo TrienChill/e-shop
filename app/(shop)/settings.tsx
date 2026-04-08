@@ -1,3 +1,4 @@
+import { useAuth } from "@/src/auth/AuthContext";
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { router } from "expo-router";
@@ -51,6 +52,9 @@ const SectionHeader = ({ title }: { title: string }) => (
 );
 
 const SettingsScreen = () => {
+  const { role } = useAuth();
+  const isAdminOrStaff = role === 'admin' || role === 'staff';
+
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) {
@@ -101,6 +105,12 @@ const SettingsScreen = () => {
         {/* Nhóm Tài khoản */}
         <SectionHeader title="Tài khoản" />
         <View style={styles.sectionContainer}>
+          {isAdminOrStaff && (
+            <SettingItem 
+              label="Trang quản trị (Admin)" 
+              onPress={() => router.push("/(admin)/dashboard")} 
+            />
+          )}
           <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => { }} />
           <SettingItem label="Về E-Shop" onPress={() => { }} />
           <SettingItem label="Đăng xuất" onPress={logout} />
