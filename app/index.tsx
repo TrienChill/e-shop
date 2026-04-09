@@ -1,27 +1,24 @@
-// Đây là file app/index.tsx (Màn hình điều hướng gốc)
-import { useAuth } from "@/src/auth/AuthContext"; // Đổi lại đường dẫn cho đúng với file context của bạn
+import { useAuth } from "@/src/auth/AuthContext";
 import { Redirect } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 
 export default function Index() {
-  const { role, loading } = useAuth();
+  const { session, role, loading } = useAuth();
 
-  // BƯỚC 1: QUAN TRỌNG NHẤT - Bắt buộc đợi Supabase check xong Role
+  // 1. CHẶN KHI ĐANG TẢI: Đảm bảo không redirect nhầm khi chưa có dữ liệu Role
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-        {/* Hiện vòng xoay loading trong lúc đợi 0.5s */}
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#2563EB" />
       </View>
     );
   }
 
-  // BƯỚC 2: Lúc này loading đã là false, role đã có dữ liệu chính xác
-  if (role === "admin" || role === "staff") {
-    // Nếu là admin/staff -> đẩy vào Dashboard
+  // 2. LUỒNG ADMIN: Nếu Admin xóa "/dashboard" để về "/", code này sẽ đẩy họ quay lại ngay
+  if (session && (role === "admin" || role === "staff")) {
     return <Redirect href="/(admin)/dashboard" />;
   }
 
-  // BƯỚC 3: Nếu là user bình thường hoặc chưa đăng nhập -> đẩy về Web mua hàng
+  // 3. LUỒNG USER/GUEST: Nếu là khách hoặc chưa đăng nhập thì mới về trang chủ bán hàng
   return <Redirect href="/(shop)/(tabs)" />;
 }

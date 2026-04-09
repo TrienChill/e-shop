@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   LogOut,
   Package,
-  Settings,
   ShieldCheck,
   ShoppingBag,
   Store,
@@ -22,14 +21,11 @@ import {
 } from "react-native";
 
 export default function AdminLayout() {
-  const { session, role, roleError, loading, userId, refreshRole, signOut } = useAuth();
+  // BƯỚC 1: Lấy state từ AuthContext (Chỉ khai báo 1 lần)
+  const { session, role, loading, signOut } = useAuth();
   const pathname = usePathname();
 
-  // Mobile fallback
-  if (Platform.OS !== "web") {
-    return <Slot />;
-  }
-
+  // BƯỚC 2: Màn hình chờ khi đang load
   if (loading) {
     return (
       <View style={styles.center}>
@@ -38,14 +34,17 @@ export default function AdminLayout() {
     );
   }
 
-  if (!session) {
-    return <Redirect href={"/(auth)/login" as any} />;
+  // BƯỚC 3: Lá chắn bảo mật - Đẩy User/Khách vãng lai ra ngoài
+  if (!session || (role !== "admin" && role !== "staff")) {
+    return <Redirect href="/(shop)/(tabs)" />;
   }
 
-  if (!role || (role !== "admin" && role !== "staff")) {
-    return <Redirect href={"/(shop)/(tabs)" as any} />;
+  // BƯỚC 4: Xử lý hiển thị trên Mobile (Không hiện Sidebar ngang)
+  if (Platform.OS !== "web") {
+    return <Slot />;
   }
 
+  // BƯỚC 5: Thiết lập Menu cho Admin/Staff trên Web
   const menuItems = [
     { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
     { href: "/(admin)/orders", label: "Đơn hàng", icon: ShoppingBag },
@@ -62,6 +61,7 @@ export default function AdminLayout() {
     });
   }
 
+  // BƯỚC 6: Render Giao diện chính cho Web Admin
   return (
     <View style={styles.container}>
       {/* SIDEBAR */}
@@ -105,12 +105,14 @@ export default function AdminLayout() {
 
       {/* MAIN CONTENT */}
       <View style={styles.content}>
+        {/* Nơi nội dung của dashboard, orders, products... sẽ được render */}
         <Slot />
       </View>
     </View>
   );
 }
 
+// === COMPONENT CON & STYLES ===
 function SidebarLink({
   href,
   label,
@@ -136,7 +138,7 @@ function SidebarLink({
 
 const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  container: { flex: 1, flexDirection: "row", backgroundColor: "#F9FAFB" },
+  container: { flex: 1, flexDirection: "row", backgroundColor: "#F9FAFB", minHeight: "100vh" as any },
   sidebar: {
     width: 280,
     backgroundColor: "#111827",
@@ -205,4 +207,3 @@ const styles = StyleSheet.create({
     padding: 40,
   },
 });
-
