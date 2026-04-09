@@ -58,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // roleResolved: true khi đã hoàn thành ít nhất một lần fetch role (hoặc xác định không có session)
+  const [roleResolved, setRoleResolved] = useState(false);
 
   const userId = session?.user?.id ?? null;
   const platform = getCurrentPlatform();
@@ -86,23 +88,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
+      console.log("[AUTH_DEBUG] 1. Session Restored:", session?.user?.id || "None");
       authLogger.sessionRestored({
         userId: session?.user?.id ?? null,
-        role: null, // role chưa được fetch tại thời điểm này
+        role: null,
         platform,
       });
       setSession(session);
-      setLoading(false);
+      // Nếu không có session → không cần fetch role, đánh dấu đã resolved ngay
+      if (!session) {
+        setRoleResolved(true);
+        setLoading(false);
+      }
+      // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log("[AUTH_DEBUG] 2. Auth State Changed:", _event, session?.user?.id || "None");
       authLogger.authStateChange({
         event: _event,
         userId: session?.user?.id ?? null,
         platform,
       });
+      if (!session) {
+        // Đăng xuất: reset role và đánh dấu resolved
+        setRole(null);
+        setRoleError(null);
+        setRoleResolved(true);
+        setLoading(false);
+      }
       setSession(session);
     });
 
@@ -110,19 +126,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Role Sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
+    if (!userId) {
+      setRole(null);
+      setRoleError(null);
+      setRoleResolved(true);
+      setLoading(false);
+      return;
+    }
+
+    console.log("[AUTH_DEBUG] 3. Starting Role Fetch for:", userId);
     setLoading(true);
+    setRoleResolved(false);
     refreshRole()
+      .then(() => {
+        console.log("[AUTH_DEBUG] 4. Role Fetch Done");
+      })
       .catch((e) => {
+        console.error("[AUTH_DEBUG] Error Fetching Role:", e);
         setRole(null);
         setRoleError((e as Error)?.message ?? "Failed to fetch role");
       })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .finally(() => {
+        setRoleResolved(true);
+        setLoading(false);
+      });
   }, [userId]);
 
   // ── Platform Block Logging ────────────────────────────────────────────────
@@ -142,18 +173,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // loading thực sự = đang tải HOẶC có session nhưng role chưa được resolve
+  const isLoading = loading || (session !== null && !roleResolved);
+
   const value = useMemo<AuthState>(
     () => ({
       session,
       userId,
       role,
       roleError,
-      loading,
+      loading: isLoading,
       isPlatformBlocked,
       refreshRole,
       signOut,
     }),
-    [session, userId, role, roleError, loading, isPlatformBlocked],
+    [session, userId, role, roleError, isLoading, isPlatformBlocked],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
