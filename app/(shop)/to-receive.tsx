@@ -7,6 +7,7 @@ import {
   getProductImageByColor,
 } from "@/src/services/product";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ArrowUpDown,
   CheckCircle2,
@@ -70,6 +71,22 @@ export default function ToReceiveScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState<any>(null);
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'orders',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'order_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'reviews',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   useEffect(() => {
     const getUser = async () => {
@@ -249,7 +266,7 @@ export default function ToReceiveScreen() {
       fetchOrders(selectedStatus);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, isAscending, user]);
+  }, [selectedStatus, isAscending, user, refreshTrigger]);
 
   const toggleSort = () => {
     setIsAscending(!isAscending);

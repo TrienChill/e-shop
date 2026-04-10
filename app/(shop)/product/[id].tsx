@@ -23,6 +23,7 @@ import {
 
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
@@ -82,6 +83,30 @@ export default function ProductDetailScreen() {
   // 1. Khai báo state lưu dữ liệu sản phẩm thật
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'product_variants',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'product_images',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'reviews',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'wishlist',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   // Variants từ bảng product_variants
   const [variants, setVariants] = useState<any[]>([]);
@@ -378,7 +403,7 @@ export default function ProductDetailScreen() {
       fetchProductDetail();
       fetchVariants();
     }
-  }, [id]);
+  }, [id, refreshTrigger]);
 
   const checkWishlistStatus = async () => {
     try {
@@ -487,7 +512,7 @@ export default function ProductDetailScreen() {
     };
 
     if (id) fetchReviews();
-  }, [id]);
+  }, [id, refreshTrigger]);
 
   useEffect(() => {
     const fetchPopular = async () => {
@@ -495,7 +520,7 @@ export default function ProductDetailScreen() {
       setPopularProducts(data);
     };
     fetchPopular();
-  }, [id]);
+  }, [id, refreshTrigger]);
 
   // 3. Hiển thị loading trong lúc đợi dữ liệu
   if (loading) {

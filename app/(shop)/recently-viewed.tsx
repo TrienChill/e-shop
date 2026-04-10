@@ -3,6 +3,7 @@ import PriceDisplay from "@/src/components/common/PriceDisplay";
 import { supabase } from "@/src/lib/supabase";
 import { calculateDiscountedPrice } from "@/src/services/product";
 import { router, useFocusEffect } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ChevronDown,
   ChevronLeft,
@@ -47,10 +48,22 @@ export default function RecentlyViewedScreen() {
   const [recentViews, setRecentViews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'product_view_history',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+
   useFocusEffect(
     useCallback(() => {
       fetchRecentViews();
-    }, [])
+    }, [refreshTrigger])
   );
 
   const fetchRecentViews = async () => {

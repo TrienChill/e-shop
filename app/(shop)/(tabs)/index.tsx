@@ -26,6 +26,7 @@ import {
 } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 
 const { width } = Dimensions.get("window");
 
@@ -41,6 +42,21 @@ const HomeScreen = () => {
     /* ========== TOP PRODUCTS SECTION ========== */
   }
   const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // --- REALTIME HOOKS ---
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'banners',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'cart_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   useEffect(() => {
     const fetchTopProducts = async () => {
@@ -52,7 +68,7 @@ const HomeScreen = () => {
       }
     };
     fetchTopProducts();
-  }, []);
+  }, [refreshTrigger]);
 
   {
     /* ========== NEW ITEMS SECTION  ========== */
@@ -67,7 +83,7 @@ const HomeScreen = () => {
       setNewItems(data);
     };
     fetchNewItems();
-  }, []);
+  }, [refreshTrigger]);
 
   {
     /* ========== MOST POPULAR SECTION  ========== */
@@ -80,7 +96,7 @@ const HomeScreen = () => {
       setPopularItems(data);
     };
     loadData();
-  }, []);
+  }, [refreshTrigger]);
 
   {
     /* ========== FLASH SALE SECTION  ========== */
@@ -93,7 +109,7 @@ const HomeScreen = () => {
       setFlashSaleProducts(data.slice(0, 4)); // Hiển thị 4 sản phẩm
     };
     fetchFlashSale();
-  }, []);
+  }, [refreshTrigger]);
 
   {
     /* ========== JUST FOR YOU SECTION  ========== */
@@ -109,7 +125,7 @@ const HomeScreen = () => {
       setJustForYouItems(data);
     };
     fetchJustForYou();
-  }, []);
+  }, [refreshTrigger]);
 
   const loadMoreJustForYou = async () => {
     if (isLoadingMore.current || !hasMoreRef.current) return;
@@ -143,7 +159,7 @@ const HomeScreen = () => {
       setBanners(data);
     };
     fetchBanners();
-  }, []);
+  }, [refreshTrigger]);
 
   const bannerScrollRef = useRef<ScrollView>(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -223,11 +239,11 @@ const HomeScreen = () => {
     }
   };
 
-  // Cập nhật mỗi khi màn hình index được focus
+  // Cập nhật mỗi khi màn hình index được focus hoặc refreshTrigger đổi
   useFocusEffect(
     useCallback(() => {
       fetchCartCount();
-    }, []),
+    }, [refreshTrigger]),
   );
 
   return (

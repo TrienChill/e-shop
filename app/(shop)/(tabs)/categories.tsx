@@ -4,6 +4,7 @@ import { calculateDiscountedPrice } from "@/src/services/product";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter, useFocusEffect } from "expo-router";
 import { ArrowLeft, Check, Filter, Grid, Heart, List, Minus, Plus, Search, ShoppingBag, ShoppingCart, X } from "lucide-react-native";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
@@ -88,10 +89,30 @@ export default function CategoriesScreen() {
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 10;
 
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'categories',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'cart_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'wishlist',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+
   useEffect(() => {
     fetchCategories();
     fetchWishlist();
-  }, []);
+  }, [refreshTrigger]);
 
   // Hàm lấy tổng số lượng sản phẩm trong giỏ
   const fetchCartCount = async () => {
@@ -116,11 +137,11 @@ export default function CategoriesScreen() {
     }
   };
 
-  // Cập nhật mỗi khi màn hình được focus
+  // Cập nhật mỗi khi màn hình được focus hoặc refreshTrigger đổi
   useFocusEffect(
     useCallback(() => {
       fetchCartCount();
-    }, [])
+    }, [refreshTrigger])
   );
 
   const fetchCategories = async () => {
@@ -278,7 +299,7 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     if (selectedSubId) fetchProducts(true);
-  }, [selectedSubId, sortBy, activeFilters]);
+  }, [selectedSubId, sortBy, activeFilters, refreshTrigger]);
 
   const addToCart = async () => {
     if (!selectedQuickProduct) return;

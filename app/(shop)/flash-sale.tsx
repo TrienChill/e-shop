@@ -4,6 +4,7 @@ import { Banner, getActiveBanners } from "@/src/services/banner";
 import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
 import { ArrowRight, ChevronLeft, Clock, Heart } from "lucide-react-native";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useEffect, useState, useRef } from "react";
 import {
@@ -257,6 +258,22 @@ export default function FlashSaleScreen() {
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
   const [wishlistItems, setWishlistItems] = useState<any[]>([]);
 
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'banners',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'wishlist',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+
   const fetchWishlist = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -314,7 +331,7 @@ export default function FlashSaleScreen() {
     fetchBanners();
     loadPopular();
     fetchWishlist();
-  }, []);
+  }, [refreshTrigger]);
 
   const displayBanners = banners.length > 1 ? [...banners, banners[0]] : banners;
 

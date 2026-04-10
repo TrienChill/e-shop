@@ -1,6 +1,7 @@
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { router, useFocusEffect } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ChevronLeft,
   ChevronRight,
@@ -83,6 +84,22 @@ export default function MyActivityScreen() {
     total: 0,
     delivered: 0,
     pending: 0,
+  });
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'profiles',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'orders',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'order_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
   });
 
   const displayTimeRange = useMemo(() => {
@@ -270,7 +287,7 @@ export default function MyActivityScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchActivityData();
-    }, [fetchActivityData]),
+    }, [fetchActivityData, refreshTrigger]),
   );
 
   const handlePrevTime = () => {

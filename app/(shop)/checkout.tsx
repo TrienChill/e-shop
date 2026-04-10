@@ -4,6 +4,7 @@ import {
   getProductImageByColor,
 } from "@/src/services/product";
 import { useRouter } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   AlertCircle,
   Banknote,
@@ -139,6 +140,26 @@ export default function CheckoutScreen() {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'user_addresses',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'cart_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'vouchers',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'shipping_methods',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   // Tính tổng tiền dựa trên sản phẩm thực tế và phí ship
   const productsTotal = cartItems.reduce(
@@ -299,7 +320,7 @@ export default function CheckoutScreen() {
     };
 
     fetchCheckoutInfo();
-  }, []);
+  }, [refreshTrigger]);
 
   const handlePlaceOrder = async () => {
     if (!userAddress || cartItems.length === 0) {

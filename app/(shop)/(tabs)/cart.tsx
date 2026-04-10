@@ -41,6 +41,7 @@ import {
     COLOR_TRANSLATIONS,
     getProductImageByColor,
 } from "../../../src/services/product";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -430,6 +431,22 @@ export default function CartScreen() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>(INITIAL_CART);
 
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'cart_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'user_addresses',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+
   // Address Modal States
   const [addressModalVisible, setAddressModalVisible] = useState(false);
   const [addressData, setAddressData] = useState({
@@ -701,10 +718,10 @@ export default function CartScreen() {
   // Thay thế hoặc bổ sung thêm bên cạnh useEffect cũ
   useFocusEffect(
     useCallback(() => {
-      // Mỗi khi màn hình này được nhìn thấy, ta sẽ fetch lại dữ liệu mới nhất
+      // Mỗi khi màn hình này được nhìn thấy hoặc data realtime thay đổi, ta sẽ fetch lại dữ liệu mới nhất
       fetchCartItems();
       fetchDefaultAddress();
-    }, []),
+    }, [refreshTrigger]),
   );
 
   return (

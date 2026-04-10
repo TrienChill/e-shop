@@ -5,6 +5,7 @@ import { calculateDiscountedPrice } from "@/src/services/product";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ArrowRight, Heart, ShoppingCart, Trash2 } from "lucide-react-native";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -43,6 +44,22 @@ export default function WishlistScreen() {
   const [selectedColor, setSelectedColor] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'wishlist',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'product_view_history',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   const handleToggleFavoritePopular = async (productId: string, isCurrentlyFavorited: boolean) => {
     try {
@@ -229,7 +246,7 @@ export default function WishlistScreen() {
       fetchWishlist();
       fetchPopular();
       fetchRecentViews();
-    }, [fetchWishlist, fetchPopular, fetchRecentViews])
+    }, [fetchWishlist, fetchPopular, fetchRecentViews, refreshTrigger])
   );
 
   const removeFromWishlist = async (wishlistId: string) => {

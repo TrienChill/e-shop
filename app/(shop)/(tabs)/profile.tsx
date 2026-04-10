@@ -4,6 +4,7 @@ import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import { supabase } from "@/src/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ArrowRight,
   Bell,
@@ -51,6 +52,18 @@ const COLOR = {
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [recentViews, setRecentViews] = useState<any[]>([]);
+
+  // --- REALTIME HOOKS ---
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'profiles',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'product_view_history',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   // Fetch profile data
   const fetchProfile = useCallback(async () => {
@@ -111,7 +124,7 @@ export default function ProfileScreen() {
     useCallback(() => {
       fetchProfile();
       fetchRecentViews();
-    }, [fetchProfile, fetchRecentViews]),
+    }, [fetchProfile, fetchRecentViews, refreshTrigger]),
   );
 
   // Hàm xử lý đăng xuất

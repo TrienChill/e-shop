@@ -2,6 +2,7 @@ import ReviewModal from "@/src/components/modals/ReviewModal";
 import { supabase } from "@/src/lib/supabase";
 import { COLOR_TRANSLATIONS, getProductImageByColor } from "@/src/services/product";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
     ChevronLeft,
     PackageSearch,
@@ -71,6 +72,22 @@ export default function ReviewsScreen() {
 
     const [pendingItems, setPendingItems] = useState<ReviewData[]>([]);
     const [reviewedItems, setReviewedItems] = useState<ReviewData[]>([]);
+
+    // --- REALTIME HOOKS ---
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    useSupabaseRealtime({
+        table: 'reviews',
+        onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    });
+    useSupabaseRealtime({
+        table: 'orders',
+        onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    });
+    useSupabaseRealtime({
+        table: 'order_items',
+        onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    });
 
     const fetchData = useCallback(async () => {
         try {
@@ -174,7 +191,7 @@ export default function ReviewsScreen() {
     useFocusEffect(
         useCallback(() => {
             fetchData();
-        }, [fetchData])
+        }, [fetchData, refreshTrigger])
     );
 
     // Tab switching animation
