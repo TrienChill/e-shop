@@ -86,8 +86,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) return;
+
+      if (error) {
+        console.warn("[AUTH_DEBUG] 1. getSession Error:", error.message);
+        // Nếu lỗi liên quan đến Refresh Token không hợp lệ hoặc không tìm thấy, 
+        // thực hiện đăng xuất để xóa token hỏng khỏi storage.
+        if (
+          error.message?.includes("Refresh Token Not Found") || 
+          error.message?.includes("invalid_grant") ||
+          (error as any).status === 400 || 
+          (error as any).status === 401
+        ) {
+          supabase.auth.signOut().catch(() => {});
+          setSession(null);
+          setRole(null);
+          setRoleResolved(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       console.log("[AUTH_DEBUG] 1. Session Restored:", session?.user?.id || "None");
       authLogger.sessionRestored({
         userId: session?.user?.id ?? null,
@@ -101,6 +121,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
       // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
+    }).catch((err) => {
+      console.error("[AUTH_DEBUG] 1. getSession Critical Error:", err);
+      if (mounted) {
+        setRoleResolved(true);
+        setLoading(false);
+      }
     });
 
     const {
