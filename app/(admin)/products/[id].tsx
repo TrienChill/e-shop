@@ -202,6 +202,17 @@ export default function ProductEditorScreen() {
       if (updatedImages.some(img => !img.url)) {
         throw new Error("Lỗi upload một số hình ảnh. Vui lòng thử lại.");
       }
+      // --- BẮT ĐẦU ĐOẠN CODE FIX ẢNH BÌA ---
+
+      // Lọc và sắp xếp để Ảnh Bìa (is_thumbnail) luôn đứng vị trí đầu tiên [0]
+      const sortedImages = [...updatedImages].sort((a, b) => {
+        if (a.is_thumbnail) return -1;
+        if (b.is_thumbnail) return 1;
+        return a.display_order - b.display_order;
+      });
+
+      // Rút trích ra mảng chỉ chứa các chuỗi URL
+      const imageUrlsForProduct = sortedImages.map(img => img.url);
 
       // 2. Lưu/Cập nhật Product
       const productData = {
@@ -209,7 +220,12 @@ export default function ProductEditorScreen() {
         price: parseFloat(price),
         description,
         is_active: true,
+        images: imageUrlsForProduct, // <--- ĐẨY MẢNG ẢNH VÀO CỘT IMAGES CỦA BẢNG PRODUCTS Ở ĐÂY
       };
+
+      // --- KẾT THÚC ĐOẠN CODE FIX ẢNH BÌA ---
+
+
 
       let finalProductId = productId;
       if (isNew) {
