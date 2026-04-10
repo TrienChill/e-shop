@@ -1,6 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
-import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { router, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -66,10 +66,10 @@ export default function ProductEditorScreen() {
       setName(data.name);
       setPrice(String(data.price));
       setDescription(data.description || "");
-      
+
       // Fetch Images from product_images table
       fetchProductImages(data.id);
-      
+
       // Fetch Variants
       fetchVariants(data.id);
     }
@@ -82,7 +82,7 @@ export default function ProductEditorScreen() {
       .select("*")
       .eq("product_id", productId)
       .order("display_order", { ascending: true });
-    
+
     if (data) {
       setProductImages(data as ProductImage[]);
     }
@@ -129,15 +129,23 @@ export default function ProductEditorScreen() {
       setUploading(true);
       const response = await fetch(uri);
       const blob = await response.blob();
-      
-      const fileExt = uri.split('.').pop() || 'jpg';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      // --- ĐOẠN ĐÃ ĐƯỢC FIX LỖI BLOB LINK ---
+      // 1. Cố gắng lấy định dạng chuẩn từ thuộc tính type của file Blob (VD: 'image/jpeg')
+      const mimeType = blob.type || 'image/jpeg';
+
+      // 2. Tách đuôi file từ chuỗi MIME type (VD: lấy 'jpeg' từ 'image/jpeg')
+      const safeExtension = mimeType.split('/')[1] || 'jpeg';
+
+      // 3. Tạo tên file mới hoàn toàn độc lập, không phụ thuộc vào tên file gốc
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${safeExtension}`;
       const filePath = `products/${fileName}`;
+      // -------------------------------------
 
       const { data, error } = await supabase.storage
-        .from("avatars") // Sử dụng bucket 'avatars' theo yêu cầu
+        .from("avatars") // Bạn đang dùng bucket 'avatars'
         .upload(filePath, blob, {
-          contentType: `image/${fileExt}`,
+          contentType: mimeType, // Truyền MIME type chuẩn vào thay vì chuỗi tự cắt
         });
 
       if (error) throw error;
@@ -181,7 +189,7 @@ export default function ProductEditorScreen() {
 
     try {
       const productId = isNew ? null : id;
-      
+
       // 1. Upload các ảnh mới
       const updatedImages = await Promise.all(productImages.map(async (img) => {
         if (img.localUri && !img.url) {
@@ -243,11 +251,11 @@ export default function ProductEditorScreen() {
       // Chuẩn bị data insert cho images
       const imagesToInsert = updatedImages.map(img => {
         let variantId = img.variant_id;
-        
+
         // Nếu variant_id là temp, tìm ID thật từ savedVariants
         if (variantId && variantId.startsWith("temp")) {
           const tempVariant = variants.find(v => v.id === variantId);
-          const realVariant = savedVariants.find(sv => 
+          const realVariant = savedVariants.find(sv =>
             sv.color === tempVariant.color && sv.size === tempVariant.size
           );
           variantId = realVariant?.id || null;
@@ -345,8 +353,8 @@ export default function ProductEditorScreen() {
 
                 <View style={styles.imageControls}>
                   <View style={styles.controlRow}>
-                    <Pressable 
-                      style={[styles.smallBtn, img.is_thumbnail && styles.activeBtn]} 
+                    <Pressable
+                      style={[styles.smallBtn, img.is_thumbnail && styles.activeBtn]}
                       onPress={() => {
                         setProductImages(prev => prev.map((p, i) => ({
                           ...p,
@@ -357,8 +365,8 @@ export default function ProductEditorScreen() {
                       <Text style={[styles.smallBtnText, img.is_thumbnail && styles.activeBtnText]}>Làm ảnh bìa</Text>
                     </Pressable>
 
-                    <Pressable 
-                      style={styles.removeIconBtn} 
+                    <Pressable
+                      style={styles.removeIconBtn}
                       onPress={() => setProductImages(prev => prev.filter((_, i) => i !== index))}
                     >
                       <Trash2 size={16} color="#EF4444" />
@@ -366,7 +374,7 @@ export default function ProductEditorScreen() {
                   </View>
 
                   <View style={styles.typeSelector}>
-                    <Pressable 
+                    <Pressable
                       style={[styles.typeBtn, img.image_type === 'general' && styles.activeTypeBtn]}
                       onPress={() => {
                         setProductImages(prev => {
@@ -378,7 +386,7 @@ export default function ProductEditorScreen() {
                     >
                       <Text style={[styles.typeBtnText, img.image_type === 'general' && styles.activeTypeBtnText]}>Chung</Text>
                     </Pressable>
-                    <Pressable 
+                    <Pressable
                       style={[styles.typeBtn, img.image_type === 'variant' && styles.activeTypeBtn]}
                       onPress={() => {
                         setProductImages(prev => {
@@ -395,8 +403,8 @@ export default function ProductEditorScreen() {
                   {img.image_type === 'variant' && (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.variantSelector}>
                       {variants.map((v) => (
-                        <Pressable 
-                          key={v.id} 
+                        <Pressable
+                          key={v.id}
                           style={[styles.variantChip, img.variant_id === v.id && styles.activeVariantChip]}
                           onPress={() => {
                             setProductImages(prev => {
@@ -425,7 +433,7 @@ export default function ProductEditorScreen() {
               </View>
             )}
           </View>
-          
+
           {(uploading || saving) && (
             <View style={styles.uploadingOverlay}>
               <ActivityIndicator color="#2563EB" />
@@ -437,7 +445,7 @@ export default function ProductEditorScreen() {
         {/* Card: Phân loại & Tồn kho */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Phân loại & Tồn kho</Text>
-          
+
           <View style={styles.variantForm}>
             <View style={{ flex: 1, gap: 8 }}>
               <Text style={styles.inputLabel}>Màu</Text>

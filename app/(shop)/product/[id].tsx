@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  FlatList,
   Image,
   Modal,
   ScrollView,
@@ -97,8 +98,8 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
 
   // 1. Tạo ref cho ScrollView ảnh
-  const imageScrollRef = useRef<ScrollView>(null);
-  const colorScrollRef = useRef<ScrollView>(null);
+  const imageScrollRef = useRef<FlatList>(null);
+  const colorScrollRef = useRef<any>(null);
 
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -108,10 +109,14 @@ export default function ProductDetailScreen() {
 
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
 
+  // Thêm một state nhỏ để đánh dấu ScrollView đã "lên hình"
+  const [isScrollReady, setIsScrollReady] = useState(false);
+
   // Đồng bộ màu sắc khi vuốt ảnh
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / SCREEN_WIDTH);
+    // console.log("[DEBUG] onScroll index:", index, "scrollX:", scrollPosition);
     if (index !== activeIndex) {
       setActiveIndex(index);
     }
@@ -121,52 +126,69 @@ export default function ProductDetailScreen() {
   const displayImages = useMemo(() => {
     return product?.product_images && product.product_images.length > 0
       ? [...product.product_images]
-          .filter((img: any) => img.image_type !== "description")
-          .sort((a: any, b: any) => a.display_order - b.display_order)
+        .filter((img: any) => img.image_type !== "description")
+        .sort((a: any, b: any) => a.display_order - b.display_order)
       : [];
   }, [product?.product_images]);
 
+  // CHỈ lấy URL từ displayImages, bỏ qua hoàn toàn product.images
   const productImages = useMemo(() => {
-    return displayImages.length > 0
-      ? displayImages.map((img: any) =>
-          img.url.startsWith("http")
-            ? img.url
-            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
-        )
-      : product?.images && product.images.length > 0
-      ? product.images.map((img: string) =>
-          img.startsWith("http")
-            ? img
-            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`
-        )
-      : ["https://via.placeholder.com/600"];
-  }, [displayImages, product?.images]);
+    if (displayImages.length === 0) return ["https://via.placeholder.com/600"]; // Ảnh mặc định nếu chưa có
+
+    return displayImages.map((img: any) =>
+      img.url.startsWith("http")
+        ? img.url
+        : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
+    );
+  }, [displayImages]);
+
+  const [listKey, setListKey] = useState("gallery-initial"); // <--- THÊM STATE NÀY
 
   // --- Tự động Scroll tới ảnh của màu được chọn ---
+  // 2. useEffect đồng bộ ảnh gọn nhẹ và chuẩn xác
+  // --- Tự động Scroll tới ảnh của màu được chọn ---
+  // --- Đồng bộ màu: Dịch chuyển tức thời ---
+  // --- Đồng bộ màu sắc với Ảnh ---
   useEffect(() => {
     if (selectedColor && displayImages.length > 0) {
-      // Tìm các variant IDs của màu này
-      const variantIdsOfColor = variants
-        .filter(v => v.color === selectedColor)
-        .map(v => v.id);
-
-      // Tìm index của ảnh đầu tiên map với variant này
-      const targetIndex = displayImages.findIndex(img => 
-        img.variant_id && variantIdsOfColor.includes(img.variant_id)
-      );
+      const targetIndex = displayImages.findIndex((img) => {
+        const variantOfImage = variants.find(v => v.id === img.variant_id);
+        return variantOfImage && variantOfImage.color === selectedColor;
+      });
 
       if (targetIndex !== -1) {
-        // Đảm bảo UI đã sẵn sàng trước khi scroll
-        requestAnimationFrame(() => {
-          imageScrollRef.current?.scrollTo({
-            x: targetIndex * SCREEN_WIDTH,
-            animated: true,
-          });
-          setActiveIndex(targetIndex);
-        });
+        // Chỉ cần cập nhật Index, giao diện sẽ tự động thay đổi ngay lập tức!
+        setActiveIndex(targetIndex);
       }
     }
   }, [selectedColor, variants, displayImages]);
+
+  // --- Hàm xử lý khi người dùng nhấn vào ảnh thu nhỏ ---
+  const handleSelectImage = (index: number) => {
+    // 1. Cập nhật ảnh to
+    setActiveIndex(index);
+
+    // 2. Tìm xem bức ảnh này thuộc về biến thể màu nào
+    const currentImageUrl = productImages[index];
+    const imageInfo = displayImages.find((img) =>
+      img.url.includes(currentImageUrl) || currentImageUrl.includes(img.url)
+    );
+
+    if (imageInfo && imageInfo.variant_id) {
+      // Tìm màu sắc tương ứng với variant_id đó
+      const matchedVariant = variants.find(v => v.id === imageInfo.variant_id);
+
+      if (matchedVariant) {
+        // Tự động chọn màu đó trên UI
+        setSelectedColor(matchedVariant.color);
+        setSelectedSize(null); // Reset size khi đổi màu (nếu muốn)
+        setQuantity(1);
+      }
+    } else {
+      // Nếu ảnh này không thuộc về biến thể nào (ảnh chung), bỏ chọn màu
+      setSelectedColor(null);
+    }
+  };
 
   // --- Derived từ bảng product_variants ---
   const uniqueColors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
@@ -326,7 +348,7 @@ export default function ProductDetailScreen() {
 
         // --- GHI LẠI VÀO BẢNG VIEW HISTORY ---
         recordRecentView(data);
-        
+
         // --- KIỂM TRA TRẠNG THÁI YÊU THÍCH ---
         checkWishlistStatus();
       } catch (error) {
@@ -368,7 +390,7 @@ export default function ProductDetailScreen() {
         .eq("user_id", user.id)
         .eq("product_id", id)
         .single();
-      
+
       if (data) setWishlist(true);
     } catch (e) {
       // Bỏ qua lỗi nếu không tìm thấy
@@ -382,7 +404,7 @@ export default function ProductDetailScreen() {
         alert("Vui lòng đăng nhập để lưu sản phẩm yêu thích");
         return;
       }
-      
+
       const prev = wishlist;
       setWishlist(!prev); // Optimistic UI update
 
@@ -500,8 +522,14 @@ export default function ProductDetailScreen() {
       setSelectedSize(null);
     } else {
       setSelectedColor(color);
-      setSelectedSize(null); // Reset size khi đổi màu
+      setSelectedSize(null);
       setQuantity(1);
+
+      // Tìm variant đầu tiên của màu này để lấy id (phòng trường hợp ảnh gắn theo variant_id cụ thể)
+      const firstVariantOfColor = variants.find(v => v.color === color);
+      if (firstVariantOfColor) {
+        // Logic bổ sung nếu cần thiết
+      }
     }
   };
 
@@ -567,55 +595,48 @@ export default function ProductDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ══════════════ 1. Ảnh sản phẩm ══════════════ */}
+        {/* ══════════════ 1. Ảnh sản phẩm (Kiểu Shopee / Lazada) ══════════════ */}
         <View style={styles.heroContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled // Bật chế độ lướt từng trang (từng ảnh)
-            showsHorizontalScrollIndicator={false} // Ẩn thanh cuộn ngang
-            onScroll={handleScroll}
-            scrollEventThrottle={16} // Giúp bắt sự kiện cuộn mượt mà hơn
-            ref={imageScrollRef} // <--- Gắn ref vào đây
-          >
-            {productImages && productImages.length > 0 ? (
-              productImages.map((imageUrl: string, index: number) => (
-                <Image
-                  key={index}
-                  source={{ uri: imageUrl }}
-                  // Ép chiều rộng của mỗi ảnh bằng đúng chiều rộng màn hình (SCREEN_WIDTH)
-                  style={[styles.heroImage, { width: SCREEN_WIDTH }]}
-                  resizeMode="contain"
-                />
-              ))
-            ) : (
-              <Image
-                source={{ uri: "https://via.placeholder.com/600" }}
-                style={[styles.heroImage, { width: SCREEN_WIDTH }]}
-                resizeMode="contain"
-              />
-            )}
-          </ScrollView>
-
-          {/* Lớp phủ gradient ở dưới để tạo kiểu */}
-          <View style={styles.heroGradient} />
-
-          {/* Dấu chấm chuyển trang (Pagination Dots) */}
-          {productImages && productImages.length > 1 && (
-            <View style={styles.pagination}>
-              {productImages.map((_: string, index: number) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.dot,
-                    activeIndex === index
-                      ? styles.activeDot
-                      : styles.inactiveDot,
-                  ]}
-                />
-              ))}
-            </View>
-          )}
+          {/* Ảnh chính hiển thị to */}
+          <Image
+            // Mẹo cực hay: Dùng thuộc tính key để ép React Native vẽ lại ảnh mới 100%, chống kẹt hình
+            key={productImages[activeIndex]}
+            source={{ uri: productImages[activeIndex] || "https://via.placeholder.com/600" }}
+            style={[styles.heroImage, { width: SCREEN_WIDTH, height: IMAGE_HEIGHT, backgroundColor: '#F3F4F6' }]}
+            resizeMode="contain"
+          />
         </View>
+
+        {/* Dải ảnh thu nhỏ (Thumbnails) bên dưới */}
+        {productImages && productImages.length > 1 && (
+          <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {productImages.map((imgUrl: string, index: number) => (
+                <TouchableOpacity
+                  key={index}
+                  activeOpacity={0.8}
+                  // SỬ DỤNG HÀM MỚI Ở ĐÂY 👇
+                  onPress={() => handleSelectImage(index)}
+                  style={{
+                    marginRight: 12,
+                    borderWidth: 2,
+                    borderColor: activeIndex === index ? '#2563EB' : 'transparent', // Viền xanh cho ảnh đang chọn
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Image
+                    source={{ uri: imgUrl }}
+                    style={{ width: 60, height: 60, backgroundColor: '#E5E7EB' }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+
 
         {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
@@ -738,8 +759,10 @@ export default function ProductDetailScreen() {
                     >
                       <Text style={[
                         styles.chipText,
-                        { color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151",
-                          fontWeight: isSelected ? "700" : "500" },
+                        {
+                          color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151",
+                          fontWeight: isSelected ? "700" : "500"
+                        },
                       ]}>
                         {size}
                       </Text>
@@ -1101,7 +1124,7 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 
