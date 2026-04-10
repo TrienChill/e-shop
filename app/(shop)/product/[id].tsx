@@ -253,6 +253,9 @@ export default function ProductDetailScreen() {
             *,
             product_discounts (
               id, discount_type, discount_value, is_active, start_date, end_date
+            ),
+            product_images (
+              id, url, display_order, is_thumbnail, image_type, variant_id
             )
           `,
           )
@@ -439,14 +442,23 @@ export default function ProductDetailScreen() {
     );
   }
 
-  // 4. Xử lý mảng hình ảnh từ Supabase
+  // 4. Xử lý mảng hình ảnh từ Supabase (Ưu tiên bảng product_images)
   const productImages =
-    product.images && product.images.length > 0
+    product.product_images && product.product_images.length > 0
+      ? product.product_images
+          .filter((img: any) => img.image_type !== "description")
+          .sort((a: any, b: any) => a.display_order - b.display_order)
+          .map((img: any) =>
+            img.url.startsWith("http")
+              ? img.url
+              : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
+          )
+      : product.images && product.images.length > 0
       ? product.images.map((img: string) =>
-        img.startsWith("http")
-          ? img
-          : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`,
-      )
+          img.startsWith("http")
+            ? img
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`
+        )
       : ["https://via.placeholder.com/600"];
 
   // 3. Hàm xử lý chọn màu

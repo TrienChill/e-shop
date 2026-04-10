@@ -1,0 +1,12 @@
+id,product_id,variant_id,url,display_order,is_thumbnail,image_type,created_at
+1dca8fc1-3eaa-41ce-a3ed-1769deef3f0d,1,13547e5a-3049-4972-aed4-645cd29e68f5,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/product-images/white.jpg,2,true,variant,2026-04-08 10:23:56.479959+00
+2f6912d6-e2fa-4e34-aa1e-0e74f047e080,101,,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/avatars/products/1775725864672_bnef0w.blob:http://localhost:8081/dc907582-4039-4bb3-a185-c46793ace5ef,0,true,general,2026-04-09 09:12:17.163655+00
+370c5e04-30e1-4f70-993d-4c0d43fd44f4,80,,https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?q=80&w=800,2,false,general,2026-04-08 10:23:56.479959+00
+5b82106f-fab7-4c42-9095-e92e420723d8,1,,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/product-images/size-chart.jpg,4,false,description,2026-04-08 10:23:56.479959+00
+5e4f875e-695a-454c-be2e-c102e2bd698e,25,2189189c-e344-467f-8fed-245ab7627ced,https://images.unsplash.com/photo-1581655353564-df123a1eb820?auto=format&fit=crop&w=500&q=60,2,false,variant,2026-04-08 10:23:56.479959+00
+5f583f2a-312c-4cf4-9b11-22c51db67a32,25,4a707d8c-b592-44b6-9ef1-af1c2f883988,https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=500&q=60,1,true,variant,2026-04-08 10:23:56.479959+00
+66823e27-e578-4115-803c-5321c2154fbb,101,a517d4ef-7bf2-4f7e-9e72-9f99abb6f09a,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/avatars/products/1775725864673_6tpoc.blob:http://localhost:8081/d7d6e845-1c4c-476e-9152-0e64d4c85579,1,false,variant,2026-04-09 09:12:17.163655+00
+b1bd020f-0919-45ff-bf2c-7f39b817739f,101,,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/avatars/products/1775725864673_z6gel.blob:http://localhost:8081/d795421c-b62a-4d0c-acb4-1caff5adecb2,2,false,general,2026-04-09 09:12:17.163655+00
+c3cc6583-93bb-450f-b5c7-99e9394b410b,1,d38defa3-36b7-4dab-b86f-7a11da5f813b,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/product-images/red.jpg,3,false,variant,2026-04-08 10:23:56.479959+00
+c985d6b8-1b26-4bd2-8bb1-fd2abb8c729c,1,94ad3e04-e39b-4fd6-b64e-5e80086d04b0,https://syqzwypdocfcpyhddoas.supabase.co/storage/v1/object/public/product-images/dark.jpg,1,false,variant,2026-04-08 10:23:56.479959+00
+d5a47d0a-dab0-4b69-a445-de379dc19c3c,80,,https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=800,1,true,general,2026-04-08 10:23:56.479959+00
