@@ -232,14 +232,25 @@ export default function ProductEditorScreen() {
         }
       }
 
-      const variantsToUpsert = variants.map(v => ({
-        id: v.id.startsWith("temp") ? undefined : v.id,
-        product_id: finalProductId,
-        color: v.color,
-        size: v.size,
-        stock: v.stock,
-        price: v.price || productData.price,
-      }));
+      // --- ĐOẠN ĐƯỢC FIX ---
+      const variantsToUpsert = variants.map(v => {
+        const variantData: any = {
+          product_id: finalProductId,
+          color: v.color,
+          size: v.size,
+          stock: v.stock,
+          price: v.price || productData.price,
+        };
+
+        // CHỈ gắn thuộc tính 'id' vào payload nếu nó là ID thật từ DB (không phải temp)
+        // Nếu là 'temp', chúng ta tuyệt đối không gửi trường 'id' lên để Supabase tự tạo mới
+        if (!v.id.startsWith("temp")) {
+          variantData.id = v.id;
+        }
+
+        return variantData;
+      });
+      // ----------------------
 
       const { data: savedVariants, error: varErr } = await supabase.from("product_variants").upsert(variantsToUpsert).select();
       if (varErr) throw varErr;
