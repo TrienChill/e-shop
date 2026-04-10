@@ -5,7 +5,9 @@ import { ArrowLeft, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,6 +21,7 @@ interface ProductImage {
   id?: string;
   url: string;
   variant_id?: string | null;
+  colorKey?: string; // <--- THÊM DÒNG NÀY: Dùng để map ảnh với màu sắc
   image_type: 'general' | 'variant' | 'description';
   is_thumbnail: boolean;
   display_order: number;
@@ -34,7 +37,7 @@ export default function ProductEditorScreen() {
 
   // Form State Cơ bản
   const [name, setName] = useState("");
-  const [price, setPrice] = useState("0");
+  const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
 
   // Image State
@@ -45,8 +48,25 @@ export default function ProductEditorScreen() {
   const [variants, setVariants] = useState<any[]>([]);
   const [newColor, setNewColor] = useState("");
   const [newSize, setNewSize] = useState("");
-  const [newStock, setNewStock] = useState("0");
+  const [newStock, setNewStock] = useState("");
   const [newPrice, setNewPrice] = useState(""); // Để trống sẽ dùng giá mặc định
+
+  // --- THÊM LOGIC GOM NHÓM BIẾN THỂ THEO MÀU ---
+  // Tự động phân loại danh sách variants thành các nhóm theo màu sắc
+  const groupedVariants = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    variants.forEach(v => {
+      const colorKey = v.color || "Không phân màu";
+      if (!groups[colorKey]) groups[colorKey] = [];
+      groups[colorKey].push(v);
+    });
+    return groups;
+  }, [variants]);
+
+  // Hàm lấy ảnh mô tả cho một màu sắc cụ thể
+  const getImageForColor = (color: string) => {
+    return productImages.find(img => img.image_type === 'variant' && (img.colorKey === color || variants.find(v => v.id === img.variant_id)?.color === color));
+  };
 
   // Fetch dữ liệu nếu là Edit Mode
   useEffect(() => {
@@ -161,21 +181,64 @@ export default function ProductEditorScreen() {
     }
   };
 
-  // Hàm thêm variant vào list tạm
+  // --- 1. Thêm biến thể thông minh (Tự sinh SKU và tách Size) ---
   const addVariant = () => {
     if (!newColor && !newSize) return alert("Vui lòng nhập màu hoặc size!");
-    const v = {
-      color: newColor || null,
-      size: newSize || null,
-      stock: parseInt(newStock) || 0,
-      price: newPrice ? parseFloat(newPrice) : parseFloat(price),
-      id: "temp_" + Math.random().toString(36).substr(2, 9),
-    };
-    setVariants([...variants, v]);
-    setNewColor("");
-    setNewSize("");
-    setNewStock("0");
-    setNewPrice("");
+
+    const sizes = newSize ? newSize.split(',').map(s => s.trim()).filter(s => s) : [''];
+    const colors = newColor ? newColor.split(',').map(c => c.trim()).filter(c => c) : [''];
+
+    let newVariants: any[] = [];
+
+    colors.forEach(c => {
+      sizes.forEach(s => {
+        // Tự động tạo SKU: SP-[Màu]-[Size]-[Random]
+        const autoSku = `SP-${(c || "K").toUpperCase().replace(/\s/g, "")}-${(s || "K").toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+
+        newVariants.push({
+          id: "temp_" + Math.random().toString(36).substr(2, 9),
+          color: c || null,
+          size: s || null,
+          sku: autoSku,
+          stock: parseInt(newStock) || 0,
+          price: newPrice ? parseFloat(newPrice) : parseFloat(price),
+        });
+      });
+    });
+
+    setVariants([...variants, ...newVariants]);
+    setNewColor(""); setNewSize(""); setNewStock(""); setNewPrice("");
+  };
+  // --- 2. Chọn ảnh chuyên dụng cho một Màu Sắc ---
+  const pickImageForColorGroup = async (color: string) => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") return alert("Cần cấp quyền truy cập ảnh!");
+
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      const newImage: ProductImage = {
+        localUri: result.assets[0].uri,
+        url: "",
+        image_type: 'variant',
+        colorKey: color, // Gắn mác ảnh này thuộc về màu sắc này
+        is_thumbnail: false,
+        display_order: productImages.length,
+      };
+
+      // Xóa ảnh cũ của màu này (nếu có) và thêm ảnh mới
+      setProductImages(prev => {
+        const filtered = prev.filter(p => !(p.image_type === 'variant' && (p.colorKey === color || variants.find(v => v.id === p.variant_id)?.color === color)));
+        return [...filtered, newImage];
+      });
+    }
+  };
+
+  // --- 2. Hàm cập nhật trực tiếp Giá và Tồn kho trên danh sách ---
+  const updateVariantField = (id: string, field: string, value: string) => {
+    setVariants(prev => prev.map(v => v.id === id ? { ...v, [field]: value } : v));
   };
 
   const removeVariant = (id: string) => {
@@ -184,7 +247,51 @@ export default function ProductEditorScreen() {
 
   // Hàm Lưu dữ liệu
   const handleSave = async () => {
-    if (!name || !price) return alert("Vui lòng nhập tên và giá!");
+    if (!name) return alert("Vui lòng nhập tên sản phẩm!");
+
+    const mainPriceNum = (price === "" || price === undefined || price === null) ? 0 : parseFloat(price);
+
+    let isProductActive = true;
+    let willBeHidden = false;
+    let needsConfirmation = false;
+
+    if (variants.length > 0) {
+      for (const v of variants) {
+        const p = (v.price === "" || v.price === undefined || v.price === null) ? 0 : parseFloat(v.price);
+        const s = (v.stock === "" || v.stock === undefined || v.stock === null) ? 0 : parseInt(String(v.stock));
+        if (p === 0) {
+          willBeHidden = true;
+          if (s > 0) {
+            needsConfirmation = true;
+          }
+        }
+      }
+    } else if (mainPriceNum === 0) {
+      willBeHidden = true;
+    }
+
+    if (willBeHidden) {
+      if (needsConfirmation) {
+        if (Platform.OS === 'web') {
+          const ok = window.confirm("Cảnh báo: Sản phẩm có phân loại giá 0đ nhưng vẫn còn tồn kho.\n\nSản phẩm sẽ tự động chuyển sang trạng thái NGƯNG BÁN. Bạn có muốn tiếp tục lưu?");
+          if (!ok) return;
+        } else {
+          const ok = await new Promise(resolve => {
+            Alert.alert(
+              "Cảnh báo Nhầm lẫn Báo giá",
+              "Sản phẩm có phân loại đang để giá 0đ nhưng vẫn khai báo còn tồn kho.\n\nSản phẩm sẽ TỰ ĐỘNG CHUYỂN SANG TRẠNG THÁI NGƯNG BÁN để tránh rủi ro. Bạn có chắc chắn muốn lưu?",
+              [
+                { text: "Hủy", onPress: () => resolve(false), style: "cancel" },
+                { text: "Lưu & Ngưng bán", onPress: () => resolve(true), style: "destructive" }
+              ]
+            );
+          });
+          if (!ok) return;
+        }
+      }
+      isProductActive = false;
+    }
+
     setSaving(true);
 
     try {
@@ -217,9 +324,9 @@ export default function ProductEditorScreen() {
       // 2. Lưu/Cập nhật Product
       const productData = {
         name,
-        price: parseFloat(price),
+        price: mainPriceNum,
         description,
-        is_active: true,
+        is_active: isProductActive,
         images: imageUrlsForProduct, // <--- ĐẨY MẢNG ẢNH VÀO CỘT IMAGES CỦA BẢNG PRODUCTS Ở ĐÂY
       };
 
@@ -237,6 +344,7 @@ export default function ProductEditorScreen() {
         if (prodErr) throw prodErr;
       }
 
+
       // 3. Quản lý Variants (Dùng Upsert để giữ ID)
       // Xóa các variants cũ không còn trong list
       if (!isNew) {
@@ -250,12 +358,16 @@ export default function ProductEditorScreen() {
 
       // --- ĐOẠN ĐƯỢC FIX ---
       const variantsToUpsert = variants.map(v => {
+        const parsedStock = (v.stock === "" || v.stock === undefined || v.stock === null) ? 0 : parseInt(String(v.stock));
+        const parsedPrice = (v.price === "" || v.price === undefined || v.price === null) ? 0 : parseFloat(String(v.price));
+
         const variantData: any = {
           product_id: finalProductId,
           color: v.color,
           size: v.size,
-          stock: v.stock,
-          price: v.price || productData.price,
+          sku: v.sku,
+          stock: parsedStock,
+          price: parsedPrice,
         };
 
         // CHỈ gắn thuộc tính 'id' vào payload nếu nó là ID thật từ DB (không phải temp)
@@ -276,27 +388,38 @@ export default function ProductEditorScreen() {
       await supabase.from("product_images").delete().eq("product_id", finalProductId);
 
       // Chuẩn bị data insert cho images
-      const imagesToInsert = updatedImages.map(img => {
-        let variantId = img.variant_id;
+      const imagesToInsert = updatedImages.map((img, index) => {
+        let varId = img.variant_id;
 
-        // Nếu variant_id là temp, tìm ID thật từ savedVariants
-        if (variantId && variantId.startsWith("temp")) {
-          const tempVariant = variants.find(v => v.id === variantId);
-          const realVariant = savedVariants.find(sv =>
-            sv.color === tempVariant.color && sv.size === tempVariant.size
-          );
-          variantId = realVariant?.id || null;
+        // 1. Nếu là ảnh được gán theo nhóm màu (UI Shopee mới)
+        if (img.image_type === 'variant' && img.colorKey) {
+          const matchedVariant = savedVariants.find(sv => sv.color === img.colorKey);
+          varId = matchedVariant ? matchedVariant.id : null;
+        }
+        // 2. Nếu là ảnh được gán trực tiếp qua chip (UI tổng quát) và vẫn mang ID tạm
+        else if (varId && varId.startsWith("temp_")) {
+          const tempVariant = variants.find(v => v.id === varId);
+          if (tempVariant) {
+            // Tìm variant thật trong DB khớp với Color/Size của variant tạm
+            const realVariant = savedVariants.find(sv =>
+              sv.color === tempVariant.color && sv.size === tempVariant.size
+            );
+            varId = realVariant ? realVariant.id : null;
+          } else {
+            varId = null;
+          }
         }
 
         return {
           product_id: finalProductId,
-          variant_id: variantId,
+          variant_id: varId,
           url: img.url,
           is_thumbnail: img.is_thumbnail,
           image_type: img.image_type,
-          display_order: img.display_order
+          display_order: index
         };
       });
+      console.log(imagesToInsert);
 
       const { error: imgErr } = await supabase.from("product_images").insert(imagesToInsert);
       if (imgErr) throw imgErr;
@@ -468,19 +591,19 @@ export default function ProductEditorScreen() {
             </View>
           )}
         </View>
-
-        {/* Card: Phân loại & Tồn kho */}
+        {/* Card: Phân loại & Tồn kho (Chuẩn Shopee) */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Phân loại & Tồn kho</Text>
 
+          {/* Khu vực tạo nhanh */}
           <View style={styles.variantForm}>
-            <View style={{ flex: 1, gap: 8 }}>
-              <Text style={styles.inputLabel}>Màu</Text>
-              <TextInput style={styles.smallInput} value={newColor} onChangeText={setNewColor} placeholder="Đỏ..." />
+            <View style={{ flex: 1.5, gap: 8 }}>
+              <Text style={styles.inputLabel}>Màu (Nhập phẩy để tạo nhiều)</Text>
+              <TextInput style={styles.smallInput} value={newColor} onChangeText={setNewColor} placeholder="Đỏ, Đen..." />
             </View>
             <View style={{ flex: 1, gap: 8 }}>
               <Text style={styles.inputLabel}>Size</Text>
-              <TextInput style={styles.smallInput} value={newSize} onChangeText={setNewSize} placeholder="M, L..." />
+              <TextInput style={styles.smallInput} value={newSize} onChangeText={setNewSize} placeholder="M, L, XL..." />
             </View>
             <View style={{ width: 60, gap: 8 }}>
               <Text style={styles.inputLabel}>Kho</Text>
@@ -491,21 +614,63 @@ export default function ProductEditorScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.variantListContainer}>
-            {variants.map((v) => (
-              <View key={v.id} style={styles.variantRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.variantMainText}>{v.color || "N/A"} - {v.size || "N/A"}</Text>
-                  <Text style={styles.variantSubText}>Kho: {v.stock} | Giá: {v.price.toLocaleString()}đ</Text>
+          {/* HIỂN THỊ DANH SÁCH THEO TỪNG NHÓM MÀU */}
+          <View style={{ marginTop: 20, gap: 16 }}>
+            {Object.entries(groupedVariants).map(([color, sizeList]) => {
+              const colorImg = getImageForColor(color);
+
+              return (
+                <View key={color} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+                  {/* Header Của Nhóm Màu & Upload Ảnh */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', padding: 12, borderBottomWidth: 1, borderColor: '#E5E7EB' }}>
+                    <Pressable
+                      onPress={() => pickImageForColorGroup(color)}
+                      style={{ width: 50, height: 50, backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginRight: 12 }}
+                    >
+                      {colorImg ? (
+                        <Image source={{ uri: colorImg.localUri || colorImg.url }} style={{ width: '100%', height: '100%' }} />
+                      ) : (
+                        <ImageIcon size={20} color="#9CA3AF" />
+                      )}
+                    </Pressable>
+                    <View>
+                      <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#111827' }}>Màu: {color}</Text>
+                      <Text style={{ fontSize: 12, color: '#6B7280' }}>Chạm vào khung viền để tải ảnh cho màu này</Text>
+                    </View>
+                  </View>
+
+                  {/* Danh sách các Size thuộc Màu này */}
+                  <View style={{ padding: 12, gap: 8 }}>
+                    {sizeList.map((v) => (
+                      <View key={v.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'white' }}>
+                        <View style={{ width: 50 }}>
+                          <Text style={{ fontWeight: 'bold', color: '#374151', textAlign: 'center' }}>{v.size || "N/A"}</Text>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: '#6B7280' }}>SKU</Text>
+                          <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.sku} onChangeText={(val) => updateVariantField(v.id, 'sku', val)} />
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10, color: '#6B7280' }}>Giá (VNĐ)</Text>
+                          <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.price !== undefined && v.price !== null ? String(v.price) : ""} onChangeText={(val) => updateVariantField(v.id, 'price', val)} keyboardType="numeric" />
+                        </View>
+
+                        <View style={{ flex: 0.8 }}>
+                          <Text style={{ fontSize: 10, color: '#6B7280' }}>Kho</Text>
+                          <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.stock !== undefined && v.stock !== null ? String(v.stock) : ""} onChangeText={(val) => updateVariantField(v.id, 'stock', val)} keyboardType="numeric" />
+                        </View>
+
+                        <Pressable onPress={() => removeVariant(v.id)} style={{ padding: 4, marginTop: 14 }}>
+                          <Trash2 size={18} color="#EF4444" />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-                <Pressable onPress={() => removeVariant(v.id)}>
-                  <Trash2 size={18} color="#EF4444" />
-                </Pressable>
-              </View>
-            ))}
-            {variants.length === 0 && (
-              <Text style={styles.emptyText}>Chưa có phân loại nào.</Text>
-            )}
+              );
+            })}
           </View>
         </View>
       </ScrollView>
