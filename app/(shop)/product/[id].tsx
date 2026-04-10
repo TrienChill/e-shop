@@ -6,7 +6,7 @@ import {
   Share2,
   Star,
 } from "lucide-react-native";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -108,7 +108,7 @@ export default function ProductDetailScreen() {
 
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
 
-  // Đồng bộ màu sắc khi vuốt ảnh - đơn giản hóa, không còn image_index
+  // Đồng bộ màu sắc khi vuốt ảnh
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / SCREEN_WIDTH);
@@ -116,6 +116,57 @@ export default function ProductDetailScreen() {
       setActiveIndex(index);
     }
   };
+
+  // --- Xử lý mảng hình ảnh hiển thị ---
+  const displayImages = useMemo(() => {
+    return product?.product_images && product.product_images.length > 0
+      ? [...product.product_images]
+          .filter((img: any) => img.image_type !== "description")
+          .sort((a: any, b: any) => a.display_order - b.display_order)
+      : [];
+  }, [product?.product_images]);
+
+  const productImages = useMemo(() => {
+    return displayImages.length > 0
+      ? displayImages.map((img: any) =>
+          img.url.startsWith("http")
+            ? img.url
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
+        )
+      : product?.images && product.images.length > 0
+      ? product.images.map((img: string) =>
+          img.startsWith("http")
+            ? img
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`
+        )
+      : ["https://via.placeholder.com/600"];
+  }, [displayImages, product?.images]);
+
+  // --- Tự động Scroll tới ảnh của màu được chọn ---
+  useEffect(() => {
+    if (selectedColor && displayImages.length > 0) {
+      // Tìm các variant IDs của màu này
+      const variantIdsOfColor = variants
+        .filter(v => v.color === selectedColor)
+        .map(v => v.id);
+
+      // Tìm index của ảnh đầu tiên map với variant này
+      const targetIndex = displayImages.findIndex(img => 
+        img.variant_id && variantIdsOfColor.includes(img.variant_id)
+      );
+
+      if (targetIndex !== -1) {
+        // Đảm bảo UI đã sẵn sàng trước khi scroll
+        requestAnimationFrame(() => {
+          imageScrollRef.current?.scrollTo({
+            x: targetIndex * SCREEN_WIDTH,
+            animated: true,
+          });
+          setActiveIndex(targetIndex);
+        });
+      }
+    }
+  }, [selectedColor, variants, displayImages]);
 
   // --- Derived từ bảng product_variants ---
   const uniqueColors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
@@ -441,25 +492,6 @@ export default function ProductDetailScreen() {
       </View>
     );
   }
-
-  // 4. Xử lý mảng hình ảnh từ Supabase (Ưu tiên bảng product_images)
-  const productImages =
-    product.product_images && product.product_images.length > 0
-      ? product.product_images
-          .filter((img: any) => img.image_type !== "description")
-          .sort((a: any, b: any) => a.display_order - b.display_order)
-          .map((img: any) =>
-            img.url.startsWith("http")
-              ? img.url
-              : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
-          )
-      : product.images && product.images.length > 0
-      ? product.images.map((img: string) =>
-          img.startsWith("http")
-            ? img
-            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img}`
-        )
-      : ["https://via.placeholder.com/600"];
 
   // 3. Hàm xử lý chọn màu
   const handleSelectColor = (color: string) => {
