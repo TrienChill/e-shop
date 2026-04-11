@@ -65,7 +65,10 @@ export default function ProductEditorScreen() {
 
   // Hàm lấy ảnh mô tả cho một màu sắc cụ thể
   const getImageForColor = (color: string) => {
-    return productImages.find(img => img.image_type === 'variant' && (img.colorKey === color || variants.find(v => v.id === img.variant_id)?.color === color));
+    return productImages.find(img => 
+      img.image_type === 'variant' && 
+      (img.colorKey === color || (img.variant_id && (variants.find(v => v.id === img.variant_id)?.color || "Không phân màu") === color))
+    );
   };
 
   // Fetch dữ liệu nếu là Edit Mode
@@ -230,7 +233,11 @@ export default function ProductEditorScreen() {
 
       // Xóa ảnh cũ của màu này (nếu có) và thêm ảnh mới
       setProductImages(prev => {
-        const filtered = prev.filter(p => !(p.image_type === 'variant' && (p.colorKey === color || variants.find(v => v.id === p.variant_id)?.color === color)));
+        const filtered = prev.filter(p => {
+          const isSameColor = p.image_type === 'variant' && 
+            (p.colorKey === color || (p.variant_id && (variants.find(v => v.id === p.variant_id)?.color || "Không phân màu") === color));
+          return !isSameColor;
+        });
         return [...filtered, newImage];
       });
     }
@@ -380,8 +387,33 @@ export default function ProductEditorScreen() {
       });
       // ----------------------
 
-      const { data: savedVariants, error: varErr } = await supabase.from("product_variants").upsert(variantsToUpsert).select();
-      if (varErr) throw varErr;
+      // --- ĐOẠN FIX LỖI NULL VALUE IN COLUMN "ID" ---
+      // Tách biến thể mới và biến thể cũ để xử lý riêng, tránh việc PostgREST điền null vào cột id khi upsert mảng hỗn hợp
+      const newVariantsToInsert = variantsToUpsert.filter(v => !v.id);
+      const existingVariantsToUpsert = variantsToUpsert.filter(v => v.id);
+
+      let savedVariants: any[] = [];
+
+      // 1. Lưu các biến thể mới (Không gửi kèm ID để DB tự generate)
+      if (newVariantsToInsert.length > 0) {
+        const { data: newlyInserted, error: insErr } = await supabase
+          .from("product_variants")
+          .insert(newVariantsToInsert)
+          .select();
+        if (insErr) throw insErr;
+        if (newlyInserted) savedVariants.push(...newlyInserted);
+      }
+
+      // 2. Cập nhật các biến thể cũ (Có kèm ID)
+      if (existingVariantsToUpsert.length > 0) {
+        const { data: updated, error: updErr } = await supabase
+          .from("product_variants")
+          .upsert(existingVariantsToUpsert)
+          .select();
+        if (updErr) throw updErr;
+        if (updated) savedVariants.push(...updated);
+      }
+      // ----------------------------------------------
 
       // 4. Lưu Hình ảnh vào product_images
       // Xóa ảnh cũ
@@ -393,7 +425,7 @@ export default function ProductEditorScreen() {
 
         // 1. Nếu là ảnh được gán theo nhóm màu (UI Shopee mới)
         if (img.image_type === 'variant' && img.colorKey) {
-          const matchedVariant = savedVariants.find(sv => sv.color === img.colorKey);
+          const matchedVariant = savedVariants.find(sv => (sv.color || "Không phân màu") === img.colorKey);
           varId = matchedVariant ? matchedVariant.id : null;
         }
         // 2. Nếu là ảnh được gán trực tiếp qua chip (UI tổng quát) và vẫn mang ID tạm
@@ -552,24 +584,28 @@ export default function ProductEditorScreen() {
 
                   {img.image_type === 'variant' && (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.variantSelector}>
-                      {variants.map((v) => (
-                        <Pressable
-                          key={v.id}
-                          style={[styles.variantChip, img.variant_id === v.id && styles.activeVariantChip]}
-                          onPress={() => {
-                            setProductImages(prev => {
-                              const updated = [...prev];
-                              updated[index] = { ...updated[index], variant_id: v.id };
-                              return updated;
-                            });
-                          }}
-                        >
-                          <Text style={[styles.variantChipText, img.variant_id === v.id && styles.activeVariantChipText]}>
-                            {v.color || ""}{v.color && v.size ? " - " : ""}{v.size || ""}
-                          </Text>
-                        </Pressable>
-                      ))}
-                      {variants.length === 0 && <Text style={styles.noVariantsPrompt}>Chưa có phân loại</Text>}
+                      {Object.keys(groupedVariants).map((color) => {
+                        const isActive = img.colorKey === color || 
+                                       (img.variant_id && (variants.find(v => v.id === img.variant_id)?.color || "Không phân màu") === color);
+                        return (
+                          <Pressable
+                            key={color}
+                            style={[styles.variantChip, isActive && styles.activeVariantChip]}
+                            onPress={() => {
+                              setProductImages(prev => {
+                                const updated = [...prev];
+                                updated[index] = { ...updated[index], colorKey: color, variant_id: null };
+                                return updated;
+                              });
+                            }}
+                          >
+                            <Text style={[styles.variantChipText, isActive && styles.activeVariantChipText]}>
+                              {color}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                      {Object.keys(groupedVariants).length === 0 && <Text style={styles.noVariantsPrompt}>Chưa có phân loại</Text>}
                     </ScrollView>
                   )}
                 </View>
