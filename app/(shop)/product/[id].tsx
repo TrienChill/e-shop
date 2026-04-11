@@ -679,8 +679,10 @@ export default function ProductDetailScreen() {
           </View>
           {/* Lấy tên từ state product */}
           <Text style={styles.productName}>{product.name}</Text>
-          {/* Lấy mô tả từ state product */}
-          <Text style={styles.productDescription}>{product.description}</Text>
+          {/* Lấy mô tả NGẮN từ state product */}
+          {product.short_description ? (
+            <Text style={styles.productDescription}>{product.short_description}</Text>
+          ) : null}
         </View>
 
         {/* Đường kẻ chia */}
@@ -812,24 +814,26 @@ export default function ProductDetailScreen() {
 
         {/* ══════════════ 4. Thông số & Mô tả ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông số & Mô tả</Text>
+          <Text style={styles.sectionTitle}>Chi tiết sản phẩm</Text>
 
-          {product.specifications && product.specifications.length > 0 ? (
-            product.specifications.map((spec: any, index: number) => (
-              <View key={index} style={styles.specRow}>
-                <Text style={styles.specLabel}>{spec.label}</Text>
-                <View style={styles.specChips}>
-                  <View style={styles.chip}>
-                    <Text style={styles.chipText}>{spec.value}</Text>
-                  </View>
+          {/* Thông số */}
+          {product.specifications && product.specifications.length > 0 && (
+            <View style={{ marginBottom: 16 }}>
+              {product.specifications.map((spec: any, index: number) => (
+                <View key={index} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
+                  <Text style={{ width: Dimensions.get('window').width * 0.35, color: '#6B7280', fontSize: 14 }}>{spec.name || spec.label}</Text>
+                  <Text style={{ flex: 1, color: '#111827', fontSize: 14 }}>{spec.value}</Text>
                 </View>
-              </View>
-            ))
-          ) : (
-            <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
-              Đang cập nhật thông số...
-            </Text>
+              ))}
+            </View>
           )}
+
+          {/* Mô tả chi tiết */}
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Mô tả sản phẩm</Text>
+          
+          <Text style={{ color: '#374151', fontSize: 14, lineHeight: 22 }}>
+            {product.description || "Đang cập nhật mô tả..."}
+          </Text>
         </View>
 
         {/* Đường kẻ chia */}

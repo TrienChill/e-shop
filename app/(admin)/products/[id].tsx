@@ -39,6 +39,7 @@ export default function ProductEditorScreen() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
+  const [shortDescription, setShortDescription] = useState("");
   const [specifications, setSpecifications] = useState<{ name: string; value: string }[]>([]);
   const [newSpecName, setNewSpecName] = useState("");
   const [newSpecValue, setNewSpecValue] = useState("");
@@ -90,6 +91,7 @@ export default function ProductEditorScreen() {
       setName(data.name);
       setPrice(String(data.price));
       setDescription(data.description || "");
+      setShortDescription(data.short_description || "");
       setSpecifications(data.specifications || []);
 
       // Fetch Images from product_images table
@@ -347,6 +349,7 @@ export default function ProductEditorScreen() {
         name,
         price: mainPriceNum,
         description,
+        short_description: shortDescription,
         is_active: isProductActive,
         images: imageUrlsForProduct, // <--- ĐẨY MẢNG ẢNH VÀO CỘT IMAGES CỦA BẢNG PRODUCTS Ở ĐÂY
         specifications, // <--- THỰC HIỆN LƯU THÔNG SỐ KỸ THUẬT Ở ĐÂY
@@ -511,19 +514,20 @@ export default function ProductEditorScreen() {
           <Text style={styles.label}>Giá cơ bản (VNĐ) *</Text>
           <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="numeric" />
 
-          <Text style={styles.label}>Mô tả</Text>
+          <Text style={styles.label}>Mô tả ngắn (Hiển thị dưới tên SP)</Text>
           <TextInput
-            style={[styles.input, { height: 100, textAlignVertical: "top" }]}
-            value={description}
-            onChangeText={setDescription}
+            style={[styles.input, { height: 60, textAlignVertical: "top" }]}
+            value={shortDescription}
+            onChangeText={setShortDescription}
             multiline
-            placeholder="Nhập mô tả sản phẩm..."
+            placeholder="VD: Áo thun cotton thoáng mát..."
           />
+
         </View>
 
-        {/* Card: Thông số kỹ thuật */}
+        {/* Card: Thông số kỹ thuật & Mô tả */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Thông số kỹ thuật</Text>
+          <Text style={styles.cardTitle}>Thông số kỹ thuật & Mô tả</Text>
           
           <View style={styles.specInputRow}>
             <TextInput 
@@ -541,6 +545,17 @@ export default function ProductEditorScreen() {
             <Pressable style={styles.addSpecBtn} onPress={addSpecification}>
               <Plus size={20} color="white" />
             </Pressable>
+          </View>
+
+          <View style={{ marginBottom: 16 }}>
+            <Text style={[styles.label, { fontSize: 13, color: '#6B7280' }]}>Mô tả chi tiết sản phẩm</Text>
+            <TextInput
+              style={[styles.input, { height: 120, textAlignVertical: "top", marginBottom: 0 }]}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              placeholder="Nhập phần văn bản mô tả chi tiết sản phẩm tại đây..."
+            />
           </View>
 
           <View style={styles.specList}>
