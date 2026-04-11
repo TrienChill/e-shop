@@ -39,8 +39,9 @@ export default function ProductEditorScreen() {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-
-  // Image State
+  const [specifications, setSpecifications] = useState<{ name: string; value: string }[]>([]);
+  const [newSpecName, setNewSpecName] = useState("");
+  const [newSpecValue, setNewSpecValue] = useState("");
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -89,6 +90,7 @@ export default function ProductEditorScreen() {
       setName(data.name);
       setPrice(String(data.price));
       setDescription(data.description || "");
+      setSpecifications(data.specifications || []);
 
       // Fetch Images from product_images table
       fetchProductImages(data.id);
@@ -211,6 +213,18 @@ export default function ProductEditorScreen() {
 
     setVariants([...variants, ...newVariants]);
     setNewColor(""); setNewSize(""); setNewStock(""); setNewPrice("");
+  };
+
+  // --- 0. Quản lý thông số kỹ thuật (Specifications) ---
+  const addSpecification = () => {
+    if (!newSpecName || !newSpecValue) return alert("Vui lòng nhập đầy đủ tên và giá trị thông số!");
+    setSpecifications([...specifications, { name: newSpecName, value: newSpecValue }]);
+    setNewSpecName("");
+    setNewSpecValue("");
+  };
+
+  const removeSpecification = (index: number) => {
+    setSpecifications(specifications.filter((_, i) => i !== index));
   };
   // --- 2. Chọn ảnh chuyên dụng cho một Màu Sắc ---
   const pickImageForColorGroup = async (color: string) => {
@@ -335,6 +349,7 @@ export default function ProductEditorScreen() {
         description,
         is_active: isProductActive,
         images: imageUrlsForProduct, // <--- ĐẨY MẢNG ẢNH VÀO CỘT IMAGES CỦA BẢNG PRODUCTS Ở ĐÂY
+        specifications, // <--- THỰC HIỆN LƯU THÔNG SỐ KỸ THUẬT Ở ĐÂY
       };
 
       // --- KẾT THÚC ĐOẠN CODE FIX ẢNH BÌA ---
@@ -504,6 +519,46 @@ export default function ProductEditorScreen() {
             multiline
             placeholder="Nhập mô tả sản phẩm..."
           />
+        </View>
+
+        {/* Card: Thông số kỹ thuật */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Thông số kỹ thuật</Text>
+          
+          <View style={styles.specInputRow}>
+            <TextInput 
+              style={[styles.smallInput, { flex: 1 }]} 
+              placeholder="Tên (VD: Chất liệu)" 
+              value={newSpecName} 
+              onChangeText={setNewSpecName} 
+            />
+            <TextInput 
+              style={[styles.smallInput, { flex: 1 }]} 
+              placeholder="Giá trị (VD: Cotton 100%)" 
+              value={newSpecValue} 
+              onChangeText={setNewSpecValue} 
+            />
+            <Pressable style={styles.addSpecBtn} onPress={addSpecification}>
+              <Plus size={20} color="white" />
+            </Pressable>
+          </View>
+
+          <View style={styles.specList}>
+            {specifications.map((spec, index) => (
+              <View key={index} style={styles.specItem}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.specLabel}>{spec.name}</Text>
+                  <Text style={styles.specValue}>{spec.value}</Text>
+                </View>
+                <Pressable onPress={() => removeSpecification(index)}>
+                  <Trash2 size={18} color="#EF4444" />
+                </Pressable>
+              </View>
+            ))}
+            {specifications.length === 0 && (
+              <Text style={styles.emptyText}>Chưa có thông số kỹ thuật nào</Text>
+            )}
+          </View>
         </View>
 
         {/* Card: Quản lý Hình ảnh */}
@@ -773,4 +828,12 @@ const styles = StyleSheet.create({
   variantRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
   variantMainText: { fontSize: 14, fontWeight: "600", color: "#111827" },
   variantSubText: { fontSize: 12, color: "#6B7280" },
+
+  // Specifications Styles
+  specInputRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
+  addSpecBtn: { backgroundColor: "#2563EB", padding: 8, borderRadius: 6, justifyContent: "center" },
+  specList: { borderTopWidth: 1, borderTopColor: "#F3F4F6", paddingTop: 10 },
+  specItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  specLabel: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
+  specValue: { fontSize: 14, color: "#111827", marginTop: 2 },
 });

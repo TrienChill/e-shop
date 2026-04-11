@@ -22,8 +22,8 @@ import {
 } from "react-native";
 
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
@@ -812,7 +812,7 @@ export default function ProductDetailScreen() {
 
         {/* ══════════════ 4. Thông số & Mô tả ══════════════ */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông số kỹ thuật</Text>
+          <Text style={styles.sectionTitle}>Thông số & Mô tả</Text>
 
           {product.specifications && product.specifications.length > 0 ? (
             product.specifications.map((spec: any, index: number) => (
