@@ -1,6 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { ArrowLeft, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -52,6 +52,118 @@ export default function ProductEditorScreen() {
   const [newSize, setNewSize] = useState("");
   const [newStock, setNewStock] = useState("");
   const [newPrice, setNewPrice] = useState(""); // Để trống sẽ dùng giá mặc định
+
+  const navigation = useNavigation();
+
+  // --- LOGIC CHỐNG THOÁT KHI CHƯA LƯU ---
+  const [initialDataStr, setInitialDataStr] = useState<string>("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Tạo snapshot chuỗi dữ liệu hiện tại để so sánh
+  const currentDataStr = React.useMemo(() => JSON.stringify({
+    name, price, shortDescription, description, specifications, variants, 
+    productImages: productImages.map(Math.random) // Cách ngẫu nhiên ngắn gọn để chỉ định hình ảnh đã thay đổi
+  }), [name, price, shortDescription, description, specifications, variants, productImages]);
+
+  // Khởi tạo trạng thái ban đầu của sản phẩm
+  useEffect(() => {
+    if (!loading) {
+      if (!initialDataStr) {
+        setInitialDataStr(currentDataStr);
+      } else if (currentDataStr !== initialDataStr) {
+        setHasUnsavedChanges(true); // Nếu khác ban đầu -> Đánh dấu là chưa lưu
+      } else {
+        setHasUnsavedChanges(false);
+      }
+    }
+  }, [loading, currentDataStr, initialDataStr]);
+
+  // Hook 1: Chặn nút Back của UI, nút Back của trình duyệt (SPA mode), và nút Back điện thoại
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      // Nếu không có thay đổi, cho phép thoát bình thường
+      if (!hasUnsavedChanges) return;
+
+      // Còn nếu có thay đổi, ngăn chặn hành động thoát
+      e.preventDefault();
+
+      if (Platform.OS === 'web') {
+        // Trên web, window.confirm sẽ chặn luồng xử lý đồng bộ
+        const ok = window.confirm("Bạn có thay đổi nội dung trang này nhưng chưa được lưu. Thao tác tiếp tục sẽ làm mất những thay đổi đó.\n\nBạn có chắc chắn muốn thoát?");
+        if (ok) {
+          // Bắt buộc phải tắt cờ trước và dùng setTimeout để đẩy việc dispatch vào hàng đợi sau khi luồng hiện tại kết thúc
+          setHasUnsavedChanges(false);
+          setTimeout(() => {
+            navigation.dispatch(e.data.action);
+          }, 0);
+        }
+      } else {
+        Alert.alert(
+          "Cảnh báo",
+          "Bạn có thay đổi nội dung trang này nhưng chưa được lưu.\nThao tác tiếp tục sẽ làm mất những thay đổi đó.\nBạn có chắc chắn muốn thoát khỏi đây?",
+          [
+            { text: "Ở lại", style: 'cancel', onPress: () => {} },
+            {
+              text: "Thoát",
+              style: 'destructive',
+              onPress: () => {
+                setHasUnsavedChanges(false);
+                setTimeout(() => {
+                  navigation.dispatch(e.data.action);
+                }, 0);
+              },
+            },
+          ]
+        );
+      }
+    });
+
+    return unsubscribe;
+  }, [hasUnsavedChanges, navigation]);
+
+  // Hàm xử lý riêng cho nút Back tự thiết kế trên ứng dụng/giao diện web
+  const handleCustomUiBack = () => {
+    if (hasUnsavedChanges) {
+      if (Platform.OS === 'web') {
+        const ok = window.confirm("Bạn có thay đổi nội dung trang này nhưng chưa được lưu. Thao tác tiếp tục sẽ làm mất những thay đổi đó.\n\nBạn có chắc chắn muốn thoát?");
+        if (ok) {
+          setHasUnsavedChanges(false);
+          setTimeout(() => router.back(), 0);
+        }
+      } else {
+        Alert.alert(
+          "Cảnh báo",
+          "Bạn có thay đổi nội dung trang này nhưng chưa được lưu.\nThao tác tiếp tục sẽ làm mất những thay đổi đó.\nBạn có chắc chắn muốn thoát khỏi đây?",
+          [
+            { text: "Ở lại", style: 'cancel' },
+            {
+              text: "Thoát",
+              style: 'destructive',
+              onPress: () => {
+                setHasUnsavedChanges(false);
+                setTimeout(() => router.back(), 0);
+              },
+            },
+          ]
+        );
+      }
+    } else {
+      router.back();
+    }
+  };
+
+  // Hook 2: Chặn hành động tải lại trang (F5) hoặc đóng Tab trên nền web
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Yêu cầu browser hiển thị prompt chuẩn
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // --- THÊM LOGIC GOM NHÓM BIẾN THỂ THEO MÀU ---
   // Tự động phân loại danh sách variants thành các nhóm theo màu sắc
@@ -475,7 +587,15 @@ export default function ProductEditorScreen() {
       if (imgErr) throw imgErr;
 
       alert(isNew ? "Thêm sản phẩm thành công!" : "Cập nhật thành công!");
-      router.push("/(admin)/products");
+      
+      // Xoá cờ thay đổi ngay trước khi rời đi để vô hiệu hóa prompt chặn
+      setHasUnsavedChanges(false);
+      
+      // Thủ thuật: Đợi một nhịp nhỏ để state 'hasUnsavedChanges' kịp update trước khi nhảy trang
+      setTimeout(() => {
+        router.push("/(admin)/products");
+      }, 0);
+      
     } catch (err: any) {
       console.error(err);
       alert("Đã có lỗi xảy ra: " + err.message);
@@ -491,7 +611,7 @@ export default function ProductEditorScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+          <Pressable onPress={handleCustomUiBack} style={styles.backBtn}>
             <ArrowLeft color="#374151" size={20} />
           </Pressable>
           <Text style={styles.title}>{isNew ? "Thêm Sản phẩm mới" : "Sửa Sản phẩm"}</Text>
