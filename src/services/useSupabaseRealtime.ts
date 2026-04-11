@@ -1,5 +1,5 @@
-import { supabase } from '@/src/lib/supabase'; // Nhớ kiểm tra lại đường dẫn import file supabase của bạn
-import { useEffect } from 'react';
+import { supabase } from '@/src/lib/supabase';
+import { useEffect, useRef } from 'react';
 
 // Định nghĩa các tham số truyền vào cho rõ ràng
 interface UseRealtimeProps {
@@ -15,32 +15,36 @@ export function useSupabaseRealtime({
     event = '*',
     filter
 }: UseRealtimeProps) {
+    // Sử dụng useRef để lưu trữ callback mới nhất, tránh lỗi "stale closure"
+    // mà không cần phải subscribe lại mỗi khi component re-render
+    const callbackRef = useRef(onUpdate);
+    
+    useEffect(() => {
+        callbackRef.current = onUpdate;
+    }, [onUpdate]);
 
     useEffect(() => {
-        // Tạo tên kênh tự động để không bị trùng lặp
-        const channelName = filter ? `realtime_${table}_${filter}` : `realtime_${table}`;
+        // Tạo tên kênh duy nhất để tránh xung đột
+        const channelName = `realtime_${table}_${event}_${filter || 'all'}_${Math.random().toString(36).substr(2, 5)}`;
 
-        // Khởi tạo trạm thu sóng
-        const subscription = supabase
+        const channel = supabase
             .channel(channelName)
             .on(
                 'postgres_changes' as any,
                 {
-                    event: event as any,
+                    event: event,
                     schema: 'public',
                     table: table,
                     filter: filter
                 },
                 (payload: any) => {
-                    console.log(`[Realtime] Bảng ${table} vừa có thay đổi!`);
-                    onUpdate(payload); // Gọi hàm cập nhật giao diện
+                    callbackRef.current(payload);
                 }
             )
             .subscribe();
 
-        // Tự động dọn dẹp trạm thu sóng khi người dùng chuyển sang trang khác
         return () => {
-            supabase.removeChannel(subscription);
+            supabase.removeChannel(channel);
         };
-    }, [table, event, filter]); // Hook sẽ tự động chạy lại nếu các tham số này thay đổi
+    }, [table, event, filter]);
 }

@@ -149,7 +149,8 @@ export const getMostPopularProducts = async () => {
         id, discount_type, discount_value, is_active, start_date, end_date
       )
     `)
-    .in("id", productIds);
+    .in("id", productIds)
+    .eq("is_active", true);
 
   if (enrichError) {
     console.error("Lỗi enrich sản phẩm phổ biến:", enrichError);
