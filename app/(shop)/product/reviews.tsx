@@ -60,6 +60,7 @@ export default function AllReviewsScreen() {
           `,
           )
           .eq("product_id", productId)
+          .eq("is_visible", true)
           .order("created_at", { ascending: false });
 
         if (error) throw error;
@@ -202,6 +203,12 @@ export default function AllReviewsScreen() {
                     <Image key={idx} source={{ uri: img }} style={styles.reviewImageThumb} />
                   ))}
                 </ScrollView>
+              )}
+              {item.admin_reply && (
+                <View style={{ backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginTop: 12 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: '#111' }}>Phản hồi từ cửa hàng</Text>
+                  <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 20 }}>{item.admin_reply}</Text>
+                </View>
               )}
             </View>
           );

@@ -58,6 +58,8 @@ interface ReviewData {
     reviewedImages?: string[];
     isEditable?: boolean;
     is_edited?: boolean;
+    admin_reply?: string;
+    is_visible?: boolean;
 }
 
 export default function ReviewsScreen() {
@@ -168,6 +170,8 @@ export default function ReviewsScreen() {
                                     reviewItem.comment = review.comment;
                                     reviewItem.reviewedImages = review.images;
                                     reviewItem.is_edited = review.is_edited;
+                                    reviewItem.admin_reply = review.admin_reply;
+                                    reviewItem.is_visible = review.is_visible;
                                     reviewItem.date = `Đã đánh giá: ${new Date(review.created_at).toLocaleDateString('vi-VN')}`;
                                 }
                                 reviewedData.push(reviewItem);
@@ -224,6 +228,7 @@ export default function ReviewsScreen() {
                     rating: data.rating,
                     comment: data.comment,
                     images: data.images,
+                    is_visible: true,
                     is_edited: false
                 }], { onConflict: 'order_item_id' });
                 if (reviewError) throw reviewError;
@@ -369,6 +374,12 @@ export default function ReviewsScreen() {
                                 <Image key={idx} source={{ uri: img }} style={styles.reviewImageThumb} />
                             ))}
                         </ScrollView>
+                    )}
+                    {item.admin_reply && (
+                        <View style={styles.adminReplyBox}>
+                            <Text style={styles.adminReplyTitle}>Phản hồi từ cửa hàng</Text>
+                            <Text style={styles.adminReplyText}>{item.admin_reply}</Text>
+                        </View>
                     )}
                 </View>
             )}
@@ -599,6 +610,23 @@ const styles = StyleSheet.create({
         height: 60,
         borderRadius: 12,
         marginRight: 8,
+    },
+    adminReplyBox: {
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: '#F3F4F6',
+        borderRadius: 8,
+    },
+    adminReplyTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.secondary,
+        marginBottom: 4,
+    },
+    adminReplyText: {
+        fontSize: 14,
+        color: COLORS.textGray,
+        lineHeight: 20,
     },
     cardFooter: {
         marginTop: 16,

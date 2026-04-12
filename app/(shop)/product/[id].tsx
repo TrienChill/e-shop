@@ -493,7 +493,8 @@ export default function ProductDetailScreen() {
     profiles (full_name, avatar_url)
   `,
           )
-          .eq("product_id", id);
+          .eq("product_id", id)
+          .eq("is_visible", true);
 
         if (error) throw error;
 
@@ -598,6 +599,12 @@ export default function ProductDetailScreen() {
               />
             ))}
           </ScrollView>
+        )}
+        {review.admin_reply && (
+          <View style={{ backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginTop: 12 }}>
+            <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: '#111' }}>Phản hồi từ cửa hàng</Text>
+            <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 20 }}>{review.admin_reply}</Text>
+          </View>
         )}
       </View>
     );

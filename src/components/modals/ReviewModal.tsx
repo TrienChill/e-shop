@@ -106,7 +106,7 @@ export default function ReviewModal({
         const filePath = `review-images/${fileName}`;
 
         const { data, error } = await supabase.storage
-          .from('images') // Tên bucket ảnh trên Supabase
+          .from('review-images') // Tên bucket ảnh trên Supabase
           .upload(filePath, decode(asset.base64!), {
             contentType: 'image/jpeg',
           });
@@ -118,7 +118,7 @@ export default function ReviewModal({
 
         if (data) {
           const { data: urlData } = supabase.storage
-            .from('images')
+            .from('review-images')
             .getPublicUrl(filePath);
           return urlData.publicUrl;
         }
