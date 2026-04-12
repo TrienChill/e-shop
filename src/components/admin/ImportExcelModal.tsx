@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -30,10 +30,11 @@ export default function ImportExcelModal({
   const [message, setMessage] = useState("");
   const [isDragging, setIsDragging] = useState(false);
 
-  // Web-only: hidden file input ref
-  const fileInputRef = useRef<any>(null);
+  // Web-only: ref cho hidden <input> và drop zone <div>
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dropZoneRef = useRef<HTMLDivElement | null>(null);
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = useCallback((file: File) => {
     const validTypes = [
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "application/vnd.ms-excel",
@@ -50,20 +51,64 @@ export default function ImportExcelModal({
     setSelectedFile(file);
     setStatus("ready");
     setMessage("");
-  };
+  }, []);
 
-  // ─── Drag & Drop handlers (web only) ─────────────────────────────────────
-  const handleDragOver = (e: any) => {
-    e.preventDefault?.();
-    setIsDragging(true);
-  };
-  const handleDragLeave = () => setIsDragging(false);
-  const handleDrop = (e: any) => {
-    e.preventDefault?.();
-    setIsDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) handleFileSelect(file);
-  };
+  // ─── Gắn Drag & Drop event listeners trực tiếp vào DOM (web only) ────────
+  // Lý do phải dùng useEffect + ref thay vì prop onDragOver trên Pressable:
+  // React Native Web không forward các DOM drag events qua Pressable.
+  useEffect(() => {
+    if (Platform.OS !== "web" || !visible) return;
+
+    // Đợi DOM render xong rồi mới lấy div
+    const timer = setTimeout(() => {
+      const el = dropZoneRef.current;
+      if (!el) return;
+
+      const onDragOver = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      };
+
+      const onDragEnter = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+      };
+
+      const onDragLeave = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Chỉ tắt khi chuột thực sự rời khỏi phần tử (không phải rời sang child)
+        if (!el.contains(e.relatedTarget as Node)) {
+          setIsDragging(false);
+        }
+      };
+
+      const onDrop = (e: DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleFileSelect(file);
+      };
+
+      el.addEventListener("dragover", onDragOver);
+      el.addEventListener("dragenter", onDragEnter);
+      el.addEventListener("dragleave", onDragLeave);
+      el.addEventListener("drop", onDrop);
+
+      // Cleanup khi modal đóng hoặc unmount
+      return () => {
+        el.removeEventListener("dragover", onDragOver);
+        el.removeEventListener("dragenter", onDragEnter);
+        el.removeEventListener("dragleave", onDragLeave);
+        el.removeEventListener("drop", onDrop);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [visible, handleFileSelect]);
 
   const handleConfirmUpload = async () => {
     if (!selectedFile) return;
@@ -77,7 +122,7 @@ export default function ImportExcelModal({
     if (result.success) {
       setStatus("success");
       setMessage(result.message);
-      onSuccess(); // Reload danh sách sản phẩm
+      onSuccess();
     } else {
       setStatus("error");
       setMessage(result.message);
@@ -85,14 +130,16 @@ export default function ImportExcelModal({
   };
 
   const handleClose = () => {
-    if (status === "loading") return; // Không đóng khi đang xử lý
+    if (status === "loading") return;
     setSelectedFile(null);
     setStatus("idle");
     setProgress(0);
     setMessage("");
+    setIsDragging(false);
     onClose();
   };
 
+  // ─── Drop Zone render ────────────────────────────────────────────────────
   const renderDropZone = () => {
     if (Platform.OS !== "web") {
       return (
@@ -105,28 +152,65 @@ export default function ImportExcelModal({
       );
     }
 
+    // Trên web: render div thật để drag & drop hoạt động,
+    // React Native's Pressable không hỗ trợ DragEvent.
+    const dropZoneStyle: React.CSSProperties = {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      border: `2px dashed ${isDragging ? "#2563EB" : "#D1D5DB"}`,
+      borderRadius: 12,
+      paddingTop: 36,
+      paddingBottom: 36,
+      paddingLeft: 24,
+      paddingRight: 24,
+      gap: 8,
+      backgroundColor: isDragging ? "#EFF6FF" : "#F9FAFB",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      userSelect: "none",
+    };
+
     return (
-      // On web, we attach event listeners via nativeID and dangerouslySetInnerHTML workaround
-      // The cleanest approach is using `onDragOver`, `onDrop` props on View (web-only)
-      <Pressable
-        style={[styles.dropZone, isDragging && styles.dropZoneDragging]}
-        onPress={() => fileInputRef.current?.click()}
-        // @ts-ignore - web specific props
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+      // @ts-ignore - div không có trong React Native types nhưng hợp lệ trên web
+      <div
+        ref={dropZoneRef}
+        style={dropZoneStyle}
+        onClick={() => fileInputRef.current?.click()}
       >
         <FileSpreadsheet size={40} color={isDragging ? "#2563EB" : "#9CA3AF"} />
-        <Text style={[styles.dropZoneTitle, isDragging && { color: "#2563EB" }]}>
-          {isDragging ? "Thả file vào đây!" : "Kéo thả file Excel vào đây"}
-        </Text>
-        <Text style={styles.dropZoneSubtext}>
-          hoặc <Text style={styles.browseText}>chọn từ máy tính</Text>
-        </Text>
-        <Text style={styles.dropZoneHint}>Hỗ trợ: .xlsx, .xls</Text>
 
-        {/* Hidden native file input for browser */}
-        {/* @ts-ignore */}
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: "600",
+            color: isDragging ? "#2563EB" : "#374151",
+            marginTop: 8,
+            textAlign: "center",
+          }}
+        >
+          {isDragging ? "🎯 Thả file vào đây!" : "Kéo thả file Excel vào đây"}
+        </span>
+
+        <span style={{ fontSize: 13, color: "#6B7280" }}>
+          hoặc{" "}
+          <span
+            style={{
+              color: "#2563EB",
+              fontWeight: "600",
+              textDecoration: "underline",
+            }}
+          >
+            chọn từ máy tính
+          </span>
+        </span>
+
+        <span style={{ fontSize: 12, color: "#9CA3AF", marginTop: 4 }}>
+          Hỗ trợ: .xlsx, .xls
+        </span>
+
+        {/* Hidden native file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -135,9 +219,11 @@ export default function ImportExcelModal({
           onChange={(e: any) => {
             const file = e.target?.files?.[0];
             if (file) handleFileSelect(file);
+            // Reset input để có thể chọn lại cùng file
+            e.target.value = "";
           }}
         />
-      </Pressable>
+      </div>
     );
   };
 
@@ -167,11 +253,12 @@ export default function ImportExcelModal({
 
           {/* ── Body ── */}
           <View style={styles.modalBody}>
-            {/* Drop zone (idle / ready) */}
+            {/* Drop zone (idle / ready / error) */}
             {(status === "idle" || status === "ready" || status === "error") && (
               <>
                 {renderDropZone()}
-                {/* Selected file preview */}
+
+                {/* File đã chọn */}
                 {selectedFile && (
                   <View style={styles.filePreview}>
                     <FileSpreadsheet size={18} color="#10B981" />
@@ -189,6 +276,14 @@ export default function ImportExcelModal({
                     </Pressable>
                   </View>
                 )}
+
+                {/* Error banner */}
+                {status === "error" && message ? (
+                  <View style={styles.errorBanner}>
+                    <XCircle size={16} color="#EF4444" />
+                    <Text style={styles.errorText}>{message}</Text>
+                  </View>
+                ) : null}
               </>
             )}
 
@@ -200,7 +295,9 @@ export default function ImportExcelModal({
                   Đang xử lý... {Math.round(progress)}%
                 </Text>
                 <View style={styles.progressTrack}>
-                  <View style={[styles.progressBar, { width: `${progress}%` as any }]} />
+                  <View
+                    style={[styles.progressBar, { width: `${progress}%` as any }]}
+                  />
                 </View>
                 <Text style={styles.loadingHint}>
                   Vui lòng không đóng cửa sổ này
@@ -219,15 +316,7 @@ export default function ImportExcelModal({
               </View>
             )}
 
-            {/* Error message banner */}
-            {status === "error" && message ? (
-              <View style={styles.errorBanner}>
-                <XCircle size={16} color="#EF4444" />
-                <Text style={styles.errorText}>{message}</Text>
-              </View>
-            ) : null}
-
-            {/* Hướng dẫn định dạng */}
+            {/* Hướng dẫn định dạng (chỉ hiện lúc idle) */}
             {status === "idle" && (
               <View style={styles.guide}>
                 <Text style={styles.guideTitle}>📋 Định dạng yêu cầu:</Text>
@@ -324,7 +413,7 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 16,
   },
-  // ── Drop Zone ──
+  // ── Drop Zone (mobile fallback only, web uses inline div style) ──
   dropZone: {
     borderWidth: 2,
     borderStyle: "dashed",
@@ -335,32 +424,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     backgroundColor: "#F9FAFB",
-    cursor: "pointer",
   } as any,
-  dropZoneDragging: {
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
-  },
-  dropZoneTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-    marginTop: 8,
-  },
-  dropZoneSubtext: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-  browseText: {
-    color: "#2563EB",
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  dropZoneHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 4,
-  },
   dropZoneText: {
     fontSize: 14,
     color: "#6B7280",
