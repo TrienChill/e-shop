@@ -1,6 +1,8 @@
 import { listOrders, updateOrderStatus } from "@/src/services/admin/orders";
-import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle } from "lucide-react-native";
+import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle, Printer } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
+import { useReactToPrint } from "react-to-print";
+import { InvoiceTemplate, InvoiceOrderData } from "@/src/components/admin/InvoiceTemplate";
 import {
   ActivityIndicator,
   NativeScrollEvent,
@@ -48,6 +50,36 @@ export default function AdminOrdersScreen() {
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+
+  // Print Logic
+  const [selectedPrintOrder, setSelectedPrintOrder] = useState<InvoiceOrderData | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  const reactToPrintFn = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `Hoa-Don-${selectedPrintOrder?.id || "DH"}`,
+    onAfterPrint: () => setSelectedPrintOrder(null),
+  });
+
+  const handlePrintDraft = async (order: any) => {
+    const printData: InvoiceOrderData = {
+      id: order.id,
+      created_at: order.created_at,
+      receiver_name: order.receiver_name,
+      phone_contact: order.phone_contact,
+      shipping_address: order.shipping_address, // Lấy từ DB
+      total_amount: order.total_amount,
+      shipping_fee: 0, 
+      items: order.order_items || [], // Phải gán chi tiết SP
+    };
+    setSelectedPrintOrder(printData);
+  };
+
+  useEffect(() => {
+    if (selectedPrintOrder?.id) {
+       reactToPrintFn(); 
+    }
+  }, [selectedPrintOrder]);
 
   const fetchOrders = async () => {
     try {
@@ -226,6 +258,11 @@ export default function AdminOrdersScreen() {
                     </View>
 
                     <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
+                      <ActionButton
+                        onPress={() => handlePrintDraft(order)}
+                        label="In HĐ"
+                        color="#1F2937"
+                      />
                       {order.status === 'pending' && (
                         <ActionButton
                           onPress={() => handleUpdateStatus(order.id, 'processing')}
@@ -275,6 +312,12 @@ export default function AdminOrdersScreen() {
         >
           <ArrowUp size={24} color="white" />
         </Pressable>
+      )}
+
+      {Platform.OS === 'web' && (
+        <div style={{ display: "none" }}>
+          <InvoiceTemplate ref={printRef} order={selectedPrintOrder} />
+        </div>
       )}
     </View>
   );
