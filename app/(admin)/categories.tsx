@@ -341,7 +341,7 @@ function CategoryForm({
 
       {/* Danh mục cha */}
       <Text style={styles.label}>Danh mục cha</Text>
-      <View style={styles.selectBox}>
+      <ScrollView style={styles.selectBox} nestedScrollEnabled={true}>
         <Pressable
           style={[
             styles.selectItem,
@@ -382,7 +382,7 @@ function CategoryForm({
               </Text>
             </Pressable>
           ))}
-      </View>
+      </ScrollView>
 
       {/* Thứ tự hiển thị */}
       <Text style={styles.label}>Thứ tự hiển thị</Text>
@@ -504,7 +504,12 @@ export default function AdminCategoriesScreen() {
 
   const handleOpenCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    // Mặc định cho danh mục gốc khi mới mở form thêm mới
+    const rootSiblings = flatList.filter((c) => c.parent_id === null);
+    const maxOrder = rootSiblings.length > 0 
+      ? Math.max(...rootSiblings.map((c) => c.display_order)) 
+      : 0;
+    setForm({ ...EMPTY_FORM, display_order: maxOrder + 1 });
     setShowForm(true);
   };
 
@@ -714,7 +719,23 @@ export default function AdminCategoriesScreen() {
         {showForm && (
           <CategoryForm
             form={form}
-            onChange={(partial) => setForm((prev) => ({ ...prev, ...partial }))}
+            onChange={(partial) => {
+              setForm((prev) => {
+                const nextForm = { ...prev, ...partial };
+                // Khi thay đổi danh mục cha, tự động tính toán thứ tự hiển thị cuối cùng trong nhóm cha đó
+                if ("parent_id" in partial) {
+                  const siblings = flatList.filter(
+                    (c) => c.parent_id === partial.parent_id
+                  );
+                  const maxOrder =
+                    siblings.length > 0
+                      ? Math.max(...siblings.map((c) => c.display_order))
+                      : 0;
+                  nextForm.display_order = maxOrder + 1;
+                }
+                return nextForm;
+              });
+            }}
             flatNodes={flatNodes}
             excludeId={editingId ?? undefined}
             editingId={editingId}
@@ -960,7 +981,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 8,
     overflow: "hidden",
-    maxHeight: 180,
+    maxHeight: 250,
   },
   selectItem: {
     paddingHorizontal: 12,
