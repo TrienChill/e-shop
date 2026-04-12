@@ -2,6 +2,7 @@ import { useAuth } from "@/src/auth/AuthContext";
 import { Link, Redirect, Slot, usePathname, useRouter } from "expo-router";
 import {
   LayoutDashboard,
+  Layers,
   LogOut,
   Package,
   ShieldCheck,
@@ -57,6 +58,7 @@ export default function AdminLayout() {
     { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
     { href: "/(admin)/orders", label: "Đơn hàng", icon: ShoppingBag },
     { href: "/(admin)/products", label: "Sản phẩm", icon: Package },
+    { href: "/(admin)/categories", label: "Danh mục", icon: Layers },
     { href: "/(admin)/vouchers", label: "Mã giảm giá", icon: Ticket },
     { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
   ];
