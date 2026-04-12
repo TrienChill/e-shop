@@ -128,7 +128,7 @@ export default function CategoriesScreen() {
       const { data, error } = await supabase
         .from("cart_items").select("quantity").eq("user_id", user.id);
       if (error) throw error;
-      const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
       setCartCount(total);
     } catch (error) {
       console.error("Lỗi lấy số lượng giỏ hàng:", error);

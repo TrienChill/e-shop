@@ -247,7 +247,7 @@ const HomeScreen = () => {
 
       if (error) throw error;
 
-      const total = data.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
       setCartCount(total);
     } catch (error) {
       console.error("Lỗi lấy số lượng giỏ hàng:", error);

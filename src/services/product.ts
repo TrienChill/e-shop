@@ -159,7 +159,7 @@ export const getMostPopularProducts = async () => {
 
   // Sắp xếp lại theo thứ tự của RPC ban đầu
   const result = productIds.map((id: any) => {
-    const product = enrichedProducts.find((p) => p.id === id);
+    const product = (enrichedProducts || []).find((p) => p.id === id);
     return calculateDiscountedPrice(product);
   });
 

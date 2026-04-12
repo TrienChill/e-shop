@@ -51,9 +51,22 @@ export const ghnApi = axios.create({
   baseURL: "https://dev-online-gateway.ghn.vn/shiip/public-api/v2",
   headers: {
     "Content-Type": "application/json",
-    "Token": process.env.EXPO_PUBLIC_GHN_TOKEN || "", 
-    "ShopId": process.env.EXPO_PUBLIC_GHN_SHOP_ID || "",
   },
+});
+
+// Sử dụng Interceptor để đảm bảo giá trị env luôn được nạp ở thời điểm tính toán (Dynamic Execution)
+ghnApi.interceptors.request.use((config) => {
+  const token = process.env.EXPO_PUBLIC_GHN_TOKEN;
+  const shopId = process.env.EXPO_PUBLIC_GHN_SHOP_ID;
+
+  if (token) {
+    config.headers.set("Token", token);
+  }
+  // Bỏ qua ShopId đối với master-data (gây lỗi 400) và API tính phí preview (để bỏ qua check lỗi địa chỉ Shop)
+  if (shopId && config.url && !config.url.includes("master-data") && !config.url.includes("fee")) {
+    config.headers.set("ShopId", shopId);
+  }
+  return config;
 });
 
 /**
@@ -68,7 +81,8 @@ export const calculateShippingFee = async (
     try {
       const response = await ghnApi.post<GHNFeeResponse>("/shipping-order/fee", {
         service_type_id: 2, // 2: Chuẩn, 1: Nhanh/Bay
-        from_district_id: 1442, // Fix cứng ID Quận của Shop xuất phát (Mặc định Quận 1 - 1442)
+        from_district_id: 1442, // Fix cứng ID Quận của Shop xuất phát (Quận 1 - 1442)
+        from_ward_code: "21012", // Fix cứng Phường xuất phát để tự động tính cước không phụ thuộc cấu hình ShopId
         to_district_id: ghnPayload.to_district_id,
         to_ward_code: ghnPayload.to_ward_code,
         weight: ghnPayload.weight,
@@ -107,7 +121,6 @@ export const fetchProvinces = async (): Promise<GHNProvince[]> => {
 export const fetchDistricts = async (provinceId: number): Promise<GHNDistrict[]> => {
   try {
     const res = await ghnApi.get<{ code: number; data: GHNDistrict[] }>(`${MASTER_DATA_URL}/district`, {
-      headers: { token: process.env.EXPO_PUBLIC_GHN_TOKEN },
       params: { province_id: provinceId },
     });
     if (res.data.code === 200) return res.data.data;
@@ -121,7 +134,6 @@ export const fetchDistricts = async (provinceId: number): Promise<GHNDistrict[]>
 export const fetchWards = async (districtId: number): Promise<GHNWard[]> => {
   try {
     const res = await ghnApi.get<{ code: number; data: GHNWard[] }>(`${MASTER_DATA_URL}/ward`, {
-      headers: { token: process.env.EXPO_PUBLIC_GHN_TOKEN },
       params: { district_id: districtId },
     });
     if (res.data.code === 200) return res.data.data;

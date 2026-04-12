@@ -122,7 +122,12 @@ export default function AddressSelector({ onLocationSelected }: Props) {
     return (
       <FlatList
         data={dataList}
-        keyExtractor={(item, index) => String(item.ProvinceID || item.DistrictID || item.WardCode || index)}
+        keyExtractor={(item, index) => {
+          if (selectionType === "province") return String(item.ProvinceID);
+          if (selectionType === "district") return String(item.DistrictID);
+          if (selectionType === "ward") return String(item.WardCode);
+          return String(index);
+        }}
         renderItem={({ item }) => (
           <Pressable 
             onPress={() => handleSelectItem(item)}
