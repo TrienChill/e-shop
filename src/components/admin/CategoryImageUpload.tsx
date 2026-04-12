@@ -22,7 +22,7 @@ interface Props {
   onUpdated: (newUrl: string | null) => void; // callback sau khi update
 }
 
-const BUCKET = "category-images";
+const BUCKET = "images";
 const PLACEHOLDER = "https://via.placeholder.com/120x80?text=No+Image";
 
 export default function CategoryImageUpload({

@@ -179,6 +179,7 @@ export const getPopularProducts = async (currentProductId?: string) => {
         )
       `)
       .eq("is_active", true)
+      .order("created_at", { ascending: false })
       .limit(20); // Lấy ứng viên từ 20 sản phẩm mới/hot nhất
 
     // 2. Loại bỏ sản phẩm hiện tại (nếu đang ở trang chi tiết)

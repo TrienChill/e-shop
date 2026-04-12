@@ -1,0 +1,4 @@
+id,name,public,file_size_limit,allowed_mime_types
+product-images,product-images,true,null,null
+avatars,avatars,true,null,null
+images,images,true,null,null
