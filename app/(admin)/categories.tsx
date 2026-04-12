@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import {
   Eye,
   EyeOff,
   FolderOpen,
+  Package2,
   Plus,
   Save,
   Trash2,
@@ -37,6 +39,8 @@ import {
   reparentChildren,
   updateCategory,
 } from "@/src/utils/categoryTree";
+import CategoryImageUpload from "@/src/components/admin/CategoryImageUpload";
+import CategoryProductsModal from "@/src/components/admin/CategoryProductsModal";
 
 // ─── Form State ───────────────────────────────────────────────────────────────
 
@@ -87,6 +91,7 @@ interface CategoryRowProps {
   onToggleActive: (cat: Category) => void;
   onMoveUp: (cat: Category) => void;
   onMoveDown: (cat: Category) => void;
+  onViewProducts: (cat: Category) => void;
   isFirst: boolean;
   isLast: boolean;
 }
@@ -100,6 +105,7 @@ function CategoryRow({
   onToggleActive,
   onMoveUp,
   onMoveDown,
+  onViewProducts,
   isFirst,
   isLast,
 }: CategoryRowProps) {
@@ -121,11 +127,19 @@ function CategoryRow({
           )}
         </Pressable>
 
-        {/* Icon folder */}
-        <FolderOpen
-          size={16}
-          color={node.depth === 0 ? "#2563EB" : node.depth === 1 ? "#7C3AED" : "#10B981"}
-        />
+        {/* Thumbnail ảnh danh mục */}
+        {node.image_url ? (
+          <Image
+            source={{ uri: node.image_url }}
+            style={styles.rowThumbnail}
+            resizeMode="cover"
+          />
+        ) : (
+          <FolderOpen
+            size={16}
+            color={node.depth === 0 ? "#2563EB" : node.depth === 1 ? "#7C3AED" : "#10B981"}
+          />
+        )}
 
         {/* Tên danh mục */}
         <View style={{ flex: 1 }}>
@@ -175,6 +189,14 @@ function CategoryRow({
           )}
         </Pressable>
 
+        {/* Xem sản phẩm trong danh mục */}
+        <Pressable
+          style={[styles.iconBtn, styles.iconBtnProducts]}
+          onPress={() => onViewProducts(node)}
+        >
+          <Package2 size={15} color="#059669" />
+        </Pressable>
+
         {/* Sửa */}
         <Pressable style={styles.iconBtn} onPress={() => onEdit(node)}>
           <Edit2 size={15} color="#4B5563" />
@@ -203,6 +225,7 @@ interface TreeViewProps {
   onToggleActive: (cat: Category) => void;
   onMoveUp: (cat: Category) => void;
   onMoveDown: (cat: Category) => void;
+  onViewProducts: (cat: Category) => void;
   siblings: CategoryNode[]; // Danh sách anh chị em cùng cấp
 }
 
@@ -215,6 +238,7 @@ function TreeView({
   onToggleActive,
   onMoveUp,
   onMoveDown,
+  onViewProducts,
   siblings,
 }: TreeViewProps) {
   return (
@@ -232,6 +256,7 @@ function TreeView({
               onToggleActive={onToggleActive}
               onMoveUp={onMoveUp}
               onMoveDown={onMoveDown}
+              onViewProducts={onViewProducts}
               isFirst={index === 0}
               isLast={index === siblings.length - 1}
             />
@@ -246,6 +271,7 @@ function TreeView({
                 onToggleActive={onToggleActive}
                 onMoveUp={onMoveUp}
                 onMoveDown={onMoveDown}
+                onViewProducts={onViewProducts}
                 siblings={node.children}
               />
             )}
@@ -338,6 +364,16 @@ function CategoryForm({
         placeholder="auto-generated"
         placeholderTextColor="#9CA3AF"
       />
+
+      {/* Upload ảnh - Chỉ hiện khi đang chỉnh sửa danh mục cụ thể */}
+      {editingId && (
+        <CategoryImageUpload
+          categoryId={editingId}
+          currentImageUrl={form.image_url}
+          categoryName={form.name_vi || form.name}
+          onUpdated={(url) => onChange({ image_url: url || "" })}
+        />
+      )}
 
       {/* Danh mục cha */}
       <Text style={styles.label}>Danh mục cha</Text>
@@ -461,6 +497,7 @@ export default function AdminCategoriesScreen() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [viewProductCat, setViewProductCat] = useState<Category | null>(null);
 
   // Build tree từ flatList — memo để không tính lại khi không cần
   const tree = useMemo(() => buildTree(flatList), [flatList]);
@@ -769,11 +806,22 @@ export default function AdminCategoriesScreen() {
               onToggleActive={handleToggleActive}
               onMoveUp={(cat) => handleMove(cat, "up")}
               onMoveDown={(cat) => handleMove(cat, "down")}
+              onViewProducts={(cat) => setViewProductCat(cat)}
               siblings={tree}
             />
           </View>
         )}
       </ScrollView>
+
+      {/* MODAL QUẢN LÝ SẢN PHẨM */}
+      {viewProductCat && (
+        <CategoryProductsModal
+          visible={!!viewProductCat}
+          categoryId={viewProductCat.id}
+          categoryName={viewProductCat.name_vi || viewProductCat.name}
+          onClose={() => setViewProductCat(null)}
+        />
+      )}
     </View>
   );
 }
@@ -884,6 +932,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  rowThumbnail: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
   catName: {
     fontSize: 14,
     fontWeight: "600",
@@ -916,6 +973,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F3F4F6",
     borderRadius: 6,
+  },
+  iconBtnProducts: {
+    backgroundColor: "#ECFDF5",
+    borderColor: "#A7F3D0",
+    borderWidth: 1,
   },
   iconBtnDisabled: {
     opacity: 0.3,
