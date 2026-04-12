@@ -45,9 +45,24 @@ const HomeScreen = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // --- REALTIME HOOKS ---
+  // Với sản phẩm: nếu DELETE thì lọc ngay ra khỏi tất cả state, không cần re-fetch
   useSupabaseRealtime({
     table: 'products',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    onUpdate: (payload) => {
+      if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (deletedId) {
+          setTopProducts(prev => prev.filter(p => p.id !== deletedId));
+          setNewItems(prev => prev.filter(p => p.id !== deletedId));
+          setPopularItems(prev => prev.filter(p => p.id !== deletedId));
+          setFlashSaleProducts(prev => prev.filter(p => p.id !== deletedId));
+          setJustForYouItems(prev => prev.filter(p => p.id !== deletedId));
+        }
+      } else {
+        // INSERT hoặc UPDATE: re-fetch để lấy dữ liệu mới nhất
+        setRefreshTrigger(prev => prev + 1);
+      }
+    }
   });
   useSupabaseRealtime({
     table: 'banners',

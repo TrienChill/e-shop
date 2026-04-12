@@ -94,7 +94,17 @@ export default function CategoriesScreen() {
   
   useSupabaseRealtime({
     table: 'products',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    onUpdate: (payload) => {
+      if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (deletedId) {
+          // Lọc sản phẩm bị xoá ra khỏi list ngay lập tức
+          setProducts(prev => prev.filter(p => p.id !== deletedId));
+        }
+      } else {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    }
   });
   useSupabaseRealtime({
     table: 'categories',

@@ -1,4 +1,5 @@
 import { getPopularProducts, calculateDiscountedPrice } from "@/src/services/product";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
 import { FilterModal } from "@/src/components/search/FilterModal";
@@ -67,6 +68,23 @@ export default function SearchScreen() {
     };
     initData();
   }, []);
+
+  // --- REALTIME: khi admin xóa sản phẩm, lọc ngay khỏi UI ---
+  useSupabaseRealtime({
+    table: 'products',
+    onUpdate: (payload) => {
+      if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (deletedId) {
+          setDiscoverProducts(prev => prev.filter(p => p.id !== deletedId));
+          setSearchResults(prev => prev.filter(p => p.id !== deletedId));
+        }
+      } else if (payload.eventType === 'INSERT') {
+        // Sản phẩm mới: reload lại phần khám phá
+        getPopularProducts().then(data => setDiscoverProducts(data));
+      }
+    }
+  });
 
   const saveHistory = async (newHistory: string[]) => {
     try {
