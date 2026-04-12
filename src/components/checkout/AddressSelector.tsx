@@ -11,18 +11,41 @@ import {
 } from "@/src/services/ghn/shippingService";
 
 interface Props {
+  initialAddress?: any;
   onLocationSelected: (
     province: GHNProvince | null,
     district: GHNDistrict | null,
-    ward: GHNWard | null
+    ward: GHNWard | null,
+    fullAddressString?: { street: string; district: string; province: string }
   ) => void;
 }
 
-export default function AddressSelector({ onLocationSelected }: Props) {
+export default function AddressSelector({ onLocationSelected, initialAddress }: Props) {
   // States of selected items
   const [selectedProvince, setSelectedProvince] = useState<GHNProvince | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<GHNDistrict | null>(null);
   const [selectedWard, setSelectedWard] = useState<GHNWard | null>(null);
+  const [street, setStreet] = useState("");
+
+  // Initialize from initialAddress
+  useEffect(() => {
+    if (initialAddress) {
+       setStreet(initialAddress.street_address || "");
+       // We only set the text representations if they are just strings, 
+       // but GHNProvince dropdown requires full objects. 
+       // Since we'll rely on GHN IDs passed to checkout state directly, 
+       // we can just mock the object locally if needed, or leave it null allowing the user to select.
+       if (!selectedProvince && initialAddress.province_city) {
+         setSelectedProvince({ ProvinceID: 0, ProvinceName: initialAddress.province_city } as any);
+       }
+       if (!selectedDistrict && initialAddress.district) {
+         setSelectedDistrict({ DistrictID: initialAddress.ghn_district_id || 0, ProvinceID: 0, DistrictName: initialAddress.district } as any);
+       }
+       if (initialAddress.ghn_ward_code) {
+         setSelectedWard({ WardCode: initialAddress.ghn_ward_code, DistrictID: initialAddress.ghn_district_id || 0, WardName: "Mặc định GHN" } as any);
+       }
+    }
+  }, [initialAddress]);
 
   // States of lists
   const [provinces, setProvinces] = useState<GHNProvince[]>([]);
@@ -76,9 +99,18 @@ export default function AddressSelector({ onLocationSelected }: Props) {
   // Push back selected location info to Checkout Screen
   useEffect(() => {
     if (onLocationSelected) {
-      onLocationSelected(selectedProvince, selectedDistrict, selectedWard);
+      onLocationSelected(
+        selectedProvince, 
+        selectedDistrict, 
+        selectedWard,
+        {
+          street: street,
+          district: selectedDistrict?.DistrictName || initialAddress?.district || "",
+          province: selectedProvince?.ProvinceName || initialAddress?.province_city || "",
+        }
+      );
     }
-  }, [selectedProvince, selectedDistrict, selectedWard]);
+  }, [selectedProvince, selectedDistrict, selectedWard, street]);
 
   // Hành động khi nhấn chọn Item trong Modal
   const handleSelectItem = (item: any) => {
@@ -194,6 +226,17 @@ export default function AddressSelector({ onLocationSelected }: Props) {
           </View>
           <ChevronDown size={20} color="#6B7280" />
         </Pressable>
+
+        {/* Số nhà, Tên đường */}
+        <View style={{ borderWidth: 1, borderColor: "#D1D5DB", backgroundColor: "white", padding: 14, borderRadius: 12 }}>
+          <TextInput 
+            value={street}
+            onChangeText={setStreet}
+            placeholder="4. Số nhà, Tên đường..."
+            placeholderTextColor="#9CA3AF"
+            style={{ fontSize: 15, color: "#111827", padding: 0 }}
+          />
+        </View>
 
       </View>
 

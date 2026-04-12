@@ -221,9 +221,8 @@ export default function CheckoutScreen() {
         // 1. Lấy thông tin địa chỉ & profile người nhận
         const { data: defaultAddr } = await supabase
           .from("user_addresses")
-          .select(
-            "receiver_name, phone_number, province_city, district, street_address",
-          )
+          // 👇 CẬP NHẬT: Lấy thêm ghn_district_id và ghn_ward_code
+          .select("id, receiver_name, phone_number, province_city, district, street_address, ghn_district_id, ghn_ward_code") 
           .eq("user_id", user.id)
           .eq("is_default", true)
           .maybeSingle();
@@ -235,6 +234,10 @@ export default function CheckoutScreen() {
             email: user.email,
           });
           setUserAddress(defaultAddr);
+          
+          // 👇 CẬP NHẬT: Truyền thẳng mã GHN từ DB vào state để API GHN chạy ngay lập tức
+          if (defaultAddr.ghn_district_id) setCustomerDistrictId(defaultAddr.ghn_district_id);
+          if (defaultAddr.ghn_ward_code) setCustomerWardCode(defaultAddr.ghn_ward_code);
         }
 
         // 2. Lấy danh sách sản phẩm ĐANG ĐƯỢC CHỌN trong giỏ hàng
@@ -470,13 +473,25 @@ export default function CheckoutScreen() {
       >
         {/* Khối thông tin người dùng */}
         <View style={styles.section}>
-          {/* Địa chỉ giao hàng */}
-          {renderInfoCard(
-            "Địa chỉ giao hàng",
-            userAddress
-              ? `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`
-              : "Chưa có địa chỉ giao hàng",
-          )}
+          {/* 👇 GỘP VÀO ĐÂY: Thay thế card cũ bằng AddressSelector */}
+          <AddressSelector 
+            initialAddress={userAddress} // Truyền địa chỉ mặc định vào để hiển thị
+            onLocationSelected={(province, district, ward, fullAddressString) => {
+               // 1. Cập nhật mã ID cho API GHN tính tiền
+               if (district) setCustomerDistrictId(district.DistrictID);
+               if (ward) setCustomerWardCode(ward.WardCode);
+               
+               // 2. Cập nhật Text để lúc bấm "Thanh toán" lưu vào DB
+               if (fullAddressString) {
+                 setUserAddress((prev: any) => ({
+                   ...prev,
+                   street_address: fullAddressString.street,
+                   district: fullAddressString.district,
+                   province_city: fullAddressString.province
+                 }));
+               }
+            }} 
+          />
 
           {/* Thông tin liên hệ (Dữ liệu từ người nhận của địa chỉ đó) */}
           {renderInfoCard(
@@ -583,18 +598,14 @@ export default function CheckoutScreen() {
         </View>
         {/* Khối tùy chọn giao hàng (Tích hợp GHN) */}
         <View style={styles.section}>
-          <AddressSelector 
-            onLocationSelected={(province, district, ward) => {
-               if (district) setCustomerDistrictId(district.DistrictID);
-               if (ward) setCustomerWardCode(ward.WardCode);
-            }} 
-          />
-
+          <Text style={styles.cardTitle}>Phương thức vận chuyển</Text>
+          
+          {/* Component này giờ chỉ chuyên lo việc hiển thị list nhà vận chuyển và tính tiền */}
           <ShippingOptions 
              dbMethods={shippingMethods} 
              customerDistrictId={customerDistrictId} 
              customerWardCode={customerWardCode} 
-             totalCartWeight={1500} // Cần tính tổng số lượng món thật sau này, hiện giả định 1.5kg
+             totalCartWeight={1500} 
              onSelectMethod={(method, fee) => {
                 setSelectedShippingId(method.id);
                 setDynamicShippingFee(fee);
