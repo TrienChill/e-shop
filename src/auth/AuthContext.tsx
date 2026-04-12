@@ -91,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mounted) return;
 
       if (error) {
-        console.warn("[AUTH_DEBUG] 1. getSession Error:", error.message);
         // Nếu lỗi liên quan đến Refresh Token không hợp lệ hoặc không tìm thấy, 
         // thực hiện đăng xuất để xóa token hỏng khỏi storage.
         if (
@@ -110,7 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
-      console.log("[AUTH_DEBUG] 1. Session Restored:", session?.user?.id || "None");
       authLogger.sessionRestored({
         userId: session?.user?.id ?? null,
         role: null,
@@ -125,7 +123,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionInitialized(true);
       // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
     }).catch((err) => {
-      console.error("[AUTH_DEBUG] 1. getSession Critical Error:", err);
       if (mounted) {
         setRoleResolved(true);
         setLoading(false);
@@ -136,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log("[AUTH_DEBUG] 2. Auth State Changed:", _event, session?.user?.id || "None");
       authLogger.authStateChange({
         event: _event,
         userId: session?.user?.id ?? null,
@@ -172,15 +168,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    console.log("[AUTH_DEBUG] 3. Starting Role Fetch for:", userId);
     setLoading(true);
     setRoleResolved(false);
     refreshRole()
       .then(() => {
-        console.log("[AUTH_DEBUG] 4. Role Fetch Done");
       })
       .catch((e) => {
-        console.error("[AUTH_DEBUG] Error Fetching Role:", e);
         setRole(null);
         setRoleError((e as Error)?.message ?? "Failed to fetch role");
       })

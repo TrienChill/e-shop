@@ -1,9 +1,10 @@
 import { useAuth } from "@/src/auth/AuthContext";
 import { Link, Redirect, Slot, usePathname, useRouter } from "expo-router";
 import {
-  LayoutDashboard,
   Layers,
+  LayoutDashboard,
   LogOut,
+  MessageSquare,
   Package,
   ShieldCheck,
   ShoppingBag,
@@ -61,6 +62,7 @@ export default function AdminLayout() {
     { href: "/(admin)/categories", label: "Danh mục", icon: Layers },
     { href: "/(admin)/vouchers", label: "Mã giảm giá", icon: Ticket },
     { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
+    { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
   ];
 
   if (role === "admin") {
@@ -104,8 +106,8 @@ export default function AdminLayout() {
             <Text style={styles.footerLinkText}>Đăng xuất</Text>
           </Pressable>
 
-          <Pressable 
-            style={styles.footerLink} 
+          <Pressable
+            style={styles.footerLink}
             onPress={() => {
               if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
                 window.localStorage.setItem("admin_mode", "shop");
