@@ -62,8 +62,8 @@ ghnApi.interceptors.request.use((config) => {
   if (token) {
     config.headers.set("Token", token);
   }
-  // Bỏ qua ShopId đối với master-data (gây lỗi 400) và API tính phí preview (để bỏ qua check lỗi địa chỉ Shop)
-  if (shopId && config.url && !config.url.includes("master-data") && !config.url.includes("fee")) {
+  // Bỏ qua ShopId đối với master-data (gây lỗi 400). Các API khác (fee, create_order) bắt buộc dùng ShopId
+  if (shopId && config.url && !config.url.includes("master-data")) {
     config.headers.set("ShopId", shopId);
   }
   return config;
@@ -81,8 +81,8 @@ export const calculateShippingFee = async (
     try {
       const response = await ghnApi.post<GHNFeeResponse>("/shipping-order/fee", {
         service_type_id: 2, // 2: Chuẩn, 1: Nhanh/Bay
-        from_district_id: 1442, // Fix cứng ID Quận của Shop xuất phát (Quận 1 - 1442)
-        from_ward_code: "21012", // Fix cứng Phường xuất phát để tự động tính cước không phụ thuộc cấu hình ShopId
+        // Bỏ các dòng Fix cứng điểm xuất phát đi vì lúc này GHN tự động quét ShopId
+        // để lấy địa chỉ Shop (Thủ Dầu Một) mà bạn vừa khai báo.
         to_district_id: ghnPayload.to_district_id,
         to_ward_code: ghnPayload.to_ward_code,
         weight: ghnPayload.weight,

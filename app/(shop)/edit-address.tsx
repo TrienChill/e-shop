@@ -22,6 +22,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AddressSelector from "@/src/components/checkout/AddressSelector";
 
 interface Address {
   id: string;
@@ -32,6 +33,9 @@ interface Address {
   street_address: string;
   is_default: boolean;
   user_id: string;
+  ward_commune?: string;
+  ghn_district_id?: number | null;
+  ghn_ward_code?: string | null;
 }
 
 const EditAddressScreen = () => {
@@ -45,47 +49,22 @@ const EditAddressScreen = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [provinceCity, setProvinceCity] = useState('');
   const [district, setDistrict] = useState('');
+  const [wardCommune, setWardCommune] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [isDefault, setIsDefault] = useState(false);
+  const [ghnDistrictId, setGhnDistrictId] = useState<number | null>(null);
+  const [ghnWardCode, setGhnWardCode] = useState<string | null>(null);
   
-  // API Data State
-  const [provinces, setProvinces] = useState<any[]>([]);
-  const [districts, setDistricts] = useState<any[]>([]);
-  const [selectedProvinceCode, setSelectedProvinceCode] = useState<number | null>(null);
+  // CACHE TRÁNH INFINITE LOOP
+  const [editingAddressCache, setEditingAddressCache] = useState<any>(null);
   
-  // Picker Modal State
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [pickerType, setPickerType] = useState<'province' | 'district'>('province');
-  const [searchQuery, setSearchQuery] = useState('');
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchAddresses();
-    fetchProvinces();
   }, []);
-
-  const fetchProvinces = async () => {
-    try {
-      const response = await fetch('https://provinces.open-api.vn/api/?depth=1');
-      const data = await response.json();
-      setProvinces(data);
-    } catch (error) {
-      console.error('Lỗi fetch tỉnh thành:', error);
-    }
-  };
-
-  const fetchDistricts = async (provinceCode: number) => {
-    try {
-      const response = await fetch(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      const data = await response.json();
-      setDistricts(data.districts || []);
-    } catch (error) {
-      console.error('Lỗi fetch quận huyện:', error);
-    }
-  };
 
   const fetchAddresses = async () => {
     setLoading(true);
@@ -114,8 +93,12 @@ const EditAddressScreen = () => {
     setPhoneNumber('');
     setProvinceCity('');
     setDistrict('');
+    setWardCommune('');
     setStreetAddress('');
     setIsDefault(false);
+    setGhnDistrictId(null);
+    setGhnWardCode(null);
+    setEditingAddressCache(null);
     setErrors({});
     setSelectedAddressId(null);
   };
@@ -127,40 +110,22 @@ const EditAddressScreen = () => {
     setProvinceCity(address.province_city);
     setDistrict(address.district);
     setStreetAddress(address.street_address);
+    setWardCommune(address.ward_commune || '');
+    setGhnDistrictId(address.ghn_district_id || null);
+    setGhnWardCode(address.ghn_ward_code || null);
     setIsDefault(address.is_default);
-    
-    // Tìm province code để load districts
-    const province = provinces.find(p => p.name === address.province_city);
-    if (province) {
-      setSelectedProvinceCode(province.code);
-      fetchDistricts(province.code);
-    }
-    
+
+    setEditingAddressCache({
+        street_address: address.street_address,
+        ward_commune: address.ward_commune || '',
+        district: address.district,
+        province_city: address.province_city,
+        ghn_district_id: address.ghn_district_id || null,
+        ghn_ward_code: address.ghn_ward_code || null
+    });
+
     setView('edit');
   };
-
-  const handleProvinceSelect = (item: any) => {
-    setProvinceCity(item.name);
-    setSelectedProvinceCode(item.code);
-    setDistrict(''); // Reset district when province changes
-    fetchDistricts(item.code);
-    setPickerVisible(false);
-    setSearchQuery('');
-  };
-
-  const handleDistrictSelect = (item: any) => {
-    setDistrict(item.name);
-    setPickerVisible(false);
-    setSearchQuery('');
-  };
-
-  const filteredData = useMemo(() => {
-    const data = pickerType === 'province' ? provinces : districts;
-    if (!searchQuery) return data;
-    return data.filter(item => 
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [pickerType, provinces, districts, searchQuery]);
 
   const handleAddNew = () => {
     resetForm();
@@ -185,18 +150,8 @@ const EditAddressScreen = () => {
       valid = false;
     }
 
-    if (!provinceCity.trim()) {
-      newErrors.provinceCity = "Vui lòng chọn Tỉnh/Thành phố";
-      valid = false;
-    }
-
-    if (!district.trim()) {
-      newErrors.district = "Vui lòng chọn Quận/Huyện";
-      valid = false;
-    }
-
-    if (!streetAddress.trim()) {
-      newErrors.streetAddress = "Vui lòng nhập địa chỉ cụ thể";
+    if (!provinceCity.trim() || !district.trim() || !wardCommune.trim() || !streetAddress.trim()) {
+      newErrors.address = "Vui lòng hoàn thành đầy đủ thông tin địa chỉ";
       valid = false;
     }
 
@@ -217,7 +172,10 @@ const EditAddressScreen = () => {
         phone_number: phoneNumber,
         province_city: provinceCity,
         district: district,
+        ward_commune: wardCommune,
         street_address: streetAddress,
+        ghn_district_id: ghnDistrictId,
+        ghn_ward_code: ghnWardCode,
         is_default: isDefault,
         user_id: user.id,
         updated_at: new Date().toISOString()
@@ -297,7 +255,7 @@ const EditAddressScreen = () => {
           )}
         </View>
         <Text style={styles.addressPhone}>{item.phone_number}</Text>
-        <Text style={styles.addressText}>{`${item.street_address}, ${item.district}, ${item.province_city}`}</Text>
+        <Text style={styles.addressText}>{`${item.street_address}, ${item.ward_commune || ''}, ${item.district}, ${item.province_city}`}</Text>
       </View>
       <View style={styles.addressActions}>
         <TouchableOpacity onPress={() => handleEditClick(item)} style={styles.actionBtn}>
@@ -391,56 +349,20 @@ const EditAddressScreen = () => {
                 {errors.phoneNumber && <Text style={styles.errorText}>{errors.phoneNumber}</Text>}
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Tỉnh/Thành phố</Text>
-                  <TouchableOpacity 
-                    style={[styles.inputPicker, errors.provinceCity && styles.inputError]} 
-                    onPress={() => {
-                        setSearchQuery('');
-                        setPickerType('province');
-                        setPickerVisible(true);
-                    }}
-                  >
-                    <Text style={provinceCity ? styles.pickerValue : styles.pickerPlaceholder} numberOfLines={1}>
-                      {provinceCity || "Chọn tỉnh"}
-                    </Text>
-                    <ChevronDown size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                  {errors.provinceCity && <Text style={styles.errorText}>{errors.provinceCity}</Text>}
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Quận/Huyện</Text>
-                  <TouchableOpacity 
-                    style={[styles.inputPicker, errors.district && styles.inputError, !selectedProvinceCode && { opacity: 0.5 }]} 
-                    disabled={!selectedProvinceCode}
-                    onPress={() => {
-                        setSearchQuery('');
-                        setPickerType('district');
-                        setPickerVisible(true);
-                    }}
-                  >
-                    <Text style={district ? styles.pickerValue : styles.pickerPlaceholder} numberOfLines={1}>
-                      {district || "Chọn quận"}
-                    </Text>
-                    <ChevronDown size={18} color="#94A3B8" />
-                  </TouchableOpacity>
-                  {errors.district && <Text style={styles.errorText}>{errors.district}</Text>}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Địa chỉ cụ thể</Text>
-                <TextInput 
-                  style={[styles.input, { height: 100, textAlignVertical: 'top' }, errors.streetAddress && styles.inputError]}
-                  placeholder="Số nhà, tên đường..."
-                  value={streetAddress}
-                  onChangeText={setStreetAddress}
-                  multiline
-                />
-                {errors.streetAddress && <Text style={styles.errorText}>{errors.streetAddress}</Text>}
-              </View>
+              <AddressSelector 
+                 initialAddress={editingAddressCache}
+                 onLocationSelected={(province, district, ward, fullStr) => {
+                     if (fullStr) {
+                         setProvinceCity(fullStr.province);
+                         setDistrict(fullStr.district);
+                         setWardCommune(fullStr.ward);
+                         setStreetAddress(fullStr.street);
+                         setGhnDistrictId(district?.DistrictID || null);
+                         setGhnWardCode(ward?.WardCode || null);
+                     }
+                 }}
+              />
+              {errors.address && <Text style={styles.errorText}>{errors.address}</Text>}
 
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Đặt làm địa chỉ mặc định</Text>
@@ -465,49 +387,7 @@ const EditAddressScreen = () => {
         </KeyboardAvoidingView>
       )}
 
-      {/* API Picker Modal */}
-      <Modal
-        visible={pickerVisible}
-        animationType="slide"
-        transparent={true}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {pickerType === 'province' ? 'Chọn Tỉnh/Thành phố' : 'Chọn Quận/Huyện'}
-              </Text>
-              <TouchableOpacity onPress={() => setPickerVisible(false)}>
-                <X size={24} color="#0F172A" />
-              </TouchableOpacity>
-            </View>
 
-            <View style={styles.searchBar}>
-              <Search size={20} color="#94A3B8" />
-              <TextInput
-                 style={styles.searchInput}
-                 placeholder="Tìm kiếm..."
-                 value={searchQuery}
-                 onChangeText={setSearchQuery}
-              />
-            </View>
-
-            <FlatList
-              data={filteredData}
-              keyExtractor={(item) => item.code.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.pickerItem} 
-                  onPress={() => pickerType === 'province' ? handleProvinceSelect(item) : handleDistrictSelect(item)}
-                >
-                  <Text style={styles.pickerItemText}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-              initialNumToRender={15}
-            />
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };

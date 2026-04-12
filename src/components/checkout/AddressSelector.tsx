@@ -16,7 +16,7 @@ interface Props {
     province: GHNProvince | null,
     district: GHNDistrict | null,
     ward: GHNWard | null,
-    fullAddressString?: { street: string; district: string; province: string }
+    fullAddressString?: { street: string; ward: string; district: string; province: string }
   ) => void;
 }
 
@@ -31,18 +31,18 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
   useEffect(() => {
     if (initialAddress) {
        setStreet(initialAddress.street_address || "");
-       // We only set the text representations if they are just strings, 
-       // but GHNProvince dropdown requires full objects. 
-       // Since we'll rely on GHN IDs passed to checkout state directly, 
-       // we can just mock the object locally if needed, or leave it null allowing the user to select.
+       
        if (!selectedProvince && initialAddress.province_city) {
          setSelectedProvince({ ProvinceID: 0, ProvinceName: initialAddress.province_city } as any);
        }
-       if (!selectedDistrict && initialAddress.district) {
-         setSelectedDistrict({ DistrictID: initialAddress.ghn_district_id || 0, ProvinceID: 0, DistrictName: initialAddress.district } as any);
+       
+       // Chỉ set District và Ward mặc định nếu database đã có lưu sẵn mã ID GHN thật.
+       // Nếu không có, bắt buộc người dùng chọn lại.
+       if (!selectedDistrict && initialAddress.district && initialAddress.ghn_district_id) {
+         setSelectedDistrict({ DistrictID: initialAddress.ghn_district_id, ProvinceID: 0, DistrictName: initialAddress.district } as any);
        }
-       if (initialAddress.ghn_ward_code) {
-         setSelectedWard({ WardCode: initialAddress.ghn_ward_code, DistrictID: initialAddress.ghn_district_id || 0, WardName: "Mặc định GHN" } as any);
+       if (!selectedWard && initialAddress.ghn_ward_code) {
+         setSelectedWard({ WardCode: initialAddress.ghn_ward_code, DistrictID: initialAddress.ghn_district_id, WardName: initialAddress.ward_commune || "Mặc định GHN" } as any);
        }
     }
   }, [initialAddress]);
@@ -66,6 +66,17 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
     loadProvinces();
   }, []);
 
+  // Tự động phân tích và Mapping ProvinceID cho dữ liệu cũ (Dựa trên so sánh chuỗi)
+  useEffect(() => {
+    if (provinces.length > 0 && initialAddress?.province_city && selectedProvince?.ProvinceID === 0) {
+      const matchName = initialAddress.province_city.toLowerCase().replace(/tỉnh|thành phố|tp\.?/g, "").trim();
+      const matched = provinces.find(p => p.ProvinceName.toLowerCase().includes(matchName));
+      if (matched) {
+        setSelectedProvince(matched);
+      }
+    }
+  }, [provinces, initialAddress]);
+
   // 2. Fetch Quận / Huyện khi đổi Tỉnh
   useEffect(() => {
     const loadDistricts = async () => {
@@ -73,10 +84,23 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
         setDistricts([]);
         return;
       }
+      
+      // LOG KIỂM TRA LỖI NHƯ YÊU CẦU: Ngăn API gọi tất cả 729 quận huyện nếu Tỉnh chưa có ID chuẩn
+      if (selectedProvince.ProvinceID === 0) {
+        console.warn("[AddressSelector Log] ProvinceID là 0 do dữ liệu cũ. Bỏ qua tải Quận/Huyện để tránh tải dữ liệu cả nước.");
+        setDistricts([]);
+        return;
+      }
+
       setIsLoadingList(true);
-      const data = await fetchDistricts(selectedProvince.ProvinceID);
-      setDistricts(data);
-      setIsLoadingList(false);
+      try {
+        const data = await fetchDistricts(selectedProvince.ProvinceID);
+        setDistricts(data);
+      } catch (err) {
+        console.error("[AddressSelector Log] Lỗi khi lấy danh sách Quận/Huyện:", err);
+      } finally {
+        setIsLoadingList(false);
+      }
     };
     loadDistricts();
   }, [selectedProvince]);
@@ -105,6 +129,7 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
         selectedWard,
         {
           street: street,
+          ward: selectedWard?.WardName || initialAddress?.ward_commune || "",
           district: selectedDistrict?.DistrictName || initialAddress?.district || "",
           province: selectedProvince?.ProvinceName || initialAddress?.province_city || "",
         }
@@ -129,8 +154,13 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
 
   // Mở Popup (Modal) tương ứng
   const openSelector = (type: "province" | "district" | "ward") => {
-    if (type === "district" && !selectedProvince) return alert("Vui lòng chọn Tỉnh/Thành trước");
-    if (type === "ward" && !selectedDistrict) return alert("Vui lòng chọn Quận/Huyện trước");
+    // Ràng buộc chọn tuần tự từ trên xuống dưới
+    if (type === "district" && (!selectedProvince || selectedProvince.ProvinceID === 0)) {
+      return alert("Dữ liệu địa chỉ cũ cần được làm mới. Vui lòng chọn lại Tỉnh/Thành trước!");
+    }
+    if (type === "ward" && (!selectedDistrict || selectedDistrict.DistrictID === 0)) {
+       return alert("Dữ liệu địa chỉ cũ cần được làm mới. Vui lòng chọn lại Quận/Huyện trước!");
+    }
     setSelectionType(type);
     setModalVisible(true);
   };

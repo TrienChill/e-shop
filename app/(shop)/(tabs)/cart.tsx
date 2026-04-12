@@ -1,47 +1,33 @@
+import AddressSelector from "@/src/components/checkout/AddressSelector";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
-    Check,
-    ChevronDown,
-    ChevronLeft,
-    X as CloseIcon,
-    Lock,
-    Minus,
-    Pencil,
-    Plus,
-    ShoppingBag,
-    Trash2,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  X as CloseIcon,
+  Lock,
+  Minus,
+  Pencil,
+  Plus,
+  ShoppingBag,
+  Trash2,
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
+import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
-    PopularCard,
-    PopularProductItem,
+  PopularCard,
+  PopularProductItem,
 } from "../../../src/components/card/PopularCard";
 import { PriceDisplay } from "../../../src/components/common/PriceDisplay";
 import { supabase } from "../../../src/lib/supabase";
 import {
-    calculateDiscountedPrice,
-    COLOR_TRANSLATIONS,
-    getProductImageByColor,
+  calculateDiscountedPrice,
+  COLOR_TRANSLATIONS,
+  getProductImageByColor,
 } from "../../../src/services/product";
-import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -454,8 +440,11 @@ export default function CartScreen() {
     phone: "0345678910",
     city: "TP. Hồ Chí Minh",
     district: "Quận 2",
+    ward: "",
     street: "26, Đường số 2, Phường Thảo Điền",
     isDefault: true,
+    ghnDistrictId: null as number | null,
+    ghnWardCode: null as string | null,
   });
 
   const handleSaveAddress = async () => {
@@ -482,8 +471,11 @@ export default function CartScreen() {
         phone_number: addressData.phone,
         province_city: addressData.city,
         district: addressData.district,
+        ward_commune: addressData.ward,
         street_address: addressData.street,
         is_default: addressData.isDefault,
+        ghn_district_id: addressData.ghnDistrictId,
+        ghn_ward_code: addressData.ghnWardCode,
         updated_at: new Date(),
       };
 
@@ -604,6 +596,19 @@ export default function CartScreen() {
   // Ẩn/hiện dropdown
   const [addressDropdownVisible, setAddressDropdownVisible] = useState(false);
 
+  // CACHE LẠI ĐỊA CHỈ BAN ĐẦU CHO MODAL KHI EDIT
+  const memoizedInitialAddress = React.useMemo(() => {
+    if (!defaultAddress) return null;
+    return {
+      street_address: defaultAddress.street_address,
+      ward_commune: defaultAddress.ward_commune,
+      district: defaultAddress.district,
+      province_city: defaultAddress.province_city,
+      ghn_district_id: defaultAddress.ghn_district_id,
+      ghn_ward_code: defaultAddress.ghn_ward_code
+    };
+  }, [defaultAddress]);
+
   // Thêm State để quản lý trạng thái tải giỏ hàng
   const [loadingCart, setLoadingCart] = useState(true);
 
@@ -695,16 +700,17 @@ export default function CartScreen() {
         setSelectedAddress(def);
 
         // Sync dữ liệu vào modal edit
-        if (def) {
-          setAddressData({
-            name: def.receiver_name,
-            phone: def.phone_number,
-            city: def.province_city,
-            district: def.district,
-            street: def.street_address,
-            isDefault: def.is_default,
-          });
-        }
+        setAddressData({
+          name: def.receiver_name || "",
+          phone: def.phone_number || "",
+          city: def.province_city || "",
+          district: def.district || "",
+          ward: def.ward_commune || "",
+          street: def.street_address || "",
+          isDefault: !!def.is_default,
+          ghnDistrictId: def.ghn_district_id || null,
+          ghnWardCode: def.ghn_ward_code || null,
+        });
       }
     } catch (err) {
       console.log("System error:", err);
@@ -932,41 +938,22 @@ export default function CartScreen() {
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Tỉnh / Thành phố</Text>
-                <TextInput
-                  style={styles.input}
-                  value={addressData.city}
-                  onChangeText={(t) =>
-                    setAddressData({ ...addressData, city: t })
+              <AddressSelector
+                initialAddress={memoizedInitialAddress}
+                onLocationSelected={(province, district, ward, fullStr) => {
+                  if (fullStr) {
+                    setAddressData(prev => ({
+                      ...prev,
+                      city: fullStr.province,
+                      district: fullStr.district,
+                      ward: fullStr.ward,
+                      street: fullStr.street,
+                      ghnDistrictId: district?.DistrictID || null,
+                      ghnWardCode: ward?.WardCode || null
+                    }));
                   }
-                  placeholder="Nhập tỉnh/thành phố"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Quận / Huyện</Text>
-                <TextInput
-                  style={styles.input}
-                  value={addressData.district}
-                  onChangeText={(t) =>
-                    setAddressData({ ...addressData, district: t })
-                  }
-                  placeholder="Nhập quận/huyện"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Tên đường / Số nhà</Text>
-                <TextInput
-                  style={styles.input}
-                  value={addressData.street}
-                  onChangeText={(t) =>
-                    setAddressData({ ...addressData, street: t })
-                  }
-                  placeholder="Nhập tên đường, số nhà"
-                />
-              </View>
+                }}
+              />
 
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Đặt làm địa chỉ mặc định</Text>
