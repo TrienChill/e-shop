@@ -1,0 +1,3 @@
+id,name,code,min_time,max_time,unit,price,is_active,created_at
+3668bfc9-2d33-4d78-a26b-4a80d2df1f68,Hỏa tốc,express,1,2,ngày,250000,true,2026-03-05 03:15:07.514347+00
+4981f04d-9961-4d05-b121-85224b137986,Tiêu chuẩn,standard,5,7,ngày,25000,true,2026-03-05 03:15:07.514347+00
