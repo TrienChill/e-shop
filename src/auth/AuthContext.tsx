@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
   // roleResolved: true khi đã hoàn thành ít nhất một lần fetch role (hoặc xác định không có session)
   const [roleResolved, setRoleResolved] = useState(false);
 
@@ -104,10 +105,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole(null);
           setRoleResolved(true);
           setLoading(false);
+          setSessionInitialized(true);
           return;
         }
       }
-
+      
       console.log("[AUTH_DEBUG] 1. Session Restored:", session?.user?.id || "None");
       authLogger.sessionRestored({
         userId: session?.user?.id ?? null,
@@ -120,12 +122,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleResolved(true);
         setLoading(false);
       }
+      setSessionInitialized(true);
       // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
     }).catch((err) => {
       console.error("[AUTH_DEBUG] 1. getSession Critical Error:", err);
       if (mounted) {
         setRoleResolved(true);
         setLoading(false);
+        setSessionInitialized(true);
       }
     });
 
@@ -146,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
       setSession(session);
+      setSessionInitialized(true);
     });
 
     return () => {
@@ -156,6 +161,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // ── Role Sync ─────────────────────────────────────────────────────────────
   useEffect(() => {
+    // CỰC KỲ QUAN TRỌNG: Không đánh giá việc thiếu `userId` cho đến khi quá trình khôi phục session ban đầu hoàn tất!
+    if (!sessionInitialized) return;
+
     if (!userId) {
       setRole(null);
       setRoleError(null);

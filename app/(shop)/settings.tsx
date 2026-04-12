@@ -108,7 +108,12 @@ const SettingsScreen = () => {
           {isAdminOrStaff && (
             <SettingItem 
               label="Trang quản trị (Admin)" 
-              onPress={() => router.push("/(admin)/dashboard")} 
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+                  window.localStorage.setItem("admin_mode", "admin");
+                }
+                router.push("/(admin)/dashboard");
+              }} 
             />
           )}
           <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => { }} />

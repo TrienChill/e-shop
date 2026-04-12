@@ -14,11 +14,19 @@ export default function Index() {
     );
   }
 
-  // 2. LUỒNG ADMIN: Nếu Admin xóa "/dashboard" để về "/", code này sẽ đẩy họ quay lại ngay
+  // 2. LUỒNG ADMIN: Nếu Admin xóa "/dashboard" để về "/", code này sẽ đẩy họ quay lại ngay,
+  // TRỪ KHI họ đã bấm nút "Về cửa hàng" (đánh dấu admin_mode = "shop" trong localStorage)
   if (session && (role === "admin" || role === "staff")) {
-    return <Redirect href="/(admin)/dashboard" />;
+    let mode = "admin"; // Mặc định là admin
+    if (typeof window !== "undefined" && window.localStorage) {
+      mode = window.localStorage.getItem("admin_mode") || "admin";
+    }
+
+    if (mode === "admin") {
+      return <Redirect href="/(admin)/dashboard" />;
+    }
   }
 
-  // 3. LUỒNG USER/GUEST: Nếu là khách hoặc chưa đăng nhập thì mới về trang chủ bán hàng
+  // 3. LUỒNG USER/GUEST hoặc Admin đang ở chế độ "shop":
   return <Redirect href="/(shop)/(tabs)" />;
 }

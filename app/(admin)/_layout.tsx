@@ -1,5 +1,5 @@
 import { useAuth } from "@/src/auth/AuthContext";
-import { Link, Redirect, Slot, usePathname } from "expo-router";
+import { Link, Redirect, Slot, usePathname, useRouter } from "expo-router";
 import {
   LayoutDashboard,
   LogOut,
@@ -24,6 +24,14 @@ export default function AdminLayout() {
   // BƯỚC 1: Lấy state từ AuthContext (Chỉ khai báo 1 lần)
   const { session, role, loading, signOut } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
+
+  // Khẳng định quyền kiểm soát: Khi vào Admin, đánh dấu admin_mode = "admin"
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem("admin_mode", "admin");
+    }
+  }, []);
 
   // BƯỚC 2: Màn hình chờ khi đang load
   if (loading) {
@@ -94,12 +102,18 @@ export default function AdminLayout() {
             <Text style={styles.footerLinkText}>Đăng xuất</Text>
           </Pressable>
 
-          <Link href="/(shop)/(tabs)" asChild>
-            <Pressable style={styles.footerLink}>
-              <Store size={18} color="#9CA3AF" />
-              <Text style={styles.footerLinkText}>Về cửa hàng</Text>
-            </Pressable>
-          </Link>
+          <Pressable 
+            style={styles.footerLink} 
+            onPress={() => {
+              if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+                window.localStorage.setItem("admin_mode", "shop");
+              }
+              router.replace("/(shop)/(tabs)");
+            }}
+          >
+            <Store size={18} color="#9CA3AF" />
+            <Text style={styles.footerLinkText}>Về cửa hàng</Text>
+          </Pressable>
         </View>
       </View>
 
