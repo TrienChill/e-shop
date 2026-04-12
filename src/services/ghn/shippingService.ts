@@ -28,6 +28,24 @@ export interface DBMethod {
   is_active: boolean;
 }
 
+// Interfaces cho Dữ liệu địa chỉ GHN
+export interface GHNProvince {
+  ProvinceID: number;
+  ProvinceName: string;
+}
+
+export interface GHNDistrict {
+  DistrictID: number;
+  ProvinceID: number;
+  DistrictName: string;
+}
+
+export interface GHNWard {
+  WardCode: string;
+  DistrictID: number;
+  WardName: string;
+}
+
 // 2. Cấu hình Axios trỏ thẳng tới Sandbox
 export const ghnApi = axios.create({
   baseURL: "https://dev-online-gateway.ghn.vn/shiip/public-api/v2",
@@ -68,4 +86,48 @@ export const calculateShippingFee = async (
 
   // Fallback: Sẽ rơi vào đây nếu lỗi API, cấu hình chưa đúng, hoặc Method là hỏa tốc
   return Number(dbMethod.price); 
+};
+
+// -------------------------------------------------------------
+// HÀM LẤY MASTER DATA (Tỉnh/Thành, Quận/Huyện, Phường/Xã) GHN
+// -------------------------------------------------------------
+const MASTER_DATA_URL = "https://dev-online-gateway.ghn.vn/shiip/public-api/master-data";
+
+export const fetchProvinces = async (): Promise<GHNProvince[]> => {
+  try {
+    const res = await ghnApi.get<{ code: number; data: GHNProvince[] }>(`${MASTER_DATA_URL}/province`);
+    if (res.data.code === 200) return res.data.data;
+    return [];
+  } catch (error) {
+    console.error("Lỗi fetchProvinces GHN:", error);
+    return [];
+  }
+};
+
+export const fetchDistricts = async (provinceId: number): Promise<GHNDistrict[]> => {
+  try {
+    const res = await ghnApi.get<{ code: number; data: GHNDistrict[] }>(`${MASTER_DATA_URL}/district`, {
+      headers: { token: process.env.EXPO_PUBLIC_GHN_TOKEN },
+      params: { province_id: provinceId },
+    });
+    if (res.data.code === 200) return res.data.data;
+    return [];
+  } catch (error) {
+    console.error("Lỗi fetchDistricts GHN:", error);
+    return [];
+  }
+};
+
+export const fetchWards = async (districtId: number): Promise<GHNWard[]> => {
+  try {
+    const res = await ghnApi.get<{ code: number; data: GHNWard[] }>(`${MASTER_DATA_URL}/ward`, {
+      headers: { token: process.env.EXPO_PUBLIC_GHN_TOKEN },
+      params: { district_id: districtId },
+    });
+    if (res.data.code === 200) return res.data.data;
+    return [];
+  } catch (error) {
+    console.error("Lỗi fetchWards GHN:", error);
+    return [];
+  }
 };

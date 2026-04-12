@@ -33,6 +33,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AddressSelector from "@/src/components/checkout/AddressSelector";
+import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -141,6 +143,11 @@ export default function CheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // GHN Address & Shipping states
+  const [customerDistrictId, setCustomerDistrictId] = useState<number | null>(null);
+  const [customerWardCode, setCustomerWardCode] = useState<string | null>(null);
+  const [dynamicShippingFee, setDynamicShippingFee] = useState<number>(0);
+
   // --- REALTIME HOOKS ---
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -176,11 +183,11 @@ export default function CheckoutScreen() {
     null,
   );
 
-  // Cập nhật phí vận chuyển dựa trên phương thức được chọn từ DB
+  // Cập nhật phí vận chuyển dựa trên phương thức được chọn
   const selectedMethod = shippingMethods.find(
     (m) => m.id === selectedShippingId,
   );
-  const shippingFee = selectedMethod ? Number(selectedMethod.price) : 0;
+  const shippingFee = dynamicShippingFee; // SỬ DỤNG GIÁ ĐỘNG TỪ GHN API HOẶC FALLBACK THÔNG QUA SHIPPING OPTIONS
 
   const discountAmount = selectedVoucher
     ? selectedVoucher.type === "percentage"
@@ -574,58 +581,25 @@ export default function CheckoutScreen() {
             </View>
           )}
         </View>
-        {/* Khối tùy chọn giao hàng */}
+        {/* Khối tùy chọn giao hàng (Tích hợp GHN) */}
         <View style={styles.section}>
-          <Text style={styles.sectionHeaderTitleText}>Tùy chọn giao hàng</Text>
+          <AddressSelector 
+            onLocationSelected={(province, district, ward) => {
+               if (district) setCustomerDistrictId(district.DistrictID);
+               if (ward) setCustomerWardCode(ward.WardCode);
+            }} 
+          />
 
-          {shippingMethods.length > 0 ? (
-            shippingMethods.map((method) => {
-              const isSelected = selectedShippingId === method.id;
-              return (
-                <TouchableOpacity
-                  key={method.id}
-                  style={[
-                    styles.shippingBtn,
-                    isSelected && styles.shippingBtnActive,
-                  ]}
-                  onPress={() => setSelectedShippingId(method.id)}
-                >
-                  <View style={styles.shippingLeft}>
-                    <View
-                      style={[
-                        styles.checkbox,
-                        isSelected && styles.checkboxActive,
-                      ]}
-                    >
-                      {isSelected && <Check color="#FFFFFF" size={14} />}
-                    </View>
-                    <Text style={styles.shippingTitle}>{method.name}</Text>
-                    <View style={styles.timeBadge}>
-                      <Text style={styles.timeText}>
-                        {method.min_time}-{method.max_time} {method.unit}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.shippingPrice}>
-                    {method.price === 0
-                      ? "Miễn phí"
-                      : `${Number(method.price).toLocaleString("vi-VN")}₫`}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <Text style={{ padding: 10, color: C.sub }}>
-              Đang tải phương thức vận chuyển...
-            </Text>
-          )}
-
-          {selectedMethod && (
-            <Text style={styles.shippingFootnote}>
-              Dự kiến nhận hàng sau {selectedMethod.max_time}{" "}
-              {selectedMethod.unit} kể từ ngày đặt.
-            </Text>
-          )}
+          <ShippingOptions 
+             dbMethods={shippingMethods} 
+             customerDistrictId={customerDistrictId} 
+             customerWardCode={customerWardCode} 
+             totalCartWeight={1500} // Cần tính tổng số lượng món thật sau này, hiện giả định 1.5kg
+             onSelectMethod={(method, fee) => {
+                setSelectedShippingId(method.id);
+                setDynamicShippingFee(fee);
+             }}
+          />
         </View>
 
         {/* Khối Phương thức thanh toán */}
