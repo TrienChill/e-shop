@@ -1,101 +1,139 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import { calculateShippingFee, GHNFeeRequest, DBMethod } from "@/src/services/ghn/shippingService";
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { ghnApi } from '@/src/services/ghn/shippingService';
 
-interface Props {
-  dbMethods: DBMethod[]; // Mảng phương thức lấy từ database
-  customerDistrictId: number | null; 
+interface ShippingOptionsProps {
+  customerDistrictId: number | null;
   customerWardCode: string | null;
-  totalCartWeight: number; // Tổng trọng lượng của giỏ hàng (grams)
-  onSelectMethod: (method: DBMethod, fee: number) => void;
+  totalCartWeight: number;
+  onSelectMethod: (serviceId: number, fee: number) => void;
 }
 
-export default function ShippingOptions({ dbMethods, customerDistrictId, customerWardCode, totalCartWeight, onSelectMethod }: Props) {
-  const [calculating, setCalculating] = useState(false);
-  const [renderedMethods, setRenderedMethods] = useState<{method: DBMethod, fee: number}[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+export default function ShippingOptions({
+  customerDistrictId,
+  customerWardCode,
+  totalCartWeight,
+  onSelectMethod
+}: ShippingOptionsProps) {
+  const [ghnServices, setGhnServices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
 
   useEffect(() => {
-    const loadRealtimeFees = async () => {
-      if (!customerDistrictId || !customerWardCode) return; 
-      
-      setCalculating(true);
-      const payload: GHNFeeRequest = {
-         to_district_id: customerDistrictId,
-         to_ward_code: customerWardCode,
-         weight: totalCartWeight || 1000, 
-      };
+    // Chỉ gọi API khi khách đã có địa chỉ cụ thể
+    if (!customerDistrictId || !customerWardCode) return;
 
-      const promises = dbMethods
-        .filter(m => m.is_active)
-        .map(async (method) => {
-           const actualFee = await calculateShippingFee(method, payload);
-           return { method, fee: actualFee };
-        });
+    const fetchGHNFee = async () => {
+      setLoading(true);
+      try {
+        // Tận dụng tính năng tự nhận diện Kho của GHN qua ShopId header trên endpoint fee
+        // Không gọi available-services vì endpoint đó bắt buộc truyền from_district rất dễ gây lỗi 400 nếu truyền sai so với Dashboard.
 
-      const processedMethods = await Promise.all(promises);
-      setRenderedMethods(processedMethods);
-      
-      // Auto-select 
-      if (processedMethods.length > 0) {
-        handleSelect(processedMethods[0].method, processedMethods[0].fee);
+        const servicesWithFee = [];
+
+        // 1. Lấy phí Giao Chuẩn (service_type_id: 2)
+        try {
+          const standardFeeRes = await ghnApi.post('/shipping-order/fee', {
+            service_type_id: 2, // Loại: Chuẩn
+            to_district_id: customerDistrictId,
+            to_ward_code: customerWardCode,
+            weight: totalCartWeight,
+            insurance_value: 0,
+            coupon: null,
+          });
+          if (standardFeeRes.data.code === 200 && standardFeeRes.data.data) {
+            servicesWithFee.push({
+              service_id: 2, // Dùng tạm số 2 làm ID
+              short_name: "Giao Hàng Chuẩn",
+              fee: standardFeeRes.data.data.total
+            });
+          }
+        } catch (err: any) {
+             console.log("Không hỗ trợ giao chuẩn:", err.response?.data?.message || err.message);
+        }
+
+        // 2. Lấy phí Giao Nhanh / Tiết kiệm (service_type_id: 1)
+        try {
+          const fastFeeRes = await ghnApi.post('/shipping-order/fee', {
+             service_type_id: 1, // Loại: Nhanh
+             to_district_id: customerDistrictId,
+             to_ward_code: customerWardCode,
+             weight: totalCartWeight,
+             insurance_value: 0,
+             coupon: null,
+          });
+          if (fastFeeRes.data.code === 200 && fastFeeRes.data.data) {
+             servicesWithFee.push({
+                service_id: 1, // Dùng tạm số 1
+                short_name: "Giao Hàng Nhanh",
+                fee: fastFeeRes.data.data.total
+             });
+          }
+        } catch (err: any) {
+             // Thường GHN sẽ báo lỗi "Tuyến đường không hỗ trợ dịch vụ này"
+             console.log("Không hỗ trợ giao nhanh:", err.response?.data?.message || err.message);
+        }
+
+        if (servicesWithFee.length > 0) {
+          setGhnServices(servicesWithFee);
+          setSelectedServiceId(servicesWithFee[0].service_id);
+          onSelectMethod(servicesWithFee[0].service_id, servicesWithFee[0].fee);
+        } else {
+           throw new Error("Tuyến đường hoặc cấu hình Kho GHN hiện không khả dụng!");
+        }
+
+      } catch (error: any) {
+        console.error("Lỗi tính phí GHN:", error.response?.data || error.message);
+      } finally {
+        setLoading(false);
       }
-      setCalculating(false);
     };
 
-    loadRealtimeFees();
-  }, [customerDistrictId, customerWardCode, totalCartWeight, dbMethods]);
+    fetchGHNFee();
+  }, [customerDistrictId, customerWardCode, totalCartWeight]);
 
-  const handleSelect = (method: DBMethod, fee: number) => {
-     setSelectedId(method.id);
-     onSelectMethod(method, fee);
+  if (!customerDistrictId) {
+    return <Text style={{ color: 'gray', padding: 8 }}>Vui lòng chọn địa chỉ để tính phí vận chuyển.</Text>;
   }
 
-  if (calculating) {
+  if (loading) {
     return (
       <View style={{ marginBottom: 24, padding: 16, backgroundColor: "#F9FAFB", borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
-         <ActivityIndicator size="small" color="#2563EB" />
-         <Text style={{ color: "#6B7280", fontStyle: "italic", fontSize: 13 }}>Đang đo lường phí từ hệ thống GHN...</Text>
+         <ActivityIndicator size="small" color="#0055FF" />
+         <Text style={{ color: "#6B7280", fontStyle: "italic", fontSize: 13 }}>Đang tính toán phí giao hàng GHN...</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ marginBottom: 24 }}>
-      <Text style={{ fontSize: 18, fontWeight: "bold", color: "#111827", marginBottom: 16 }}>Phương Thức Giao Hàng</Text>
-      
-      {renderedMethods.map(({ method, fee }) => {
-        const isSelected = selectedId === method.id;
-        return (
-          <Pressable 
-            key={method.id} 
-            onPress={() => handleSelect(method, fee)}
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: 16,
-              borderWidth: 1,
-              borderRadius: 12,
-              marginBottom: 12,
-              borderColor: isSelected ? "#3B82F6" : "#E5E7EB",
-              backgroundColor: isSelected ? "#EFF6FF" : "white"
-            }}
-          >
-             <View style={{ flex: 1 }}>
-               <Text style={{ fontWeight: "700", fontSize: 15, color: isSelected ? "#1D4ED8" : "#374151" }}>
-                 {method.name}
-               </Text>
-               <Text style={{ fontSize: 12, color: "#6B7280", marginTop: 4 }}>
-                 Thời gian nhận dự kiến: {method.min_time} - {method.max_time} ngày
-               </Text>
-             </View>
-             <Text style={{ fontWeight: "800", fontSize: 15, color: isSelected ? "#2563EB" : "#111827" }}>
-               {fee.toLocaleString("vi-VN")}₫
-             </Text>
-          </Pressable>
-        );
-      })}
+    <View>
+      {ghnServices.map((service) => (
+        <TouchableOpacity
+          key={service.service_id}
+          style={{
+             flexDirection: "row",
+             justifyContent: "space-between",
+             alignItems: "center",
+             borderWidth: 1, 
+             borderColor: selectedServiceId === service.service_id ? '#0055FF' : '#E5E7EB',
+             backgroundColor: selectedServiceId === service.service_id ? '#EFF6FF' : 'white',
+             padding: 16, 
+             borderRadius: 12, 
+             marginBottom: 8
+          }}
+          onPress={() => {
+            setSelectedServiceId(service.service_id);
+            onSelectMethod(service.service_id, service.fee);
+          }}
+        >
+          <Text style={{ fontWeight: 'bold', fontSize: 15, color: selectedServiceId === service.service_id ? "#1D4ED8" : "#374151" }}>
+            {service.short_name}
+          </Text>
+          <Text style={{ fontWeight: '800', fontSize: 15, color: selectedServiceId === service.service_id ? "#2563EB" : "#111827" }}>
+            {service.fee.toLocaleString('vi-VN')}₫
+          </Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }

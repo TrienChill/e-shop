@@ -1,14 +1,15 @@
+import AddressEditModal from "@/src/components/checkout/AddressEditModal";
+import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 import { supabase } from "@/src/lib/supabase";
 import {
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
-import { useRouter } from "expo-router";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   Banknote,
-  Check,
   CheckCircle2,
   ChevronLeft,
   Gift,
@@ -16,7 +17,7 @@ import {
   Plus,
   Settings,
   ShoppingBag,
-  X,
+  X
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -33,9 +34,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AddressSelector from "@/src/components/checkout/AddressSelector";
-import ShippingOptions from "@/src/components/checkout/ShippingOptions";
-import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -164,10 +162,6 @@ export default function CheckoutScreen() {
     table: 'vouchers',
     onUpdate: () => setRefreshTrigger(prev => prev + 1)
   });
-  useSupabaseRealtime({
-    table: 'shipping_methods',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
-  });
 
   // Tính tổng tiền dựa trên sản phẩm thực tế và phí ship
   const productsTotal = cartItems.reduce(
@@ -178,13 +172,10 @@ export default function CheckoutScreen() {
   // Thêm State để lưu voucher từ database
   const [dbVouchers, setDbVouchers] = useState<any[]>([]);
 
-  const [shippingMethods, setShippingMethods] = useState<any[]>([]);
-  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(
-    null,
-  );
+  const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
   const [allAddresses, setAllAddresses] = useState<any[]>([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
-  
+
   // States cho Address Edit Modal
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
@@ -237,23 +228,23 @@ export default function CheckoutScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      
+
       const { data: addresses } = await supabase
         .from("user_addresses")
-        .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default") 
+        .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default")
         .eq("user_id", user.id)
         .order("is_default", { ascending: false });
-        
+
       if (addresses && addresses.length > 0) {
         setAllAddresses(addresses);
         // Nếu địa chỉ đang chọn không còn trong list, chọn lại cái mặc định
         const currentStillExists = addresses.find(a => a.id === userAddress?.id);
         if (!currentStillExists) {
-            handleSelectAddress(addresses[0]);
+          handleSelectAddress(addresses[0]);
         } else {
-            // Cập nhật lại data mới nhất cho địa chỉ đang chọn
-            const updatedCurrent = addresses.find(a => a.id === userAddress?.id);
-            if (updatedCurrent) handleSelectAddress(updatedCurrent);
+          // Cập nhật lại data mới nhất cho địa chỉ đang chọn
+          const updatedCurrent = addresses.find(a => a.id === userAddress?.id);
+          if (updatedCurrent) handleSelectAddress(updatedCurrent);
         }
       } else {
         setAllAddresses([]);
@@ -269,7 +260,7 @@ export default function CheckoutScreen() {
       alert("Vui lòng điền đủ Họ tên và Số điện thoại");
       return;
     }
-    
+
     setSavingAddress(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -277,7 +268,7 @@ export default function CheckoutScreen() {
         alert("Vui lòng đăng nhập để lưu địa chỉ");
         return;
       }
-      
+
       // Nếu đặt làm mặc định, set các địa chỉ khác về false trước
       if (editAddressData.isDefault) {
         await supabase
@@ -309,7 +300,7 @@ export default function CheckoutScreen() {
         .single();
 
       if (error) throw error;
-      
+
       await reloadAddresses();
       setEditModalVisible(false);
       alert("Lưu địa chỉ thành công!");
@@ -327,18 +318,14 @@ export default function CheckoutScreen() {
       phone: addr.phone_number,
       email: userProfile?.email || "",
     });
-    
+
     // Cập nhật tọa độ (mã GHN) để tự động tính lại phí ship
     if (addr.ghn_district_id) setCustomerDistrictId(Number(addr.ghn_district_id));
     if (addr.ghn_ward_code) setCustomerWardCode(String(addr.ghn_ward_code));
-    
+
     setShowAddressModal(false);
   };
 
-  // Cập nhật phí vận chuyển dựa trên phương thức được chọn
-  const selectedMethod = shippingMethods.find(
-    (m) => m.id === selectedShippingId,
-  );
   const shippingFee = dynamicShippingFee; // SỬ DỤNG GIÁ ĐỘNG TỪ GHN API HOẶC FALLBACK THÔNG QUA SHIPPING OPTIONS
 
   const discountAmount = selectedVoucher
@@ -374,21 +361,21 @@ export default function CheckoutScreen() {
         const { data: addresses } = await supabase
           .from("user_addresses")
           // 👇 CẬP NHẬT: Lấy TOÀN BỘ danh sách địa chỉ thuộc về user
-          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default") 
+          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default")
           .eq("user_id", user.id)
           .order('is_default', { ascending: false });
 
         if (addresses && addresses.length > 0) {
           setAllAddresses(addresses);
           const defaultAddr = addresses[0]; // Đã sắp xếp is_default=true lên đầu
-          
+
           setUserProfile({
             name: defaultAddr.receiver_name,
             phone: defaultAddr.phone_number,
             email: user.email,
           });
           setUserAddress(defaultAddr);
-          
+
           // 👇 CẬP NHẬT: Truyền thẳng mã GHN từ DB vào state để API GHN chạy ngay lập tức
           if (defaultAddr.ghn_district_id) setCustomerDistrictId(Number(defaultAddr.ghn_district_id));
           if (defaultAddr.ghn_ward_code) setCustomerWardCode(String(defaultAddr.ghn_ward_code));
@@ -446,18 +433,7 @@ export default function CheckoutScreen() {
           setDbVouchers(formattedVouchers);
         }
 
-        // 4. Fetch danh sách Phương thức vận chuyển từ bảng mới
-        const { data: shipData } = await supabase
-          .from("shipping_methods")
-          .select("*")
-          .eq("is_active", true)
-          .order("price", { ascending: true });
 
-        if (shipData && shipData.length > 0) {
-          setShippingMethods(shipData);
-          // Tự động chọn phương thức đầu tiên (thường là rẻ nhất) làm mặc định
-          setSelectedShippingId(shipData[0].id);
-        }
 
         if (cartData) {
           const formattedItems = cartData.map((item: any) => {
@@ -517,6 +493,7 @@ export default function CheckoutScreen() {
             status: "pending", // Trạng thái chờ xử lý
             platform_voucher_id: selectedVoucher?.id || null,
             shipping_fee: shippingFee,
+            shipping_method_id: selectedShippingId, // Lưu id dịch vụ từ GHN
           },
         ])
         .select()
@@ -635,9 +612,9 @@ export default function CheckoutScreen() {
               <Text className="text-blue-600 font-bold text-xs mr-1">Thay đổi</Text>
             </TouchableOpacity>
           </View>
-          
+
           {loading ? (
-            <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "flex-start"}} />
+            <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "flex-start" }} />
           ) : userAddress ? (
             <View>
               <View className="flex-row items-center mb-1.5">
@@ -750,20 +727,21 @@ export default function CheckoutScreen() {
             </View>
           )}
         </View>
-        {/* Khối tùy chọn giao hàng (Tích hợp GHN) */}
+        {/* Khối tùy chọn giao hàng (Tích hợp API GHN) */}
         <View style={styles.section}>
-          <Text style={styles.cardTitle}>Phương thức vận chuyển</Text>
-          
-          {/* Component này giờ chỉ chuyên lo việc hiển thị list nhà vận chuyển và tính tiền */}
-          <ShippingOptions 
-             dbMethods={shippingMethods} 
-             customerDistrictId={customerDistrictId} 
-             customerWardCode={customerWardCode} 
-             totalCartWeight={1500} 
-             onSelectMethod={(method, fee) => {
-                setSelectedShippingId(method.id);
-                setDynamicShippingFee(fee);
-             }}
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
+            Phương thức vận chuyển
+          </Text>
+
+          <ShippingOptions
+            customerDistrictId={customerDistrictId}
+            customerWardCode={customerWardCode}
+            totalCartWeight={1500} // Trọng lượng gram (sau này bạn map từ sản phẩm thật)
+            onSelectMethod={(serviceId, fee) => {
+              // Nhận trực tiếp ID dịch vụ của GHN (ví dụ: 53320) và phí ship
+              setSelectedShippingId(String(serviceId)); 
+              setDynamicShippingFee(fee);
+            }}
           />
         </View>
 
@@ -991,9 +969,8 @@ export default function CheckoutScreen() {
                   <TouchableOpacity
                     key={addr.id}
                     onPress={() => handleSelectAddress(addr)}
-                    className={`flex-row items-center p-4 mb-3 border-[1.5px] rounded-2xl ${
-                      isSelected ? "border-blue-600 bg-blue-50/40" : "border-gray-200 bg-white"
-                    }`}
+                    className={`flex-row items-center p-4 mb-3 border-[1.5px] rounded-2xl ${isSelected ? "border-blue-600 bg-blue-50/40" : "border-gray-200 bg-white"
+                      }`}
                     activeOpacity={0.7}
                   >
                     <View className="flex-1 mr-3">
@@ -1014,17 +991,16 @@ export default function CheckoutScreen() {
                         {addr.street_address}, {addr.ward_commune ? `${addr.ward_commune}, ` : ''}{addr.district}, {addr.province_city}
                       </Text>
                     </View>
-                    
+
                     <View className="flex-row items-center space-x-4">
                       {/* Edit Button */}
                       <TouchableOpacity onPress={() => openEditAddress(addr)} className="p-2 mr-2">
                         <Pencil size={18} color="#6B7280" />
                       </TouchableOpacity>
-                      
+
                       {/* Radio Button */}
-                      <View className={`w-5 h-5 rounded-full border-[1.5px] items-center justify-center ${
-                        isSelected ? "border-blue-600 bg-white" : "border-gray-300"
-                      }`}>
+                      <View className={`w-5 h-5 rounded-full border-[1.5px] items-center justify-center ${isSelected ? "border-blue-600 bg-white" : "border-gray-300"
+                        }`}>
                         {isSelected && <View className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
                       </View>
                     </View>
