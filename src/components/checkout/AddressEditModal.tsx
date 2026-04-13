@@ -32,17 +32,24 @@ export default function AddressEditModal({
   handleSaveAddress,
   saving = false,
 }: AddressEditModalProps) {
-  const memoizedInitialAddress = React.useMemo(() => {
-    if (!addressData.id && !addressData.city) return null; // New form
-    return {
-      street_address: addressData.street,
-      ward_commune: addressData.ward,
-      district: addressData.district,
-      province_city: addressData.city,
-      ghn_district_id: addressData.ghnDistrictId,
-      ghn_ward_code: addressData.ghnWardCode,
-    } as Address;
-  }, [addressData.id, addressData.street, addressData.ward, addressData.district, addressData.city, addressData.ghnDistrictId, addressData.ghnWardCode]);
+  const [initialAddr, setInitialAddr] = React.useState<Address | null>(null);
+
+  React.useEffect(() => {
+    if (visible) {
+      if (!addressData.id && !addressData.city) {
+        setInitialAddr(null); // New form
+      } else {
+        setInitialAddr({
+          street_address: addressData.street,
+          ward_commune: addressData.ward,
+          district: addressData.district,
+          province_city: addressData.city,
+          ghn_district_id: addressData.ghnDistrictId,
+          ghn_ward_code: addressData.ghnWardCode,
+        });
+      }
+    }
+  }, [visible, addressData.id]);
 
   return (
     <Modal
@@ -117,7 +124,7 @@ export default function AddressEditModal({
             </View>
 
             <AddressSelector
-              initialAddress={memoizedInitialAddress}
+              initialAddress={initialAddr}
               onLocationSelected={(province, district, ward, fullStr) => {
                 if (fullStr) {
                   setAddressData((prev: any) => ({
