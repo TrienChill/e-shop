@@ -4,11 +4,11 @@ import { useRouter } from "expo-router";
 import {
   Check,
   ChevronLeft,
+  X as CloseIcon,
   Minus,
   Plus,
   ShoppingBag,
-  Trash2,
-  X as CloseIcon
+  Trash2
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
@@ -16,13 +16,13 @@ import {
   FlatList,
   Image,
   Modal,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  Pressable
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -100,24 +100,21 @@ const CartItemRow = ({
         style={styles.cartImage}
         resizeMode="cover"
       />
+      {/* Nút Xóa nằm trên ảnh giống wishlist */}
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={() => onDelete(item.id)}
+        activeOpacity={0.7}
+      >
+        <Trash2 size={16} color={C.sub} />
+      </TouchableOpacity>
     </View>
 
     {/* Details */}
     <View style={styles.cartDetails}>
-      <View style={styles.cartNameRow}>
-        <Text style={[styles.cartName, { flex: 1 }]} numberOfLines={2}>
-          {item.name}
-        </Text>
-        {/* Nút Xóa */}
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => onDelete(item.id)}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Trash2 size={16} color="#EF4444" />
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.cartName} numberOfLines={2}>
+        {item.name}
+      </Text>
 
       {/* Giá: dùng PriceDisplay để hiển thị giảm giá nếu có */}
       <PriceDisplay
@@ -304,7 +301,7 @@ export default function CartScreen() {
         `)
         .eq('id', item.product_id)
         .single();
-      
+
       if (error || !productData) {
         alert("Không thể lấy thông tin sản phẩm");
         return;
@@ -322,11 +319,11 @@ export default function CartScreen() {
 
   const handleConfirmSelection = async () => {
     if (!selectingProduct) return;
-    
+
     // Kiểm tra đã chọn đủ màu/size chưa
     const hasColors = productVariants.some(v => v.color);
     const hasSizes = productVariants.some(v => v.size);
-    
+
     if ((hasColors && !selectedColor) || (hasSizes && !selectedSize)) {
       alert("Vui lòng chọn đầy đủ phân loại!");
       return;
@@ -363,7 +360,7 @@ export default function CartScreen() {
             is_selected: true
           });
       }
-      
+
       setSelectionModalVisible(false);
       alert("Đã thêm vào giỏ hàng!");
     } catch (e) {
@@ -724,25 +721,25 @@ export default function CartScreen() {
         animationType="slide"
         onRequestClose={() => setSelectionModalVisible(false)}
       >
-        <Pressable 
-          style={styles.modalOverlay} 
-          onPress={() => setSelectionModalVisible(false)} 
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setSelectionModalVisible(false)}
         />
         <View style={styles.selectionSheet}>
           <View style={styles.sheetHeader}>
             <View style={styles.sheetProductInfo}>
-               <Image 
-                  source={{ uri: selectingProduct?.images?.[0] || 'https://via.placeholder.com/100' }} 
-                  style={styles.sheetThumb} 
-               />
-               <View>
-                 <Text style={styles.sheetPrice}>
-                   {(selectingProduct?.price || 0).toLocaleString('vi-VN')} đ
-                 </Text>
-                 <Text style={styles.sheetStock}>
-                   Chọn phân loại sản phẩm
-                 </Text>
-               </View>
+              <Image
+                source={{ uri: selectingProduct?.images?.[0] || 'https://via.placeholder.com/100' }}
+                style={styles.sheetThumb}
+              />
+              <View>
+                <Text style={styles.sheetPrice}>
+                  {(selectingProduct?.price || 0).toLocaleString('vi-VN')} đ
+                </Text>
+                <Text style={styles.sheetStock}>
+                  Chọn phân loại sản phẩm
+                </Text>
+              </View>
             </View>
             <TouchableOpacity onPress={() => setSelectionModalVisible(false)}>
               <CloseIcon size={24} color="#000" />
@@ -801,7 +798,7 @@ export default function CartScreen() {
           </ScrollView>
 
           <View style={styles.sheetFooter}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.confirmBtn, isProcessingAdd && { opacity: 0.6 }]}
               onPress={handleConfirmSelection}
               disabled={isProcessingAdd}
