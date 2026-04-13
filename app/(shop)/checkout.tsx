@@ -18,8 +18,6 @@ import {
   ChevronRight,
   Gift,
   Pencil,
-  Plus,
-  Settings,
   ShoppingBag,
   X
 } from "lucide-react-native";
@@ -442,13 +440,13 @@ export default function CheckoutScreen() {
           const formattedItems = cartData.map((item: any) => {
             const p = item.products;
             // Tính giá sau khi áp dụng product_discounts
-            const withDiscount = calculateDiscountedPrice(p); 
+            const withDiscount = calculateDiscountedPrice(p);
 
             return {
               id: item.id,
               product_id: item.product_id, // THÊM DÒNG NÀY: Đây là ID số của sản phẩm
               name: p.name,
-              price: withDiscount.finalPrice, 
+              price: withDiscount.finalPrice,
               originalPrice: withDiscount.originalPrice,
               hasDiscount: withDiscount.hasDiscount,
               quantity: item.quantity,
@@ -582,15 +580,15 @@ export default function CheckoutScreen() {
       if (selectedVoucher?.user_voucher_id) {
         const { error: updateVoucherErr } = await supabase
           .from("user_vouchers")
-          .update({ 
-            is_used: true, 
+          .update({
+            is_used: true,
             used_at: new Date().toISOString(),
-            order_id: orderData.id 
+            order_id: orderData.id
           })
           .eq("id", selectedVoucher.user_voucher_id);
 
         if (updateVoucherErr) console.error("Lỗi cập nhật voucher:", updateVoucherErr);
-        
+
         // Trừ kho Voucher tổng
         try {
           const { data: vData } = await supabase
@@ -598,7 +596,7 @@ export default function CheckoutScreen() {
             .select("used_count")
             .eq("id", selectedVoucher.id)
             .single();
-            
+
           if (vData) {
             await supabase
               .from("vouchers")
@@ -770,8 +768,8 @@ export default function CheckoutScreen() {
                   {selectedVoucher ? "Mã giảm giá đã chọn" : "Mã giảm giá của bạn"}
                 </Text>
                 <Text style={{ fontSize: 13, color: selectedVoucher ? COLORS.primary : COLORS.textSecondary, marginTop: 2, fontWeight: selectedVoucher ? "600" : "500" }}>
-                  {selectedVoucher ? 
-                    (selectedVoucher.type === "percentage" ? `Đã áp dụng giảm ${selectedVoucher.discount}%` : `Đã áp dụng giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`) 
+                  {selectedVoucher ?
+                    (selectedVoucher.type === "percentage" ? `Đã áp dụng giảm ${selectedVoucher.discount}%` : `Đã áp dụng giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`)
                     : "Chọn hoặc nhập mã"}
                 </Text>
               </View>
@@ -792,7 +790,7 @@ export default function CheckoutScreen() {
             totalCartWeight={1500} // Trọng lượng gram (sau này bạn map từ sản phẩm thật)
             onSelectMethod={(serviceId, fee) => {
               // Nhận trực tiếp ID dịch vụ của GHN (ví dụ: 53320) và phí ship
-              setSelectedShippingId(String(serviceId)); 
+              setSelectedShippingId(String(serviceId));
               setDynamicShippingFee(fee);
             }}
           />
@@ -803,7 +801,7 @@ export default function CheckoutScreen() {
           <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: COLORS.secondary }}>
             Phương thức thanh toán
           </Text>
-          
+
           <View style={styles.codPaymentCard}>
             <View style={styles.codIconWrapper}>
               <Banknote size={24} color={C.blue} />
@@ -1042,8 +1040,8 @@ export default function CheckoutScreen() {
             </TouchableOpacity>
           </View>
 
-          <VoucherCollection 
-            onVoucherCollected={() => setRefreshTrigger(prev => prev + 1)} 
+          <VoucherCollection
+            onVoucherCollected={() => setRefreshTrigger(prev => prev + 1)}
             style={{ marginBottom: 8, marginTop: 4 }}
           />
 
