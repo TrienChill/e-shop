@@ -10,8 +10,21 @@ import {
   GHNWard 
 } from "@/src/services/ghn/shippingService";
 
+export interface Address {
+  id?: string;
+  receiver_name?: string;
+  phone_number?: string;
+  province_city?: string;
+  district?: string;
+  ward_commune?: string;
+  street_address?: string;
+  is_default?: boolean;
+  ghn_district_id?: number | string;
+  ghn_ward_code?: string | number;
+}
+
 interface Props {
-  initialAddress?: any;
+  initialAddress?: Address | null;
   onLocationSelected: (
     province: GHNProvince | null,
     district: GHNDistrict | null,
@@ -27,24 +40,77 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
   const [selectedWard, setSelectedWard] = useState<GHNWard | null>(null);
   const [street, setStreet] = useState("");
 
+  const [isMapping, setIsMapping] = useState(false);
+  const [mappingError, setMappingError] = useState<string | null>(null);
+
   // Initialize from initialAddress
   useEffect(() => {
-    if (initialAddress) {
-       setStreet(initialAddress.street_address || "");
-       
-       if (!selectedProvince && initialAddress.province_city) {
-         setSelectedProvince({ ProvinceID: 0, ProvinceName: initialAddress.province_city } as any);
-       }
-       
-       // Chỉ set District và Ward mặc định nếu database đã có lưu sẵn mã ID GHN thật.
-       // Nếu không có, bắt buộc người dùng chọn lại.
-       if (!selectedDistrict && initialAddress.district && initialAddress.ghn_district_id) {
-         setSelectedDistrict({ DistrictID: initialAddress.ghn_district_id, ProvinceID: 0, DistrictName: initialAddress.district } as any);
-       }
-       if (!selectedWard && initialAddress.ghn_ward_code) {
-         setSelectedWard({ WardCode: initialAddress.ghn_ward_code, DistrictID: initialAddress.ghn_district_id, WardName: initialAddress.ward_commune || "Mặc định GHN" } as any);
-       }
-    }
+    const fetchAddressData = async () => {
+      if (!initialAddress) return;
+      
+      setIsMapping(true);
+      setMappingError(null);
+      setStreet(initialAddress.street_address || "");
+      
+      // 1. Tỉnh/Thành
+      if (!selectedProvince && initialAddress.province_city) {
+        setSelectedProvince({ ProvinceID: 0, ProvinceName: initialAddress.province_city } as any);
+      }
+      
+      // 2. Quận/Huyện
+      if (!selectedDistrict && initialAddress.district && initialAddress.ghn_district_id) {
+        setSelectedDistrict({ 
+          DistrictID: Number(initialAddress.ghn_district_id), 
+          ProvinceID: 0, 
+          DistrictName: initialAddress.district 
+        } as any);
+      }
+      
+      // 3. Phường/Xã
+      if (!selectedWard) {
+        // Nếu DB có đủ tên Phường + Mã Phường
+        if (initialAddress.ghn_ward_code && initialAddress.ward_commune) {
+          setSelectedWard({ 
+            WardCode: String(initialAddress.ghn_ward_code), 
+            DistrictID: Number(initialAddress.ghn_district_id), 
+            WardName: initialAddress.ward_commune 
+          } as any);
+        } 
+        // Nếu DB chỉ có tên Phường (không có mã hoặc mã sai)
+        else if (initialAddress.ward_commune && initialAddress.ghn_district_id) {
+           try {
+             const wardsList = await fetchWards(Number(initialAddress.ghn_district_id));
+             const matchName = initialAddress.ward_commune.toLowerCase().replace(/phường|xã|thị trấn/g, "").trim();
+             const matched = wardsList.find(w => w.WardName.toLowerCase().includes(matchName));
+             
+             if (matched) {
+                console.log("[AddressSelector] Đã map được phường gốc:", matched.WardCode);
+                setSelectedWard(matched);
+             } else {
+                setMappingError(`Không thể tự động khớp mã phường cho: ${initialAddress.ward_commune}. Vui lòng chọn lại.`);
+                setSelectedWard({ 
+                   WardCode: "", 
+                   DistrictID: Number(initialAddress.ghn_district_id), 
+                   WardName: initialAddress.ward_commune
+                } as any);
+             }
+           } catch {
+             setMappingError("Lỗi kết nối khi lấy danh sách Phường/Xã GHN.");
+           }
+        } 
+        // Nếu DB có mã nhưng mất tên
+        else if (initialAddress.ghn_ward_code) {
+           setSelectedWard({ 
+             WardCode: String(initialAddress.ghn_ward_code), 
+             DistrictID: Number(initialAddress.ghn_district_id), 
+             WardName: "Mặc định GHN" 
+           } as any);
+        }
+      }
+      setIsMapping(false);
+    };
+
+    fetchAddressData();
   }, [initialAddress]);
 
   // States of lists
@@ -250,12 +316,22 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
           style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: selectedDistrict ? "#D1D5DB" : "#E5E7EB", backgroundColor: selectedDistrict ? "white" : "#F9FAFB", padding: 14, borderRadius: 12 }}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-             <Text style={{ fontSize: 15, color: selectedWard ? "#111827" : "#9CA3AF", paddingLeft: 28 }}>
-                {selectedWard ? selectedWard.WardName : "3. Chọn Phường / Xã"}
-             </Text>
+             {isMapping ? (
+                <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 28 }}>
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                  <Text style={{ fontSize: 15, color: "#6B7280", marginLeft: 8 }}>Đang đồng bộ...</Text>
+                </View>
+             ) : (
+                <Text style={{ fontSize: 15, color: selectedWard ? "#111827" : "#9CA3AF", paddingLeft: 28 }}>
+                   {selectedWard ? selectedWard.WardName : "3. Chọn Phường / Xã"}
+                </Text>
+             )}
           </View>
           <ChevronDown size={20} color="#6B7280" />
         </Pressable>
+        {mappingError && (
+          <Text style={{ color: "#EF4444", fontSize: 13, marginTop: -8, marginLeft: 4 }}>{mappingError}</Text>
+        )}
 
         {/* Số nhà, Tên đường */}
         <View style={{ borderWidth: 1, borderColor: "#D1D5DB", backgroundColor: "white", padding: 14, borderRadius: 12 }}>

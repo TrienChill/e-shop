@@ -221,8 +221,8 @@ export default function CheckoutScreen() {
         // 1. Lấy thông tin địa chỉ & profile người nhận
         const { data: defaultAddr } = await supabase
           .from("user_addresses")
-          // 👇 CẬP NHẬT: Lấy thêm ghn_district_id và ghn_ward_code
-          .select("id, receiver_name, phone_number, province_city, district, street_address, ghn_district_id, ghn_ward_code") 
+          // 👇 CẬP NHẬT: Lấy thêm ghn_district_id, ward_commune và ghn_ward_code
+          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code") 
           .eq("user_id", user.id)
           .eq("is_default", true)
           .maybeSingle();
@@ -236,8 +236,8 @@ export default function CheckoutScreen() {
           setUserAddress(defaultAddr);
           
           // 👇 CẬP NHẬT: Truyền thẳng mã GHN từ DB vào state để API GHN chạy ngay lập tức
-          if (defaultAddr.ghn_district_id) setCustomerDistrictId(defaultAddr.ghn_district_id);
-          if (defaultAddr.ghn_ward_code) setCustomerWardCode(defaultAddr.ghn_ward_code);
+          if (defaultAddr.ghn_district_id) setCustomerDistrictId(Number(defaultAddr.ghn_district_id));
+          if (defaultAddr.ghn_ward_code) setCustomerWardCode(String(defaultAddr.ghn_ward_code));
         }
 
         // 2. Lấy danh sách sản phẩm ĐANG ĐƯỢC CHỌN trong giỏ hàng
@@ -478,8 +478,8 @@ export default function CheckoutScreen() {
             initialAddress={userAddress} // Truyền địa chỉ mặc định vào để hiển thị
             onLocationSelected={(province, district, ward, fullAddressString) => {
                // 1. Cập nhật mã ID cho API GHN tính tiền
-               if (district) setCustomerDistrictId(district.DistrictID);
-               if (ward) setCustomerWardCode(ward.WardCode);
+               if (district) setCustomerDistrictId(Number(district.DistrictID));
+               if (ward) setCustomerWardCode(String(ward.WardCode));
                
                // 2. Cập nhật Text để lúc bấm "Thanh toán" lưu vào DB
                if (fullAddressString) {
