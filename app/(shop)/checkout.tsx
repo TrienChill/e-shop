@@ -67,35 +67,6 @@ const C = {
   error: "#EF4444",
 };
 
-// Dữ liệu mẫu cho Phương thức thanh toán
-const PAYMENT_METHODS = [
-  {
-    id: "1",
-    type: "Mastercard",
-    number: "**** **** **** 1579",
-    holder: "Triển Chill",
-    expiry: "12/22",
-    bgColor: "#EEF2FF", // Light Blue Pastel
-    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Mastercard-logo.svg/1280px-Mastercard-logo.svg.png",
-  },
-  {
-    id: "2",
-    type: "Visa",
-    number: "**** **** **** 4242",
-    holder: "Triển Chill",
-    expiry: "09/25",
-    bgColor: "#FFF1F2", // Light Pink Pastel
-    logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png",
-  },
-  {
-    id: "cash",
-    type: "Cash",
-    name: "Tiền mặt (COD)",
-    number: "Thanh toán khi nhận hàng",
-    bgColor: "#F3F4F6", // Light Gray
-    icon: Banknote,
-  },
-];
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -827,85 +798,28 @@ export default function CheckoutScreen() {
           />
         </View>
 
-        {/* Khối Phương thức thanh toán */}
-        <View style={styles.paymentSection}>
-          <Text style={styles.paymentSectionTitle}>Phương thức thanh toán</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToAlignment="center"
-            decelerationRate="fast"
-            contentContainerStyle={styles.paymentList}
-            snapToInterval={SCREEN_WIDTH * 0.75 + 16}
-          >
-            {PAYMENT_METHODS.map((method) => {
-              const isSelected = selectedPaymentId === method.id;
-
-              return (
-                <TouchableOpacity
-                  key={method.id}
-                  activeOpacity={0.9}
-                  style={[
-                    styles.paymentCard,
-                    { backgroundColor: method.bgColor },
-                  ]}
-                  onPress={() => setSelectedPaymentId(method.id)}
-                >
-                  {/* Header thẻ */}
-                  <View style={styles.cardHeader}>
-                    {method.logo ? (
-                      <Image
-                        source={{ uri: method.logo }}
-                        style={styles.cardLogo}
-                        resizeMode="contain"
-                      />
-                    ) : (
-                      method.icon &&
-                      React.createElement(method.icon as any, {
-                        color: C.blue,
-                        size: 32,
-                      })
-                    )}
-                    <View style={styles.settingsBtn}>
-                      <Settings size={14} color={C.blue} />
-                    </View>
-                  </View>
-
-                  {/* Badge chọn */}
-                  {isSelected && (
-                    <View style={styles.selectedBadge}>
-                      <CheckCircle2 size={24} color={C.blue} fill="#FFF" />
-                    </View>
-                  )}
-
-                  {/* Nội dung thẻ */}
-                  <View style={styles.cardContentBottom}>
-                    <Text
-                      style={[
-                        styles.cardNumber,
-                        method.type === "Cash" && { fontSize: 16 },
-                      ]}
-                    >
-                      {method.number}
-                    </Text>
-                    <View style={styles.cardFooter}>
-                      <Text style={styles.cardHolder}>
-                        {method.type === "Cash" ? method.name : method.holder}
-                      </Text>
-                      {method.expiry && (
-                        <Text style={styles.cardExpiry}>{method.expiry}</Text>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* Nút thêm thẻ mới */}
-            <TouchableOpacity style={styles.addCardBtn} activeOpacity={0.8}>
-              <Plus size={32} color="#FFFFFF" />
-            </TouchableOpacity>
-          </ScrollView>
+        {/* Khối Phương thức thanh toán chuyên nghiệp chỉ có COD */}
+        <View style={styles.section}>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: COLORS.secondary }}>
+            Phương thức thanh toán
+          </Text>
+          
+          <View style={styles.codPaymentCard}>
+            <View style={styles.codIconWrapper}>
+              <Banknote size={24} color={C.blue} />
+            </View>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.codTitle}>
+                Thanh toán khi nhận hàng (COD)
+              </Text>
+              <Text style={styles.codSubtitle}>
+                Thanh toán bằng tiền mặt khi giao hàng tận nơi
+              </Text>
+            </View>
+            <View style={styles.codCheckMark}>
+              <CheckCircle2 size={22} color={C.blue} />
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -1710,85 +1624,41 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  // ── Payment Section Styles ──
-  paymentSection: {
-    marginBottom: 40,
+  codPaymentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1.5,
+    borderColor: "#3B82F6",
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 20,
   },
-  paymentSectionTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.secondary,
-    marginBottom: 28,
-    paddingHorizontal: 0,
-  },
-  paymentList: {
-    paddingTop: 12, // Thêm padding để hiển thị dấu tích không bị che
-    paddingRight: 20,
-    gap: 16,
-  },
-  paymentCard: {
-    width: SCREEN_WIDTH * 0.75,
-    aspectRatio: 1.586,
+  codIconWrapper: {
+    width: 48,
+    height: 48,
     borderRadius: 24,
-    padding: 24,
-    justifyContent: "space-between",
-    position: "relative",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  cardLogo: {
-    width: 60,
-    height: 35,
-  },
-  settingsBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.8)",
+    backgroundColor: "#EFF6FF",
     justifyContent: "center",
     alignItems: "center",
+    marginRight: 16,
+    borderWidth: 1,
+    borderColor: "#DBEAFE",
   },
-  selectedBadge: {
-    position: "absolute",
-    top: -10,
-    right: -10,
-    zIndex: 10,
-  },
-  cardContentBottom: {
-    gap: 12,
-  },
-  cardNumber: {
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: 2,
-    color: COLORS.secondary,
-    fontFamily: "monospace",
-  },
-  cardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardHolder: {
-    fontSize: 14,
+  codTitle: {
+    fontSize: 16,
     fontWeight: "700",
-    color: COLORS.secondary,
+    color: "#0F172A",
+    marginBottom: 4,
   },
-  cardExpiry: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: "600",
+  codSubtitle: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 18,
   },
-  addCardBtn: {
-    width: 80,
-    aspectRatio: 0.6,
-    backgroundColor: C.blue,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
+  codCheckMark: {
+    marginLeft: 8,
   },
   // ── Status Modal Styles ──
   statusModalOverlay: {
