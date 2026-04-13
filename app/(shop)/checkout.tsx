@@ -2,6 +2,7 @@ import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 import { supabase } from "@/src/lib/supabase";
 import {
+  calculateDiscountedPrice,
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
@@ -397,52 +398,65 @@ export default function CheckoutScreen() {
               name,
               price,
               images,
-              variants
+              variants,
+              product_discounts (
+                id, discount_type, discount_value, is_active, start_date, end_date
+              )
             )
           `,
           )
           .eq("user_id", user.id)
           .eq("is_selected", true); // Chỉ lấy những món người dùng tích chọn để thanh toán
 
-        // 3. Fetch danh sách Voucher khả dụng
+        // 3. Lấy danh sách Voucher người dùng đang có (user_vouchers)
+        const { data: userVoucherData } = await supabase
+          .from("user_vouchers")
+          .select(`
+            id,
+            is_used,
+            vouchers!inner (
+              id, code, description, discount_type, discount_value, min_order_value, expired_at, is_active
+            )
+          `)
+          .eq("user_id", user.id)
+          .eq("is_used", false) // Chỉ lấy mã chưa dùng
+          .eq("vouchers.is_active", true)
+          .gt("vouchers.expired_at", new Date().toISOString());
 
-        const { data: voucherData } = await supabase
-          .from("vouchers")
-          .select("*")
-          .eq("is_active", true) // Chỉ lấy voucher đang hoạt động
-          .gt("expired_at", new Date().toISOString()) // SỬA: expiry_date -> expired_at
-          .order("discount_value", { ascending: false }); // SỬA: discount_percent -> discount_value
-
-        if (voucherData && voucherData.length > 0) {
-          const formattedVouchers = voucherData.map((v) => ({
-            id: v.id,
-            title: v.code,
-            description:
-              v.description ||
-              (v.discount_type === "percentage"
-                ? `Giảm ${v.discount_value}% đơn hàng`
-                : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ đơn hàng`),
-            validUntil: v.expired_at
-              ? new Date(v.expired_at).toLocaleDateString("vi-VN")
-              : "Không thời hạn", // SỬA: expired_at
-            discount: Number(v.discount_value), // Ép kiểu số cho numeric
-            type: v.discount_type, // Lưu lại loại giảm giá để tính toán sau này
-            icon: v.discount_value > 10 ? Gift : ShoppingBag,
-          }));
+        if (userVoucherData && userVoucherData.length > 0) {
+          // Lọc các voucher đủ điều kiện (ví dụ: Đơn hàng phải lớn hơn min_order_value)
+          // Lưu ý: Lúc này cart chưa tính xong total, nên ta map dữ liệu trước, việc vô hiệu hóa nút bấm sẽ làm ở UI
+          const formattedVouchers = userVoucherData.map((uv: any) => {
+            const v = uv.vouchers;
+            return {
+              id: v.id,
+              user_voucher_id: uv.id, // Lưu lại ID này để cập nhật is_used = true khi đặt hàng
+              title: v.code,
+              description: v.description,
+              validUntil: new Date(v.expired_at).toLocaleDateString("vi-VN"),
+              discount: Number(v.discount_value),
+              type: v.discount_type,
+              minOrderValue: Number(v.min_order_value || 0),
+              icon: Number(v.discount_value) > 10 ? Gift : ShoppingBag,
+            };
+          });
 
           setDbVouchers(formattedVouchers);
         }
 
-
-
         if (cartData) {
           const formattedItems = cartData.map((item: any) => {
             const p = item.products;
+            // Tính giá sau khi áp dụng product_discounts
+            const withDiscount = calculateDiscountedPrice(p); 
+
             return {
               id: item.id,
               product_id: item.product_id, // THÊM DÒNG NÀY: Đây là ID số của sản phẩm
               name: p.name,
-              price: p.price,
+              price: withDiscount.finalPrice, 
+              originalPrice: withDiscount.originalPrice,
+              hasDiscount: withDiscount.hasDiscount,
               quantity: item.quantity,
               image: getProductImageByColor(p, item.color),
               // Hiển thị thì dùng TV, nhưng gửi đi/truy vấn thì dùng raw
@@ -567,6 +581,20 @@ export default function CheckoutScreen() {
           console.error("[STOCK_CHECK] Exception khi xử lý stock:", stockErr.message);
           throw stockErr; // Đẩy lỗi ra ngoài để hiển thị Alert cho user
         }
+      }
+
+      // NẾU CÓ XÀI VOUCHER -> Cập nhật is_used = true trong user_vouchers
+      if (selectedVoucher?.user_voucher_id) {
+        const { error: updateVoucherErr } = await supabase
+          .from("user_vouchers")
+          .update({ 
+            is_used: true, 
+            used_at: new Date().toISOString(),
+            order_id: orderData.id 
+          })
+          .eq("id", selectedVoucher.user_voucher_id);
+
+        if (updateVoucherErr) console.error("Lỗi cập nhật voucher:", updateVoucherErr);
       }
 
       // 4. Xóa các món đã mua khỏi giỏ hàng
@@ -1054,6 +1082,7 @@ export default function CheckoutScreen() {
             {dbVouchers && dbVouchers.length > 0 ? (
               dbVouchers.map((voucher) => {
                 const IconComp = voucher.icon;
+                const isEligible = productsTotal >= voucher.minOrderValue;
                 const isSelected = selectedVoucher?.id === voucher.id;
 
                 return (
@@ -1087,8 +1116,10 @@ export default function CheckoutScreen() {
                       </Text>
 
                       <TouchableOpacity
+                        disabled={!isEligible}
                         style={[
                           styles.applyBtn,
+                          !isEligible && { backgroundColor: '#E5E7EB' },
                           isSelected && { backgroundColor: COLORS.primary },
                         ]}
                         onPress={() => {
@@ -1099,10 +1130,11 @@ export default function CheckoutScreen() {
                         <Text
                           style={[
                             styles.applyText,
+                            !isEligible && { color: '#9CA3AF' },
                             isSelected && { color: "#FFF" },
                           ]}
                         >
-                          {isSelected ? "Đã áp dụng" : "Áp dụng ngay"}
+                          {isSelected ? "Đã áp dụng" : (isEligible ? "Áp dụng ngay" : "Chưa đủ ĐK")}
                         </Text>
                       </TouchableOpacity>
                     </View>
