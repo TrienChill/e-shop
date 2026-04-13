@@ -41,6 +41,12 @@ export function PriceDisplay({
 }: PriceDisplayProps) {
   const { final: finalSize, original: originalSize } = sizeConfig[size];
 
+  // Tính phần trăm giảm giá
+  const discountPercent =
+    hasDiscount && finalPrice && originalPrice > 0
+      ? Math.round((1 - finalPrice / originalPrice) * 100)
+      : 0;
+
   return (
     <View
       style={[
@@ -52,10 +58,19 @@ export function PriceDisplay({
       {hasDiscount && finalPrice != null ? (
         <>
           {/* Giá sau giảm – màu đỏ */}
-          <Text style={[styles.finalPrice, { fontSize: finalSize }]}>
-            {formatVND(finalPrice)}
-            <Text style={{ fontSize: finalSize * 0.7 }}> đ</Text>
-          </Text>
+          <View style={styles.row}>
+            <Text style={[styles.finalPrice, { fontSize: finalSize }]}>
+              {formatVND(finalPrice)}
+              <Text style={{ fontSize: finalSize * 0.7 }}> đ</Text>
+            </Text>
+
+            {/* Phần trăm giảm giá - Badge nổi bật */}
+            {discountPercent > 0 && (
+              <View style={styles.discountBadge}>
+                <Text style={styles.discountText}>-{discountPercent}%</Text>
+              </View>
+            )}
+          </View>
 
           {/* Giá gốc – gạch ngang */}
           <Text style={[styles.originalPrice, { fontSize: originalSize }]}>
@@ -76,17 +91,19 @@ export function PriceDisplay({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
+    flexDirection: "column",
+    alignItems: "flex-start",
     marginTop: 4,
   },
   /** Variant lg dùng baseline thay vì center để giá gốc nhỏ hơn trông tự nhiên */
   containerLg: {
-    alignItems: "baseline",
-    gap: 10,
+    alignItems: "flex-start",
     marginTop: 0,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   finalPrice: {
     fontWeight: "700",
@@ -96,10 +113,22 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     textDecorationLine: "line-through",
     fontWeight: "500",
+    marginTop: -2,
   },
   normalPrice: {
     fontWeight: "700",
     color: "#111827",
+  },
+  discountBadge: {
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discountText: {
+    color: "#EF4444",
+    fontSize: 10,
+    fontWeight: "800",
   },
 });
 
