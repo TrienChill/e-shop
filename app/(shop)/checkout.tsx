@@ -35,6 +35,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AddressSelector from "@/src/components/checkout/AddressSelector";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
+import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -183,6 +184,141 @@ export default function CheckoutScreen() {
   );
   const [allAddresses, setAllAddresses] = useState<any[]>([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  
+  // States cho Address Edit Modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [editAddressData, setEditAddressData] = useState({
+    id: null,
+    name: "",
+    phone: "",
+    city: "",
+    district: "",
+    ward: "",
+    street: "",
+    isDefault: false,
+    ghnDistrictId: null as number | null,
+    ghnWardCode: null as string | null,
+  });
+
+  const openAddAddress = () => {
+    setEditAddressData({
+      id: null,
+      name: "",
+      phone: "",
+      city: "",
+      district: "",
+      ward: "",
+      street: "",
+      isDefault: allAddresses.length === 0, // Mặc định true nếu chưa có địa chỉ nào
+      ghnDistrictId: null,
+      ghnWardCode: null,
+    });
+    setEditModalVisible(true);
+  };
+
+  const openEditAddress = (addr: any) => {
+    setEditAddressData({
+      id: addr.id,
+      name: addr.receiver_name || "",
+      phone: addr.phone_number || "",
+      city: addr.province_city || "",
+      district: addr.district || "",
+      ward: addr.ward_commune || "",
+      street: addr.street_address || "",
+      isDefault: addr.is_default || false,
+      ghnDistrictId: addr.ghn_district_id ? Number(addr.ghn_district_id) : null,
+      ghnWardCode: addr.ghn_ward_code ? String(addr.ghn_ward_code) : null,
+    });
+    setEditModalVisible(true);
+  };
+
+  const reloadAddresses = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: addresses } = await supabase
+        .from("user_addresses")
+        .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default") 
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false });
+        
+      if (addresses && addresses.length > 0) {
+        setAllAddresses(addresses);
+        // Nếu địa chỉ đang chọn không còn trong list, chọn lại cái mặc định
+        const currentStillExists = addresses.find(a => a.id === userAddress?.id);
+        if (!currentStillExists) {
+            handleSelectAddress(addresses[0]);
+        } else {
+            // Cập nhật lại data mới nhất cho địa chỉ đang chọn
+            const updatedCurrent = addresses.find(a => a.id === userAddress?.id);
+            if (updatedCurrent) handleSelectAddress(updatedCurrent);
+        }
+      } else {
+        setAllAddresses([]);
+        setUserAddress(null);
+      }
+    } catch (error) {
+      console.error("Lỗi reload địa chỉ", error);
+    }
+  };
+
+  const handleSaveAddress = async () => {
+    if (!editAddressData.name.trim() || !editAddressData.phone.trim()) {
+      alert("Vui lòng điền đủ Họ tên và Số điện thoại");
+      return;
+    }
+    
+    setSavingAddress(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để lưu địa chỉ");
+        return;
+      }
+      
+      // Nếu đặt làm mặc định, set các địa chỉ khác về false trước
+      if (editAddressData.isDefault) {
+        await supabase
+          .from("user_addresses")
+          .update({ is_default: false })
+          .eq("user_id", user.id);
+      }
+
+      const payload = {
+        user_id: user.id,
+        receiver_name: editAddressData.name,
+        phone_number: editAddressData.phone,
+        province_city: editAddressData.city,
+        district: editAddressData.district,
+        ward_commune: editAddressData.ward,
+        street_address: editAddressData.street,
+        is_default: editAddressData.isDefault,
+        ghn_district_id: editAddressData.ghnDistrictId,
+        ghn_ward_code: editAddressData.ghnWardCode,
+        updated_at: new Date(),
+      };
+
+      const finalPayload = editAddressData.id ? { ...payload, id: editAddressData.id } : payload;
+
+      const { data, error } = await supabase
+        .from("user_addresses")
+        .upsert(finalPayload)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      await reloadAddresses();
+      setEditModalVisible(false);
+      alert("Lưu địa chỉ thành công!");
+    } catch (error: any) {
+      alert("Không thể lưu địa chỉ: " + error.message);
+    } finally {
+      setSavingAddress(false);
+    }
+  };
 
   const handleSelectAddress = (addr: any) => {
     setUserAddress(addr);
@@ -836,7 +972,12 @@ export default function CheckoutScreen() {
         />
         <View className="absolute bottom-0 w-full bg-white rounded-t-3xl pt-6 pb-8 px-5 max-h-[75%]">
           <View className="flex-row items-center justify-between mb-6 px-1">
-            <Text className="text-xl font-extrabold text-gray-900">Sổ địa chỉ của bạn</Text>
+            <View>
+              <Text className="text-xl font-extrabold text-gray-900">Sổ địa chỉ của bạn</Text>
+              <TouchableOpacity onPress={openAddAddress} className="mt-1">
+                <Text className="text-blue-600 font-bold text-[14px]">+ Thêm địa chỉ mới</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity onPress={() => setShowAddressModal(false)} className="p-2 bg-gray-100 rounded-full">
               <X color="#4B5563" size={20} />
             </TouchableOpacity>
@@ -874,11 +1015,18 @@ export default function CheckoutScreen() {
                       </Text>
                     </View>
                     
-                    {/* Radio Button */}
-                    <View className={`w-5 h-5 rounded-full border-[1.5px] items-center justify-center ${
-                      isSelected ? "border-blue-600 bg-white" : "border-gray-300"
-                    }`}>
-                      {isSelected && <View className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
+                    <View className="flex-row items-center space-x-4">
+                      {/* Edit Button */}
+                      <TouchableOpacity onPress={() => openEditAddress(addr)} className="p-2 mr-2">
+                        <Pencil size={18} color="#6B7280" />
+                      </TouchableOpacity>
+                      
+                      {/* Radio Button */}
+                      <View className={`w-5 h-5 rounded-full border-[1.5px] items-center justify-center ${
+                        isSelected ? "border-blue-600 bg-white" : "border-gray-300"
+                      }`}>
+                        {isSelected && <View className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
+                      </View>
                     </View>
                   </TouchableOpacity>
                 );
@@ -893,6 +1041,15 @@ export default function CheckoutScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      <AddressEditModal
+        visible={editModalVisible}
+        onClose={() => setEditModalVisible(false)}
+        addressData={editAddressData}
+        setAddressData={setEditAddressData}
+        handleSaveAddress={handleSaveAddress}
+        saving={savingAddress}
+      />
 
       {/* Modal hiển thị danh sách mã giảm giá */}
       <Modal
