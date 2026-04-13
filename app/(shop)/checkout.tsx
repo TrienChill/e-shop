@@ -14,6 +14,7 @@ import {
   Banknote,
   CheckCircle2,
   ChevronLeft,
+  ChevronRight,
   Gift,
   Pencil,
   Plus,
@@ -330,11 +331,19 @@ export default function CheckoutScreen() {
 
   const shippingFee = dynamicShippingFee; // SỬ DỤNG GIÁ ĐỘNG TỪ GHN API HOẶC FALLBACK THÔNG QUA SHIPPING OPTIONS
 
-  const discountAmount = selectedVoucher
-    ? selectedVoucher.type === "percentage"
-      ? (productsTotal * selectedVoucher.discount) / 100
-      : selectedVoucher.discount // Nếu là số tiền mặt thì trừ trực tiếp
-    : 0;
+  let discountAmount = 0;
+  if (selectedVoucher) {
+    if (selectedVoucher.type === "percentage") {
+      let calc = (productsTotal * selectedVoucher.discount) / 100;
+      if (selectedVoucher.maxDiscount > 0) {
+        calc = Math.min(calc, selectedVoucher.maxDiscount);
+      }
+      discountAmount = calc;
+    } else {
+      discountAmount = selectedVoucher.discount;
+    }
+  }
+
   // Đảm bảo số tiền giảm không vượt quá tổng đơn
   const finalDiscount = Math.min(discountAmount, productsTotal);
   const finalTotal = productsTotal + shippingFee - finalDiscount;
@@ -410,19 +419,28 @@ export default function CheckoutScreen() {
           .eq("is_selected", true); // Chỉ lấy những món người dùng tích chọn để thanh toán
 
         // 3. Lấy danh sách Voucher người dùng đang có (user_vouchers)
-        const { data: userVoucherData } = await supabase
+        const { data: rawUserVoucherData, error: voucherErr } = await supabase
           .from("user_vouchers")
           .select(`
             id,
             is_used,
             vouchers!inner (
-              id, code, description, discount_type, discount_value, min_order_value, expired_at, is_active
+              id, code, discount_type, discount_value, min_order_value, max_discount, expired_at, is_active
             )
           `)
           .eq("user_id", user.id)
           .eq("is_used", false) // Chỉ lấy mã chưa dùng
-          .eq("vouchers.is_active", true)
-          .gt("vouchers.expired_at", new Date().toISOString());
+          .eq("vouchers.is_active", true);
+
+        if (voucherErr) {
+          console.error("Lỗi fetch voucher:", voucherErr);
+        }
+
+        // Lọc trong JS để đảm bảo bắt được các mã không có ngày hết hạn (expired_at = null)
+        const userVoucherData = rawUserVoucherData?.filter((uv: any) => {
+          if (!uv.vouchers.expired_at) return true; // Không có hạn -> Luôn hợp lệ
+          return new Date(uv.vouchers.expired_at) > new Date(); // Có hạn -> Phải lớn hơn ngày hôm nay
+        });
 
         if (userVoucherData && userVoucherData.length > 0) {
           // Lọc các voucher đủ điều kiện (ví dụ: Đơn hàng phải lớn hơn min_order_value)
@@ -433,11 +451,14 @@ export default function CheckoutScreen() {
               id: v.id,
               user_voucher_id: uv.id, // Lưu lại ID này để cập nhật is_used = true khi đặt hàng
               title: v.code,
-              description: v.description,
-              validUntil: new Date(v.expired_at).toLocaleDateString("vi-VN"),
+              description: v.discount_type === "percentage"
+                ? `Giảm ${v.discount_value}%${v.max_discount ? ` tối đa ${v.max_discount.toLocaleString("vi-VN")}đ` : ''} cho đơn hàng`
+                : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ cho đơn hàng`,
+              validUntil: v.expired_at ? new Date(v.expired_at).toLocaleDateString("vi-VN") : "Không thời hạn",
               discount: Number(v.discount_value),
               type: v.discount_type,
               minOrderValue: Number(v.min_order_value || 0),
+              maxDiscount: Number(v.max_discount || 0),
               icon: Number(v.discount_value) > 10 ? Gift : ShoppingBag,
             };
           });
@@ -507,6 +528,7 @@ export default function CheckoutScreen() {
             address_id: userAddress.id,
             status: "pending", // Trạng thái chờ xử lý
             platform_voucher_id: selectedVoucher?.id || null,
+            discount_amount: finalDiscount,
             shipping_fee: shippingFee,
             shipping_method_id: selectedShippingId, // Lưu id dịch vụ từ GHN
           },
@@ -596,6 +618,24 @@ export default function CheckoutScreen() {
           .eq("id", selectedVoucher.user_voucher_id);
 
         if (updateVoucherErr) console.error("Lỗi cập nhật voucher:", updateVoucherErr);
+        
+        // Trừ kho Voucher tổng
+        try {
+          const { data: vData } = await supabase
+            .from("vouchers")
+            .select("used_count")
+            .eq("id", selectedVoucher.id)
+            .single();
+            
+          if (vData) {
+            await supabase
+              .from("vouchers")
+              .update({ used_count: (vData.used_count || 0) + 1 })
+              .eq("id", selectedVoucher.id);
+          }
+        } catch (e) {
+          console.error("Lỗi tăng used_count cho vouchers", e);
+        }
       }
 
       // 4. Xóa các món đã mua khỏi giỏ hàng
@@ -672,27 +712,6 @@ export default function CheckoutScreen() {
                 </Text>
               </View>
             </View>
-            {selectedVoucher && (
-              <TouchableOpacity
-                style={styles.discountBadgePurple}
-                onPress={() => setSelectedVoucher(null)}
-              >
-                <Text style={styles.discountBadgeText}>
-                  {selectedVoucher.type === "percentage"
-                    ? `Giảm ${selectedVoucher.discount}%`
-                    : `Giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`}
-                </Text>
-                <X color="#FFF" size={14} />
-              </TouchableOpacity>
-            )}
-            {!selectedVoucher && (
-              <TouchableOpacity
-                style={styles.addVoucherBtnMini}
-                onPress={() => setShowVouchers(true)}
-              >
-                <Plus size={16} color={C.blue} />
-              </TouchableOpacity>
-            )}
           </View>
 
           {loading ? (
@@ -754,14 +773,41 @@ export default function CheckoutScreen() {
           {selectedVoucher && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>
-                Giảm giá ({selectedVoucher.discount}%)
+                Giảm giá ({selectedVoucher.type === "percentage" ? `${selectedVoucher.discount}%` : "Trực tiếp"})
               </Text>
               <Text style={[styles.summaryValue, { color: "#EF4444" }]}>
-                -{discountAmount.toLocaleString("vi-VN")}₫
+                -{finalDiscount.toLocaleString("vi-VN")}₫
               </Text>
             </View>
           )}
         </View>
+
+        {/* Khối chọn Voucher */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.voucherSelectRow}
+            onPress={() => setShowVouchers(true)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+              <View style={styles.voucherIconContainer}>
+                <Gift size={20} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={{ fontSize: 16, fontWeight: "700", color: COLORS.secondary }}>
+                  {selectedVoucher ? "Mã giảm giá đã chọn" : "Mã giảm giá của bạn"}
+                </Text>
+                <Text style={{ fontSize: 13, color: selectedVoucher ? COLORS.primary : COLORS.textSecondary, marginTop: 2, fontWeight: selectedVoucher ? "600" : "500" }}>
+                  {selectedVoucher ? 
+                    (selectedVoucher.type === "percentage" ? `Đã áp dụng giảm ${selectedVoucher.discount}%` : `Đã áp dụng giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`) 
+                    : "Chọn hoặc nhập mã"}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Khối tùy chọn giao hàng (Tích hợp API GHN) */}
         <View style={styles.section}>
           <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>
@@ -1091,6 +1137,7 @@ export default function CheckoutScreen() {
                 const IconComp = voucher.icon;
                 const isEligible = productsTotal >= voucher.minOrderValue;
                 const isSelected = selectedVoucher?.id === voucher.id;
+                const missingAmount = voucher.minOrderValue - productsTotal;
 
                 return (
                   <View key={voucher.id} style={styles.voucherCard}>
@@ -1114,13 +1161,18 @@ export default function CheckoutScreen() {
                         <IconComp color={COLORS.primary} size={20} />
                         <Text style={styles.voucherTitle}>
                           {voucher.type === "percentage"
-                            ? `Giảm ${voucher.discount}%`
+                            ? `Giảm ${voucher.discount}%${voucher.maxDiscount ? ` (Tối đa ${voucher.maxDiscount.toLocaleString("vi-VN")}đ)` : ''}`
                             : `Giảm ${voucher.discount.toLocaleString("vi-VN")}đ`}
                         </Text>
                       </View>
-                      <Text style={styles.voucherDesc}>
+                      <Text style={[styles.voucherDesc, !isEligible && { marginBottom: 4 }]}>
                         {voucher.description}
                       </Text>
+                      {!isEligible && missingAmount > 0 && (
+                        <Text style={{ fontSize: 12, color: '#EF4444', marginBottom: 16, fontStyle: 'italic', fontWeight: "500" }}>
+                          * Mua thêm {missingAmount.toLocaleString("vi-VN")}đ để sử dụng mã này
+                        </Text>
+                      )}
 
                       <TouchableOpacity
                         disabled={!isEligible}
@@ -1626,6 +1678,31 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFF6FF",
     justifyContent: "center",
     alignItems: "center",
+  },
+  voucherSelectRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F0F4FF",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginVertical: 4,
+  },
+  voucherIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
   },
   // ── Payment Section Styles ──
   paymentSection: {
