@@ -11,6 +11,7 @@ import {
     ViewStyle,
 } from "react-native";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
+import { supabase } from "@/src/lib/supabase";
 
 export interface PopularProductItem {
   id: string | number;
@@ -33,6 +34,40 @@ export function PopularCard({ item, style }: PopularCardProps) {
   const router = useRouter();
   const [liked, setLiked] = useState(false);
 
+  React.useEffect(() => {
+    const checkLiked = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('wishlist')
+        .select('id')
+        .eq('product_id', item.id)
+        .eq('user_id', user.id)
+        .maybeSingle(); // Dùng maybeSingle để tránh báo lỗi nếu không tìm thấy
+        
+      if (data) setLiked(true);
+    };
+    checkLiked();
+  }, [item.id]);
+
+  const toggleWishlist = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("Vui lòng đăng nhập để dùng tính năng này!");
+      return;
+    }
+    
+    // Optimistic UI Toggle
+    setLiked(!liked);
+    
+    if (!liked) {
+      await supabase.from('wishlist').insert({ product_id: item.id, user_id: user.id });
+    } else {
+      await supabase.from('wishlist').delete().eq('product_id', item.id).eq('user_id', user.id);
+    }
+  };
+
   return (
     <View style={[styles.popularCard, style]}>
       <TouchableOpacity
@@ -54,11 +89,10 @@ export function PopularCard({ item, style }: PopularCardProps) {
             </View>
           )}
 
-          {/* Heart/Wishlist Button */}
           <TouchableOpacity
             style={styles.heartBtn}
             activeOpacity={0.7}
-            onPress={() => setLiked((p) => !p)}
+            onPress={toggleWishlist}
           >
             <Heart
               size={14}

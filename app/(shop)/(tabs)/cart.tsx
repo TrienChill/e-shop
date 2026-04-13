@@ -3,18 +3,14 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import {
   Check,
-  ChevronDown,
   ChevronLeft,
-  X as CloseIcon,
-  Lock,
   Minus,
-  Pencil,
   Plus,
   ShoppingBag,
-  Trash2,
+  Trash2
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   PopularCard,
@@ -46,101 +42,16 @@ interface CartItem {
 }
 
 interface WishlistItem {
-  id: string;
+  id: string; // ID của dòng wishlist trong DB
+  product_id: string | number;
   name: string;
   price: number;
+  originalPrice: number;
+  hasDiscount: boolean;
   color: string;
   size: string;
   image: string;
 }
-
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
-const INITIAL_CART: CartItem[] = [
-  {
-    id: "1",
-    name: "Sản phẩm thời trang cao cấp",
-    size: "M",
-    color: "Hồng",
-    price: 170000,
-    originalPrice: 170000,
-    finalPrice: 170000,
-    hasDiscount: false,
-    image:
-      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80",
-    quantity: 1,
-  },
-  {
-    id: "2",
-    name: "Sản phẩm thời trang cao cấp",
-    size: "M",
-    color: "Hồng",
-    price: 170000,
-    originalPrice: 170000,
-    finalPrice: 170000,
-    hasDiscount: false,
-    image:
-      "https://images.unsplash.com/photo-1529139574466-a303027614a4?w=400&q=80",
-    quantity: 1,
-  },
-];
-
-const WISHLIST_ITEMS: WishlistItem[] = [
-  {
-    id: "w1",
-    name: "Sản phẩm thời trang cao cấp",
-    price: 170000,
-    color: "Hồng",
-    size: "M",
-    image:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
-  },
-  {
-    id: "w2",
-    name: "Sản phẩm thời trang cao cấp",
-    price: 170000,
-    color: "Trắng",
-    size: "S",
-    image:
-      "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
-  },
-];
-
-const POPULAR_ITEMS: PopularProductItem[] = [
-  {
-    id: "p1",
-    name: "Áo Kiểu Nữ",
-    price: 178000,
-    image:
-      "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
-    badge: "New",
-    badgeColor: "#3B82F6",
-  },
-  {
-    id: "p2",
-    name: "Váy Hoa Nhí",
-    price: 178000,
-    image:
-      "https://images.unsplash.com/photo-1499939667766-4afceb292d05?w=400&q=80",
-    badge: "Sale",
-    badgeColor: "#EF4444",
-  },
-  {
-    id: "p3",
-    name: "Đầm Đỏ Đẹp",
-    price: 178000,
-    image:
-      "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=400&q=80",
-    badge: "Hot",
-    badgeColor: "#F97316",
-  },
-  {
-    id: "p4",
-    name: "Sơ Mi Trắng",
-    price: 178000,
-    image:
-      "https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=400&q=80",
-  },
-];
 
 const C = {
   bg: "#FFFFFF",
@@ -259,7 +170,15 @@ const WishlistRow = ({
         style={styles.cartImage}
         resizeMode="cover"
       />
-      <TouchableOpacity style={styles.deleteBtn}>
+      <TouchableOpacity
+        style={styles.deleteBtn}
+        onPress={async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('wishlist').delete().eq('id', item.id);
+          }
+        }}
+      >
         <Trash2 size={16} color={C.sub} />
       </TouchableOpacity>
     </View>
@@ -269,9 +188,12 @@ const WishlistRow = ({
       <Text style={styles.cartName} numberOfLines={2}>
         {item.name}
       </Text>
-      <Text style={{ fontSize: 15, fontWeight: "700", color: C.text }}>
-        {item.price.toLocaleString("vi-VN")} đ
-      </Text>
+      <PriceDisplay
+        hasDiscount={item.hasDiscount}
+        finalPrice={item.price}
+        originalPrice={item.originalPrice}
+        size="sm"
+      />
 
       {/* Color + Size tags + Add to cart */}
       <View style={styles.wishlistBottom}>
@@ -306,13 +228,19 @@ const EmptyCartState = () => (
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function CartScreen() {
   const router = useRouter();
-  const [cartItems, setCartItems] = useState<CartItem[]>(INITIAL_CART);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [popularItems, setPopularItems] = useState<PopularProductItem[]>([]);
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
   // --- REALTIME HOOKS ---
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
     table: 'cart_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'wishlist',
     onUpdate: () => setRefreshTrigger(prev => prev + 1)
   });
   useSupabaseRealtime({
@@ -351,23 +279,46 @@ export default function CartScreen() {
     await supabase.from("cart_items").delete().eq("id", id);
   };
 
-  const addWishlistToCart = (item: WishlistItem) => {
-    setCartItems((prev) => {
-      const exists = prev.find((i) => i.id === item.id);
-      if (exists)
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i,
-        );
-      // Bổ sung các trường discount mặc định (wishlist item chưa có discount info)
-      const newItem: CartItem = {
-        ...item,
-        originalPrice: item.price,
-        finalPrice: item.price,
-        hasDiscount: false,
-        quantity: 1,
-      };
-      return [...prev, newItem];
-    });
+  const addWishlistToCart = async (item: WishlistItem) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Vui lòng đăng nhập để thao tác");
+        return;
+      }
+
+      const { data: existingCart } = await supabase
+        .from('cart_items')
+        .select('id, quantity')
+        .eq('user_id', user.id)
+        .eq('product_id', item.product_id)
+        .eq('color', item.color)
+        .eq('size', item.size)
+        .maybeSingle();
+
+      if (existingCart) {
+        await supabase
+          .from('cart_items')
+          .update({ quantity: existingCart.quantity + 1, is_selected: true })
+          .eq('id', existingCart.id);
+      } else {
+        await supabase
+          .from('cart_items')
+          .insert({
+            user_id: user.id,
+            product_id: item.product_id,
+            quantity: 1,
+            color: item.color,
+            size: item.size,
+            is_selected: true
+          });
+      }
+
+      // Có thể xoá khỏi wishlist sau khi nhét vào giỏ hàng tuỳ ý bạn, ở đây tạm thời giữ
+      // await supabase.from('wishlist').delete().eq('id', item.id);
+    } catch (e) {
+      console.error(e)
+    }
   };
 
   // ── State tích chọn sản phẩm ──────────────────────────────────────────────
@@ -477,14 +428,92 @@ export default function CartScreen() {
   };
 
 
+  const fetchWishlist = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  // Gọi hàm fetch khi màn hình được load
+      const { data, error } = await supabase
+        .from('wishlist')
+        .select(`
+          id,
+          product_id,
+          products (
+            id, name, price, images, variants,
+            product_discounts (
+              discount_type, discount_value, is_active
+            )
+          )
+        `)
+        .eq('user_id', user.id);
 
-  // Thay thế hoặc bổ sung thêm bên cạnh useEffect cũ
+      if (error) throw error;
+
+      if (data) {
+        const formatted = data.map((item: any) => {
+          const p = item.products;
+          const discountInfo = calculateDiscountedPrice(p);
+          return {
+            id: item.id,
+            product_id: p.id,
+            name: p.name,
+            price: discountInfo.finalPrice,
+            originalPrice: discountInfo.originalPrice,
+            hasDiscount: discountInfo.hasDiscount,
+            image: p.images ? p.images[0] : "",
+            color: p.variants && p.variants[0] ? p.variants[0].color : "Mặc định",
+            size: p.variants && p.variants[0] && p.variants[0].sizes[0] ? p.variants[0].sizes[0].size : "M",
+          };
+        });
+        setWishlistItems(formatted);
+      }
+    } catch (e) { console.error("Lỗi fetch wishlist", e); }
+  }
+
+  const fetchPopularProducts = async () => {
+    try {
+      // Lấy danh sách sản phẩm đánh dấu is_popular
+      // Lưu ý: Nếu DB của bạn có thuộc tính is_popular thì .eq('is_popular', true), 
+      // Ở đây mình tạm thời Sort lấy 5 em mới lên xem như "Phổ Biến" để biểu diễn. 
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, price, images,
+          product_discounts (
+            discount_type, discount_value, is_active
+          )
+        `)
+        .eq('is_active', true)
+        .order('id', { ascending: false }) // Có thể đổi thành rating hoặc lượt bán 
+        .limit(6);
+
+      if (error) console.error(error);
+      if (data) {
+        const formatted = data.map((item: any) => {
+          const discountInfo = calculateDiscountedPrice(item);
+          return {
+            id: String(item.id),
+            name: item.name,
+            price: item.price,
+            originalPrice: discountInfo.originalPrice,
+            finalPrice: discountInfo.finalPrice,
+            hasDiscount: discountInfo.hasDiscount,
+            image: item.images ? item.images[0] : "https://via.placeholder.com/400",
+            badge: discountInfo.hasDiscount ? "Sale" : "Hot",
+            badgeColor: discountInfo.hasDiscount ? "#EF4444" : "#3B82F6",
+          };
+        });
+        setPopularItems(formatted);
+      }
+    } catch (e) { }
+  }
+
+
   useFocusEffect(
     useCallback(() => {
-      // Mỗi khi màn hình này được nhìn thấy hoặc data realtime thay đổi, ta sẽ fetch lại dữ liệu mới nhất
       fetchCartItems();
+      fetchWishlist();
+      fetchPopularProducts();
     }, [refreshTrigger]),
   );
 
@@ -560,23 +589,27 @@ export default function CartScreen() {
         )}
 
         {/* ── From Your Wishlist ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Từ danh sách yêu thích</Text>
-          {WISHLIST_ITEMS.map((item) => (
-            <WishlistRow
-              key={item.id}
-              item={item}
-              onAddToCart={addWishlistToCart}
-            />
-          ))}
-        </View>
+        {wishlistItems.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Từ danh sách yêu thích</Text>
+            {wishlistItems.map((item) => (
+              <WishlistRow
+                key={item.id}
+                item={item}
+                onAddToCart={addWishlistToCart}
+              />
+            ))}
+          </View>
+        )}
 
         {/* ── Most Popular (only shown when cart is empty) ── */}
-        {isEmpty && (
+        {isEmpty && popularItems.length > 0 && (
           <View style={styles.section}>
             <View style={styles.popularHeader}>
               <Text style={styles.sectionTitle}>Phổ biến nhất</Text>
-              <TouchableOpacity style={styles.seeAllBtn}>
+              <TouchableOpacity style={styles.seeAllBtn}
+                onPress={() => router.push("/product/popular-products" as any)} // Điều hướng đến trang tìm kiếm chung, có thể lọc theo sản phẩm phổ biến ở đó
+              >
                 <Text style={styles.seeAllText}>Xem tất cả</Text>
                 <View style={styles.seeAllCircle}>
                   <Plus size={14} color={C.white} />
@@ -584,7 +617,7 @@ export default function CartScreen() {
               </TouchableOpacity>
             </View>
             <FlatList
-              data={POPULAR_ITEMS}
+              data={popularItems}
               horizontal
               showsHorizontalScrollIndicator={false}
               keyExtractor={(item) => item.id.toString()}
