@@ -837,7 +837,7 @@ export default function ProductDetailScreen() {
 
           {/* Mô tả chi tiết */}
           <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Mô tả sản phẩm</Text>
-          
+
           <Text style={{ color: '#374151', fontSize: 14, lineHeight: 22 }}>
             {product.description || "Đang cập nhật mô tả..."}
           </Text>
@@ -846,40 +846,6 @@ export default function ProductDetailScreen() {
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 5. Giao hàng ══════════════ */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Giao hàng</Text>
-
-          {(
-            product.shipping_info || [
-              { type: "Tiêu chuẩn", time: "5-7 ngày", price: 30000 },
-              { type: "Hỏa tốc", time: "1-2 ngày", price: 50000 },
-            ]
-          ).map((d: any) => (
-            <View key={d.type} style={styles.deliveryRow}>
-              <Text style={styles.deliveryType}>{d.type}</Text>
-              <View style={styles.deliveryMeta}>
-                <View style={styles.deliveryTimeBadge}>
-                  <Text style={styles.deliveryTimeText}>{d.time}</Text>
-                </View>
-
-                {/* Phần hiển thị giá VNĐ */}
-                <Text style={styles.deliveryPrice}>
-                  {(d.price || 0).toLocaleString("vi-VN")}
-                  <Text
-                    style={{ fontSize: styles.deliveryPrice.fontSize * 0.75 }}
-                  >
-                    {" "}
-                    đ
-                  </Text>
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Đường kẻ chia */}
-        <View style={styles.divider} />
 
         {/* ══════════════ 6. Đánh giá & Nhận xét ══════════════ */}
         <View style={styles.section}>
