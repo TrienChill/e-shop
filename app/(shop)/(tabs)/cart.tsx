@@ -7,10 +7,23 @@ import {
   Minus,
   Plus,
   ShoppingBag,
-  Trash2
+  Trash2,
+  X as CloseIcon
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Image, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Pressable
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   PopularCard,
@@ -195,16 +208,8 @@ const WishlistRow = ({
         size="sm"
       />
 
-      {/* Color + Size tags + Add to cart */}
-      <View style={styles.wishlistBottom}>
-        <View style={styles.tagsRow}>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{item.color}</Text>
-          </View>
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>{item.size}</Text>
-          </View>
-        </View>
+      {/* Add to cart button only (Tags removed as per request) */}
+      <View style={[styles.wishlistBottom, { justifyContent: 'flex-end' }]}>
         <TouchableOpacity
           style={styles.addCartBtn}
           onPress={() => onAddToCart(item)}
@@ -231,6 +236,14 @@ export default function CartScreen() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [popularItems, setPopularItems] = useState<PopularProductItem[]>([]);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
+
+  // States cho Modal lựa chọn variant
+  const [isSelectionModalVisible, setSelectionModalVisible] = useState(false);
+  const [selectingProduct, setSelectingProduct] = useState<any>(null);
+  const [productVariants, setProductVariants] = useState<any[]>([]);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [isProcessingAdd, setIsProcessingAdd] = useState(false);
 
   // --- REALTIME HOOKS ---
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -281,19 +294,56 @@ export default function CartScreen() {
 
   const addWishlistToCart = async (item: WishlistItem) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        alert("Vui lòng đăng nhập để thao tác");
+      // Thay vì add thẳng, ta fetch toàn bộ thông tin sản phẩm và mở Modal chọn size/color
+      const { data: productData, error } = await supabase
+        .from('products')
+        .select(`
+          id, name, price, images,
+          product_discounts ( discount_type, discount_value, is_active ),
+          product_variants ( id, color, size, stock )
+        `)
+        .eq('id', item.product_id)
+        .single();
+      
+      if (error || !productData) {
+        alert("Không thể lấy thông tin sản phẩm");
         return;
       }
+
+      setSelectingProduct(productData);
+      setProductVariants(productData.product_variants || []);
+      setSelectedColor(null);
+      setSelectedSize(null);
+      setSelectionModalVisible(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleConfirmSelection = async () => {
+    if (!selectingProduct) return;
+    
+    // Kiểm tra đã chọn đủ màu/size chưa
+    const hasColors = productVariants.some(v => v.color);
+    const hasSizes = productVariants.some(v => v.size);
+    
+    if ((hasColors && !selectedColor) || (hasSizes && !selectedSize)) {
+      alert("Vui lòng chọn đầy đủ phân loại!");
+      return;
+    }
+
+    try {
+      setIsProcessingAdd(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
       const { data: existingCart } = await supabase
         .from('cart_items')
         .select('id, quantity')
         .eq('user_id', user.id)
-        .eq('product_id', item.product_id)
-        .eq('color', item.color)
-        .eq('size', item.size)
+        .eq('product_id', selectingProduct.id)
+        .eq('color', selectedColor || null)
+        .eq('size', selectedSize || null)
         .maybeSingle();
 
       if (existingCart) {
@@ -306,18 +356,20 @@ export default function CartScreen() {
           .from('cart_items')
           .insert({
             user_id: user.id,
-            product_id: item.product_id,
+            product_id: selectingProduct.id,
             quantity: 1,
-            color: item.color,
-            size: item.size,
+            color: selectedColor || null,
+            size: selectedSize || null,
             is_selected: true
           });
       }
-
-      // Có thể xoá khỏi wishlist sau khi nhét vào giỏ hàng tuỳ ý bạn, ở đây tạm thời giữ
-      // await supabase.from('wishlist').delete().eq('id', item.id);
+      
+      setSelectionModalVisible(false);
+      alert("Đã thêm vào giỏ hàng!");
     } catch (e) {
-      console.error(e)
+      console.error(e);
+    } finally {
+      setIsProcessingAdd(false);
     }
   };
 
@@ -665,6 +717,104 @@ export default function CartScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Modal Lựa chọn Size/Màu cho Wishlist Item ── */}
+      <Modal
+        visible={isSelectionModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setSelectionModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay} 
+          onPress={() => setSelectionModalVisible(false)} 
+        />
+        <View style={styles.selectionSheet}>
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetProductInfo}>
+               <Image 
+                  source={{ uri: selectingProduct?.images?.[0] || 'https://via.placeholder.com/100' }} 
+                  style={styles.sheetThumb} 
+               />
+               <View>
+                 <Text style={styles.sheetPrice}>
+                   {(selectingProduct?.price || 0).toLocaleString('vi-VN')} đ
+                 </Text>
+                 <Text style={styles.sheetStock}>
+                   Chọn phân loại sản phẩm
+                 </Text>
+               </View>
+            </View>
+            <TouchableOpacity onPress={() => setSelectionModalVisible(false)}>
+              <CloseIcon size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
+            {/* Màu sắc */}
+            {productVariants.some(v => v.color) && (
+              <View style={styles.sheetSection}>
+                <Text style={styles.sheetSectionTitle}>Màu sắc</Text>
+                <View style={styles.chipGrid}>
+                  {[...new Set(productVariants.map(v => v.color))].filter(Boolean).map((color: any) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.chip,
+                        selectedColor === color && styles.chipSelected
+                      ]}
+                      onPress={() => setSelectedColor(color)}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        selectedColor === color && styles.chipTextSelected
+                      ]}>{color}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Kích thước */}
+            {productVariants.some(v => v.size) && (
+              <View style={styles.sheetSection}>
+                <Text style={styles.sheetSectionTitle}>Kích thước</Text>
+                <View style={styles.chipGrid}>
+                  {[...new Set(productVariants.filter(v => !selectedColor || v.color === selectedColor).map(v => v.size))].filter(Boolean).map((size: any) => (
+                    <TouchableOpacity
+                      key={size}
+                      style={[
+                        styles.chip,
+                        selectedSize === size && styles.chipSelected
+                      ]}
+                      onPress={() => setSelectedSize(size)}
+                    >
+                      <Text style={[
+                        styles.chipText,
+                        selectedSize === size && styles.chipTextSelected
+                      ]}>{size}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+            <View style={{ height: 40 }} />
+          </ScrollView>
+
+          <View style={styles.sheetFooter}>
+            <TouchableOpacity 
+              style={[styles.confirmBtn, isProcessingAdd && { opacity: 0.6 }]}
+              onPress={handleConfirmSelection}
+              disabled={isProcessingAdd}
+            >
+              {isProcessingAdd ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.confirmBtnText}>Xác nhận thêm</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
     </SafeAreaView>
   );
@@ -870,6 +1020,99 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     borderTopWidth: 1,
     borderTopColor: C.border,
+  },
+  // Modal Selection Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  selectionSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingTop: 24,
+    minHeight: '40%',
+    maxHeight: '80%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  sheetProductInfo: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  sheetThumb: {
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  sheetPrice: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  sheetStock: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  sheetScroll: {
+    paddingHorizontal: 24,
+  },
+  sheetSection: {
+    marginBottom: 24,
+  },
+  sheetSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  chip: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  chipSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+  },
+  chipText: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: '#2563EB',
+  },
+  sheetFooter: {
+    padding: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  confirmBtn: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   totalWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
   totalLabel: { fontSize: 16, fontWeight: "700", color: C.text },
