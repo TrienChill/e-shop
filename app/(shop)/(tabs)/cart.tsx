@@ -410,13 +410,16 @@ export default function CartScreen() {
   // Thêm State để quản lý trạng thái tải giỏ hàng
   const [loadingCart, setLoadingCart] = useState(true);
 
-  const fetchCartItems = async () => {
+  const fetchCartItems = async (isSilent = false) => {
     try {
-      setLoadingCart(true);
+      if (!isSilent && cartItems.length === 0) setLoadingCart(true);
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoadingCart(false);
+        return;
+      }
 
       // 1. Fetch cart_items join với products
       const { data, error } = await supabase
@@ -490,14 +493,14 @@ export default function CartScreen() {
           products (
             id, name, price, images, variants,
             product_discounts (
-              discount_type, discount_value, is_active
+              discount_type, discount_value, is_active, start_date, end_date
             )
           )
         `)
         .eq('user_id', user.id);
 
       if (error) throw error;
-
+      
       if (data) {
         const formatted = data.map((item: any) => {
           const p = item.products;
@@ -521,21 +524,18 @@ export default function CartScreen() {
 
   const fetchPopularProducts = async () => {
     try {
-      // Lấy danh sách sản phẩm đánh dấu is_popular
-      // Lưu ý: Nếu DB của bạn có thuộc tính is_popular thì .eq('is_popular', true), 
-      // Ở đây mình tạm thời Sort lấy 5 em mới lên xem như "Phổ Biến" để biểu diễn. 
       const { data, error } = await supabase
         .from('products')
         .select(`
           id, name, price, images,
           product_discounts (
-            discount_type, discount_value, is_active
+            discount_type, discount_value, is_active, start_date, end_date
           )
         `)
         .eq('is_active', true)
-        .order('id', { ascending: false }) // Có thể đổi thành rating hoặc lượt bán 
+        .order('id', { ascending: false }) 
         .limit(6);
-
+        
       if (error) console.error(error);
       if (data) {
         const formatted = data.map((item: any) => {
@@ -560,7 +560,10 @@ export default function CartScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      fetchCartItems();
+      // Chỉ hiện loading xoay vòng ở lần đầu tiên vào app
+      // Các lần update sau (do trigger realtime) sẽ fetch ngầm (silent)
+      const isInitial = cartItems.length === 0 && wishlistItems.length === 0;
+      fetchCartItems(!isInitial);
       fetchWishlist();
       fetchPopularProducts();
     }, [refreshTrigger]),
