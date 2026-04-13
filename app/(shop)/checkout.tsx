@@ -1,6 +1,7 @@
 import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 import PriceDisplay from "@/src/components/common/PriceDisplay";
+import VoucherCollection from "@/src/components/common/VoucherCollection";
 import { supabase } from "@/src/lib/supabase";
 import {
   calculateDiscountedPrice,
@@ -1126,6 +1127,11 @@ export default function CheckoutScreen() {
               <X color="#000" size={24} />
             </TouchableOpacity>
           </View>
+
+          <VoucherCollection 
+            onVoucherCollected={() => setRefreshTrigger(prev => prev + 1)} 
+            style={{ marginBottom: 8, marginTop: 4 }}
+          />
 
           <ScrollView
             style={styles.voucherList}

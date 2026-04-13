@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import CommonHeader from '@/src/components/layout/Header';
+import VoucherCollection from '@/src/components/common/VoucherCollection';
 import {
   ScrollView,
   Text,
@@ -185,6 +186,7 @@ export default function VouchersScreen() {
   const [userVouchers, setUserVouchers] = useState<Voucher[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Mock data as fallback
   const mockVouchers: Voucher[] = [
@@ -286,7 +288,7 @@ export default function VouchersScreen() {
       }
     };
     fetchMyVouchers();
-  }, []);
+  }, [refreshTrigger]);
 
   const rewardsProgress: RewardProgress[] = [
     {
@@ -377,10 +379,14 @@ export default function VouchersScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 40 }}>
         {activeTab === 'rewards' ? (
           <View>
-            {userVouchers.map((voucher) => (
+            <VoucherCollection onVoucherCollected={() => setRefreshTrigger(prev => prev + 1)} />
+            
+            <View style={{ paddingHorizontal: 24 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 16 }}>Voucher của bạn</Text>
+              {userVouchers.map((voucher) => (
               <VoucherTicket
                 key={voucher.id}
                 type={voucher.type}
@@ -426,9 +432,10 @@ export default function VouchersScreen() {
                 }
               />
             ))}
+            </View>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 24 }}>
             {rewardsProgress.map((item) => (
               <View key={item.id} style={{ width: '47%', marginBottom: 48, alignItems: 'center', backgroundColor: '#FFF', padding: 20, borderRadius: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F8FAFC' }}>
                 <CircularProgress
