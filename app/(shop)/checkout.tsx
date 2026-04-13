@@ -177,11 +177,27 @@ export default function CheckoutScreen() {
   // Thêm State để lưu voucher từ database
   const [dbVouchers, setDbVouchers] = useState<any[]>([]);
 
-  // Thêm State mới vào CheckoutScreen
   const [shippingMethods, setShippingMethods] = useState<any[]>([]);
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(
     null,
   );
+  const [allAddresses, setAllAddresses] = useState<any[]>([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+
+  const handleSelectAddress = (addr: any) => {
+    setUserAddress(addr);
+    setUserProfile({
+      name: addr.receiver_name,
+      phone: addr.phone_number,
+      email: userProfile?.email || "",
+    });
+    
+    // Cập nhật tọa độ (mã GHN) để tự động tính lại phí ship
+    if (addr.ghn_district_id) setCustomerDistrictId(Number(addr.ghn_district_id));
+    if (addr.ghn_ward_code) setCustomerWardCode(String(addr.ghn_ward_code));
+    
+    setShowAddressModal(false);
+  };
 
   // Cập nhật phí vận chuyển dựa trên phương thức được chọn
   const selectedMethod = shippingMethods.find(
@@ -219,15 +235,17 @@ export default function CheckoutScreen() {
         if (!user) return;
 
         // 1. Lấy thông tin địa chỉ & profile người nhận
-        const { data: defaultAddr } = await supabase
+        const { data: addresses } = await supabase
           .from("user_addresses")
-          // 👇 CẬP NHẬT: Lấy thêm ghn_district_id, ward_commune và ghn_ward_code
-          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code") 
+          // 👇 CẬP NHẬT: Lấy TOÀN BỘ danh sách địa chỉ thuộc về user
+          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default") 
           .eq("user_id", user.id)
-          .eq("is_default", true)
-          .maybeSingle();
+          .order('is_default', { ascending: false });
 
-        if (defaultAddr) {
+        if (addresses && addresses.length > 0) {
+          setAllAddresses(addresses);
+          const defaultAddr = addresses[0]; // Đã sắp xếp is_default=true lên đầu
+          
           setUserProfile({
             name: defaultAddr.receiver_name,
             phone: defaultAddr.phone_number,
@@ -238,6 +256,8 @@ export default function CheckoutScreen() {
           // 👇 CẬP NHẬT: Truyền thẳng mã GHN từ DB vào state để API GHN chạy ngay lập tức
           if (defaultAddr.ghn_district_id) setCustomerDistrictId(Number(defaultAddr.ghn_district_id));
           if (defaultAddr.ghn_ward_code) setCustomerWardCode(String(defaultAddr.ghn_ward_code));
+        } else {
+          setAllAddresses([]);
         }
 
         // 2. Lấy danh sách sản phẩm ĐANG ĐƯỢC CHỌN trong giỏ hàng
@@ -471,33 +491,31 @@ export default function CheckoutScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Khối thông tin người dùng */}
-        <View style={styles.section}>
-          {/* 👇 GỘP VÀO ĐÂY: Thay thế card cũ bằng AddressSelector */}
-          <AddressSelector 
-            initialAddress={userAddress} // Truyền địa chỉ mặc định vào để hiển thị
-            onLocationSelected={(province, district, ward, fullAddressString) => {
-               // 1. Cập nhật mã ID cho API GHN tính tiền
-               if (district) setCustomerDistrictId(Number(district.DistrictID));
-               if (ward) setCustomerWardCode(String(ward.WardCode));
-               
-               // 2. Cập nhật Text để lúc bấm "Thanh toán" lưu vào DB
-               if (fullAddressString) {
-                 setUserAddress((prev: any) => ({
-                   ...prev,
-                   street_address: fullAddressString.street,
-                   district: fullAddressString.district,
-                   province_city: fullAddressString.province
-                 }));
-               }
-            }} 
-          />
-
-          {/* Thông tin liên hệ (Dữ liệu từ người nhận của địa chỉ đó) */}
-          {renderInfoCard(
-            "Thông tin liên hệ",
-            userProfile?.phone || "Chưa có số điện thoại",
-            userProfile?.name, // Hiển thị tên người nhận ở dòng dưới
+        {/* Khối thông tin người dùng (Lựa chọn địa chỉ) */}
+        <View className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm mb-6 mt-2">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-lg font-extrabold text-gray-900">Địa chỉ giao hàng</Text>
+            <TouchableOpacity onPress={() => setShowAddressModal(true)} className="flex-row items-center px-3 py-1.5 bg-blue-50 rounded-full">
+              <Text className="text-blue-600 font-bold text-xs mr-1">Thay đổi</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {loading ? (
+            <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "flex-start"}} />
+          ) : userAddress ? (
+            <View>
+              <View className="flex-row items-center mb-1.5">
+                <Text className="font-bold text-[15px] text-gray-900 mr-2">
+                  {userAddress.receiver_name}
+                </Text>
+                <Text className="text-gray-500 font-medium">| {userAddress.phone_number}</Text>
+              </View>
+              <Text className="text-[14px] text-gray-600 leading-5">
+                {userAddress.street_address}, {userAddress.ward_commune ? `${userAddress.ward_commune}, ` : ''}{userAddress.district}, {userAddress.province_city}
+              </Text>
+            </View>
+          ) : (
+            <Text className="text-red-500 text-[14px] font-medium">Hiện không có thông tin địa chỉ giao hàng.</Text>
           )}
         </View>
 
@@ -802,6 +820,77 @@ export default function CheckoutScreen() {
               </>
             )}
           </View>
+        </View>
+      </Modal>
+
+      {/* Modal chọn địa chỉ (NativeWind style) */}
+      <Modal
+        visible={showAddressModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddressModal(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50"
+          onPress={() => setShowAddressModal(false)}
+        />
+        <View className="absolute bottom-0 w-full bg-white rounded-t-3xl pt-6 pb-8 px-5 max-h-[75%]">
+          <View className="flex-row items-center justify-between mb-6 px-1">
+            <Text className="text-xl font-extrabold text-gray-900">Sổ địa chỉ của bạn</Text>
+            <TouchableOpacity onPress={() => setShowAddressModal(false)} className="p-2 bg-gray-100 rounded-full">
+              <X color="#4B5563" size={20} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+            {allAddresses.length > 0 ? (
+              allAddresses.map((addr) => {
+                const isSelected = userAddress?.id === addr.id;
+                return (
+                  <TouchableOpacity
+                    key={addr.id}
+                    onPress={() => handleSelectAddress(addr)}
+                    className={`flex-row items-center p-4 mb-3 border-[1.5px] rounded-2xl ${
+                      isSelected ? "border-blue-600 bg-blue-50/40" : "border-gray-200 bg-white"
+                    }`}
+                    activeOpacity={0.7}
+                  >
+                    <View className="flex-1 mr-3">
+                      <View className="flex-row items-center mb-1 flex-wrap">
+                        <Text className="font-bold text-[15px] text-gray-900 mr-2">
+                          {addr.receiver_name}
+                        </Text>
+                        <Text className="text-gray-500 font-medium text-[14px]">
+                          | {addr.phone_number}
+                        </Text>
+                        {addr.is_default && (
+                          <View className="bg-red-500 rounded ml-2 px-1.5 py-[2px]">
+                            <Text className="text-[10px] font-bold text-white">Mặc định</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text className="text-[14px] text-gray-600 leading-5">
+                        {addr.street_address}, {addr.ward_commune ? `${addr.ward_commune}, ` : ''}{addr.district}, {addr.province_city}
+                      </Text>
+                    </View>
+                    
+                    {/* Radio Button */}
+                    <View className={`w-5 h-5 rounded-full border-[1.5px] items-center justify-center ${
+                      isSelected ? "border-blue-600 bg-white" : "border-gray-300"
+                    }`}>
+                      {isSelected && <View className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              <View className="items-center py-6">
+                <Text className="text-center text-red-500 font-medium">
+                  Không tìm thấy địa chỉ giao hàng nào trong hệ thống!
+                </Text>
+              </View>
+            )}
+          </ScrollView>
         </View>
       </Modal>
 
