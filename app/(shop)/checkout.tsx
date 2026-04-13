@@ -1,5 +1,6 @@
 import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
+import PriceDisplay from "@/src/components/common/PriceDisplay";
 import { supabase } from "@/src/lib/supabase";
 import {
   calculateDiscountedPrice,
@@ -718,9 +719,15 @@ export default function CheckoutScreen() {
                     Phân loại: {item.color}, {item.size}
                   </Text>
                 </View>
-                <Text style={styles.itemPrice}>
-                  {(item.price * item.quantity).toLocaleString("vi-VN")}₫
-                </Text>
+                <View style={{ alignItems: "flex-end" }}>
+                  <PriceDisplay
+                    originalPrice={item.originalPrice * item.quantity}
+                    finalPrice={item.price * item.quantity}
+                    hasDiscount={item.hasDiscount}
+                    size="sm"
+                    justify="flex-end"
+                  />
+                </View>
               </View>
             ))
           ) : (
