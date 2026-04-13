@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Pressable, Modal, FlatList, ActivityIndicator, TextInput } from "react-native";
-import { ChevronDown, X, MapPin } from "lucide-react-native";
+import { View, Text, Pressable, Modal, FlatList, ActivityIndicator, TextInput, TouchableOpacity } from "react-native";
+import { ChevronDown, X, MapPin, Search } from "lucide-react-native";
 import { 
   fetchProvinces, 
   fetchDistricts, 
@@ -122,6 +122,7 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
   const [modalVisible, setModalVisible] = useState(false);
   const [selectionType, setSelectionType] = useState<"province" | "district" | "ward" | null>(null);
   const [isLoadingList, setIsLoadingList] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // 1. Fetch Tỉnh / Thành khi load component
   useEffect(() => {
@@ -151,7 +152,6 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
         return;
       }
       
-      // LOG KIỂM TRA LỖI NHƯ YÊU CẦU: Ngăn API gọi tất cả 729 quận huyện nếu Tỉnh chưa có ID chuẩn
       if (selectedProvince.ProvinceID === 0) {
         console.warn("[AddressSelector Log] ProvinceID là 0 do dữ liệu cũ. Bỏ qua tải Quận/Huyện để tránh tải dữ liệu cả nước.");
         setDistricts([]);
@@ -218,15 +218,15 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
     setModalVisible(false);
   };
 
-  // Mở Popup (Modal) tương ứng
+  // Popup (Modal) tương ứng
   const openSelector = (type: "province" | "district" | "ward") => {
-    // Ràng buộc chọn tuần tự từ trên xuống dưới
     if (type === "district" && (!selectedProvince || selectedProvince.ProvinceID === 0)) {
       return alert("Dữ liệu địa chỉ cũ cần được làm mới. Vui lòng chọn lại Tỉnh/Thành trước!");
     }
     if (type === "ward" && (!selectedDistrict || selectedDistrict.DistrictID === 0)) {
        return alert("Dữ liệu địa chỉ cũ cần được làm mới. Vui lòng chọn lại Quận/Huyện trước!");
     }
+    setSearchQuery(""); // Reset search when opening
     setSelectionType(type);
     setModalVisible(true);
   };
@@ -238,131 +238,297 @@ export default function AddressSelector({ onLocationSelected, initialAddress }: 
     else if (selectionType === "district") dataList = districts;
     else if (selectionType === "ward") dataList = wards;
 
+    // Filter by search query
+    const filteredData = dataList.filter((item) => {
+      const name = (item.ProvinceName || item.DistrictName || item.WardName || "").toLowerCase();
+      return name.includes(searchQuery.toLowerCase());
+    });
+
     if (isLoadingList) {
       return (
+        <View style={{ padding: 60, alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#2563EB" />
+          <Text style={{ marginTop: 16, color: "#6B7280", fontSize: 15, fontWeight: "500" }}>Đang lấy dữ liệu từ GHN...</Text>
+        </View>
+      );
+    }
+
+    if (filteredData.length === 0 && searchQuery.length > 0) {
+      return (
         <View style={{ padding: 40, alignItems: "center" }}>
-          <ActivityIndicator size="large" color="#3B82F6" />
-          <Text style={{ marginTop: 12, color: "#6B7280" }}>Đang lấy dữ liệu từ GHN...</Text>
+          <MapPin size={48} color="#D1D5DB" />
+          <Text style={{ marginTop: 16, color: "#9CA3AF", fontSize: 16, textAlign: "center" }}>
+            Không tìm thấy kết quả cho "{searchQuery}"
+          </Text>
         </View>
       );
     }
 
     return (
       <FlatList
-        data={dataList}
+        data={filteredData}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
         keyExtractor={(item, index) => {
-          if (selectionType === "province") return String(item.ProvinceID);
-          if (selectionType === "district") return String(item.DistrictID);
-          if (selectionType === "ward") return String(item.WardCode);
+          if (selectionType === "province") return String(item.ProvinceID || index);
+          if (selectionType === "district") return String(item.DistrictID || index);
+          if (selectionType === "ward") return String(item.WardCode || index);
           return String(index);
         }}
-        renderItem={({ item }) => (
-          <Pressable 
-            onPress={() => handleSelectItem(item)}
-            style={({ pressed }) => ({
-              paddingVertical: 14,
-              borderBottomWidth: 1,
-              borderColor: "#E5E7EB",
-              backgroundColor: pressed ? "#F3F4F6" : "transparent"
-            })}
-          >
-            <Text style={{ fontSize: 15, color: "#1F2937", fontWeight: "500" }}>
-              {item.ProvinceName || item.DistrictName || item.WardName}
-            </Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const name = item.ProvinceName || item.DistrictName || item.WardName;
+          const isSelected = 
+            (selectionType === "province" && selectedProvince?.ProvinceID === item.ProvinceID) ||
+            (selectionType === "district" && selectedDistrict?.DistrictID === item.DistrictID) ||
+            (selectionType === "ward" && selectedWard?.WardCode === item.WardCode);
+
+          return (
+            <Pressable 
+              onPress={() => handleSelectItem(item)}
+              style={({ pressed }) => ({
+                paddingVertical: 16,
+                paddingHorizontal: 16,
+                borderRadius: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                backgroundColor: isSelected ? "#EFF6FF" : pressed ? "#F9FAFB" : "transparent",
+                marginBottom: 4,
+              })}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                <MapPin size={18} color={isSelected ? "#2563EB" : "#9CA3AF"} style={{ marginRight: 12 }} />
+                <Text style={{ 
+                  fontSize: 16, 
+                  color: isSelected ? "#2563EB" : "#374151", 
+                  fontWeight: isSelected ? "700" : "500",
+                  flex: 1
+                }}>
+                  {name}
+                </Text>
+              </View>
+              {isSelected && (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#2563EB" }} />
+              )}
+            </Pressable>
+          );
+        }}
       />
     );
   };
 
   return (
     <View style={{ marginBottom: 24 }}>
-      <Text style={{ fontSize: 16, fontWeight: "bold", color: "#111827", marginBottom: 12 }}>
-        Địa chỉ giao hàng (Tính phí tự động)
+      <Text style={{ fontSize: 14, fontWeight: "700", color: "#6B7280", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 }}>
+        Thông tin địa chỉ
       </Text>
 
-      <View style={{ gap: 12, display: "flex", flexDirection: "column" }}>
+      <View style={{ 
+        backgroundColor: "#F9FAFB", 
+        borderRadius: 24, 
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "#F3F4F6",
+        gap: 8 
+      }}>
         
         {/* Tỉnh / Thành phố */}
         <Pressable 
           onPress={() => openSelector("province")}
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", backgroundColor: "white", padding: 14, borderRadius: 12 }}
+          style={({ pressed }) => ({ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            backgroundColor: pressed ? "#F3F4F6" : "white", 
+            padding: 16, 
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: selectedProvince ? "#E5E7EB" : "#F3F4F6",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            elevation: 1
+          })}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <MapPin size={18} color="#6B7280" style={{ marginRight: 10 }}/>
-            <Text style={{ fontSize: 15, color: selectedProvince ? "#111827" : "#9CA3AF" }}>
-              {selectedProvince ? selectedProvince.ProvinceName : "1. Chọn Tỉnh / Thành phố"}
-            </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#EFF6FF", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+              <MapPin size={20} color="#2563EB" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700", marginBottom: 2, textTransform: "uppercase" }}>Tỉnh / Thành phố</Text>
+              <Text style={{ fontSize: 16, color: selectedProvince ? "#111827" : "#D1D5DB", fontWeight: "700" }} numberOfLines={1}>
+                {selectedProvince ? selectedProvince.ProvinceName : "Bấm để chọn..."}
+              </Text>
+            </View>
           </View>
-          <ChevronDown size={20} color="#6B7280" />
+          <ChevronDown size={20} color="#9CA3AF" />
         </Pressable>
 
         {/* Quận / Huyện */}
         <Pressable 
           onPress={() => openSelector("district")}
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: selectedProvince ? "#D1D5DB" : "#E5E7EB", backgroundColor: selectedProvince ? "white" : "#F9FAFB", padding: 14, borderRadius: 12 }}
+          disabled={!selectedProvince}
+          style={({ pressed }) => ({ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            backgroundColor: !selectedProvince ? "#F3F4F6" : pressed ? "#F3F4F6" : "white", 
+            padding: 16, 
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: selectedDistrict ? "#E5E7EB" : "#F3F4F6",
+            opacity: !selectedProvince ? 0.6 : 1,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            elevation: 1
+          })}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-             <Text style={{ fontSize: 15, color: selectedDistrict ? "#111827" : "#9CA3AF", paddingLeft: 28 }}>
-                {selectedDistrict ? selectedDistrict.DistrictName : "2. Chọn Quận / Huyện"}
-             </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#F5F3FF", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+              <MapPin size={20} color="#7C3AED" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700", marginBottom: 2, textTransform: "uppercase" }}>Quận / Huyện</Text>
+              <Text style={{ fontSize: 16, color: selectedDistrict ? "#111827" : "#D1D5DB", fontWeight: "700" }} numberOfLines={1}>
+                {selectedDistrict ? selectedDistrict.DistrictName : "Bấm để chọn..."}
+              </Text>
+            </View>
           </View>
-          <ChevronDown size={20} color="#6B7280" />
+          <ChevronDown size={20} color="#9CA3AF" />
         </Pressable>
 
         {/* Phường / Xã */}
         <Pressable 
           onPress={() => openSelector("ward")}
-          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: selectedDistrict ? "#D1D5DB" : "#E5E7EB", backgroundColor: selectedDistrict ? "white" : "#F9FAFB", padding: 14, borderRadius: 12 }}
+          disabled={!selectedDistrict || isMapping}
+          style={({ pressed }) => ({ 
+            flexDirection: "row", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            backgroundColor: !selectedDistrict ? "#F3F4F6" : pressed ? "#F3F4F6" : "white", 
+            padding: 16, 
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: selectedWard ? "#E5E7EB" : "#F3F4F6",
+            opacity: !selectedDistrict ? 0.6 : 1,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            elevation: 1
+          })}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-             {isMapping ? (
-                <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 28 }}>
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                  <Text style={{ fontSize: 15, color: "#6B7280", marginLeft: 8 }}>Đang đồng bộ...</Text>
-                </View>
-             ) : (
-                <Text style={{ fontSize: 15, color: selectedWard ? "#111827" : "#9CA3AF", paddingLeft: 28 }}>
-                   {selectedWard ? selectedWard.WardName : "3. Chọn Phường / Xã"}
-                </Text>
-             )}
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+            <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#ECFDF5", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+              {isMapping ? (
+                <ActivityIndicator size="small" color="#10B981" />
+              ) : (
+                <MapPin size={20} color="#10B981" />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700", marginBottom: 2, textTransform: "uppercase" }}>Phường / Xã</Text>
+              <Text style={{ fontSize: 16, color: selectedWard ? "#111827" : "#D1D5DB", fontWeight: "700" }} numberOfLines={1}>
+                {selectedWard ? selectedWard.WardName : "Bấm để chọn..."}
+              </Text>
+            </View>
           </View>
-          <ChevronDown size={20} color="#6B7280" />
+          <ChevronDown size={20} color="#9CA3AF" />
         </Pressable>
         {mappingError && (
-          <Text style={{ color: "#EF4444", fontSize: 13, marginTop: -8, marginLeft: 4 }}>{mappingError}</Text>
+          <Text style={{ color: "#EF4444", fontSize: 12, marginTop: 4, marginLeft: 12, fontWeight: "600" }}>⚠️ {mappingError}</Text>
         )}
 
         {/* Số nhà, Tên đường */}
-        <View style={{ borderWidth: 1, borderColor: "#D1D5DB", backgroundColor: "white", padding: 14, borderRadius: 12 }}>
-          <TextInput 
-            value={street}
-            onChangeText={setStreet}
-            placeholder="4. Số nhà, Tên đường..."
-            placeholderTextColor="#9CA3AF"
-            style={{ fontSize: 15, color: "#111827", padding: 0 }}
-          />
+        <View style={{ 
+          flexDirection: "row", 
+          alignItems: "center",
+          backgroundColor: "white", 
+          padding: 16, 
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: street ? "#E5E7EB" : "#F3F4F6",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.04,
+          shadowRadius: 3,
+          elevation: 1
+        }}>
+          <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: "#FFF7ED", alignItems: "center", justifyContent: "center", marginRight: 14 }}>
+            <MapPin size={20} color="#F97316" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 11, color: "#9CA3AF", fontWeight: "700", marginBottom: 2, textTransform: "uppercase" }}>Địa chỉ chi tiết</Text>
+            <TextInput 
+              value={street}
+              onChangeText={setStreet}
+              placeholder="Số nhà, tên đường..."
+              placeholderTextColor="#D1D5DB"
+              style={{ fontSize: 16, color: "#111827", fontWeight: "700", padding: 0 }}
+            />
+          </View>
         </View>
 
       </View>
 
       {/* Modal Chọn Item */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View style={{ backgroundColor: "white", padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "80%" }}>
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={{ flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.6)" }}>
+          <Pressable style={{ flex: 1 }} onPress={() => setModalVisible(false)} />
+          <View style={{ 
+            backgroundColor: "white", 
+            borderTopLeftRadius: 32, 
+            borderTopRightRadius: 32, 
+            height: "85%",
+            paddingTop: 8
+          }}>
+             {/* Notch */}
+             <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: "#E5E7EB", alignSelf: "center", marginBottom: 12 }} />
+
              {/* Header Modal */}
-             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <Text style={{ fontSize: 18, fontWeight: "bold" }}>
-                  {selectionType === "province" ? "Chọn Tỉnh / Thành" : 
-                   selectionType === "district" ? "Chọn Quận / Huyện" : "Chọn Phường / Xã"}
-                </Text>
-                <Pressable onPress={() => setModalVisible(false)} style={{ padding: 4 }}>
-                  <X size={24} color="#6B7280" />
-                </Pressable>
+             <View style={{ paddingHorizontal: 24, paddingBottom: 16 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                   <Text style={{ fontSize: 22, fontWeight: "800", color: "#111827" }}>
+                     {selectionType === "province" ? "Chọn Tỉnh / Thành" : 
+                      selectionType === "district" ? "Chọn Quận / Huyện" : "Chọn Phường / Xã"}
+                   </Text>
+                   <TouchableOpacity onPress={() => setModalVisible(false)} style={{ padding: 10, backgroundColor: "#F3F4F6", borderRadius: 24 }}>
+                     <X size={20} color="#6B7280" />
+                   </TouchableOpacity>
+                </View>
+
+                {/* Search Bar */}
+                <View style={{ 
+                  flexDirection: "row", 
+                  alignItems: "center", 
+                  backgroundColor: "#F3F4F6", 
+                  borderRadius: 18, 
+                  paddingHorizontal: 16,
+                  height: 56
+                }}>
+                  <Search size={20} color="#9CA3AF" style={{ marginRight: 12 }} />
+                  <TextInput 
+                    placeholder={`Tìm ${selectionType === "province" ? "tỉnh thành" : selectionType === "district" ? "quận huyện" : "phường xã"}...`}
+                    placeholderTextColor="#9CA3AF"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    style={{ flex: 1, fontSize: 16, color: "#111827", fontWeight: "600" }}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery("")}>
+                      <X size={20} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  )}
+                </View>
              </View>
 
              {/* Danh sách List */}
-             {renderList()}
+             <View style={{ flex: 1, paddingHorizontal: 16 }}>
+                {renderList()}
+             </View>
           </View>
         </View>
       </Modal>
