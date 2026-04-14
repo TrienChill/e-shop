@@ -1,42 +1,39 @@
-import {
-  listAllReturns,
-  getAdminReturnDetail,
-  approveReturn,
-  rejectReturn,
-  markShippingBack,
-  completeReturn,
-  processRefund,
-  RETURN_STATUS_LABELS,
-  RETURN_STATUS_COLORS,
-} from "@/src/services/admin/returns";
 import { supabase } from "@/src/lib/supabase";
+import {
+  approveReturn,
+  completeReturn,
+  getAdminReturnDetail,
+  listAllReturns,
+  markShippingBack,
+  processRefund,
+  rejectReturn,
+  RETURN_STATUS_COLORS,
+  RETURN_STATUS_LABELS,
+} from "@/src/services/admin/returns";
 import {
   AlertTriangle,
   Check,
   Clock,
+  DollarSign,
   PackageX,
-  RefreshCcw,
   RotateCcw,
   Search,
-  XCircle,
-  X,
-  ArrowUpDown,
-  DollarSign,
   Truck,
+  X,
+  XCircle
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  View,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 const STATUS_TABS = [
@@ -478,8 +475,8 @@ export default function AdminReturnsScreen() {
                   {detailData.refund_method === "bank_transfer"
                     ? `CK: ${detailData.bank_name} - ${detailData.bank_account_name}`
                     : detailData.refund_method === "wallet"
-                    ? "Ví điện tử"
-                    : "Nguyên phương thức TT"}
+                      ? "Ví điện tử"
+                      : "Nguyên phương thức TT"}
                 </Text>
               </View>
 

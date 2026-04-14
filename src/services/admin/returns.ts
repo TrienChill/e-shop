@@ -51,13 +51,6 @@ export async function listAllReturns(params?: { status?: string; limit?: number 
         products (name),
         order_items (price_at_purchase)
       ),
-      orders (
-        id,
-        total_amount,
-        receiver_name,
-        phone_contact,
-        status
-      ),
       profiles (full_name, phone)
     `)
     .order("created_at", { ascending: false })
@@ -69,7 +62,23 @@ export async function listAllReturns(params?: { status?: string; limit?: number 
 
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as any[];
+
+  const returns = data ?? [];
+  if (returns.length === 0) return returns;
+
+  const orderIds = returns.map((r: any) => r.order_id);
+  const { data: ordersData } = await supabase
+    .from("orders")
+    .select("id, total_amount, receiver_name, phone_contact, status")
+    .in("id", orderIds);
+
+  const orderMap: Record<number, any> = {};
+  (ordersData ?? []).forEach((o: any) => { orderMap[o.id] = o; });
+
+  return returns.map((r: any) => ({
+    ...r,
+    orders: orderMap[r.order_id] || null,
+  }));
 }
 
 export async function getAdminReturnDetail(returnId: number) {
@@ -78,18 +87,25 @@ export async function getAdminReturnDetail(returnId: number) {
     .select(`
       *,
       return_items (*),
-      orders (
-        *,
-        order_items (*, products (name, images)),
-        user_addresses (*)
-      ),
       profiles (full_name, phone, avatar_url)
     `)
     .eq("id", returnId)
     .single();
 
   if (error) throw error;
-  return data;
+  if (!data) return null;
+
+  const { data: orderData } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      order_items (*, products (name, images)),
+      user_addresses (*)
+    `)
+    .eq("id", data.order_id)
+    .single();
+
+  return { ...data, orders: orderData };
 }
 
 export async function approveReturn(returnId: number, adminId: string, notes?: string) {

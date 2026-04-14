@@ -65,6 +65,7 @@ export default function AdminLayout() {
     { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
     { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
     { href: "/(admin)/shipping", label: "Vận chuyển", icon: Truck },
+    { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
   ];
 
   if (role === "admin") {

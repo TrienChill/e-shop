@@ -73,18 +73,30 @@ export async function getMyReturns(userId: string) {
         *,
         products (name, images),
         order_items (price_at_purchase, selected_variant)
-      ),
-      orders (
-        id,
-        total_amount,
-        created_at
       )
     `)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as any[];
+
+  const returns = data ?? [];
+
+  if (returns.length === 0) return returns;
+
+  const orderIds = returns.map((r: any) => r.order_id);
+  const { data: ordersData } = await supabase
+    .from("orders")
+    .select("id, total_amount, created_at")
+    .in("id", orderIds);
+
+  const orderMap: Record<number, any> = {};
+  (ordersData ?? []).forEach((o: any) => { orderMap[o.id] = o; });
+
+  return returns.map((r: any) => ({
+    ...r,
+    orders: orderMap[r.order_id] || null,
+  }));
 }
 
 export async function getReturnDetail(returnId: number) {
@@ -96,29 +108,36 @@ export async function getReturnDetail(returnId: number) {
         *,
         products (name, images),
         order_items (price_at_purchase, selected_variant, quantity)
-      ),
-      orders (
-        *,
-        order_items (*),
-        user_addresses (
-          receiver_name,
-          phone_number,
-          province_city,
-          district,
-          ward_commune,
-          street_address
-        )
       )
     `)
     .eq("id", returnId)
     .single();
 
   if (error) throw error;
-  return data;
+  if (!data) return null;
+
+  const { data: orderData } = await supabase
+    .from("orders")
+    .select(`
+      *,
+      order_items (*, products (name, images)),
+      user_addresses (
+        receiver_name,
+        phone_number,
+        province_city,
+        district,
+        ward_commune,
+        street_address
+      )
+    `)
+    .eq("id", data.order_id)
+    .single();
+
+  return { ...data, orders: orderData };
 }
 
 export async function getOrderForReturn(orderId: number, userId: string) {
-  const { data, error } = await supabase
+  const { data: orderData, error } = await supabase
     .from("orders")
     .select(`
       *,
@@ -126,15 +145,22 @@ export async function getOrderForReturn(orderId: number, userId: string) {
         *,
         products (name, images, variants),
         reviews (id, rating)
-      ),
-      return_requests (id, status)
+      )
     `)
     .eq("id", orderId)
     .eq("user_id", userId)
     .single();
 
   if (error) throw error;
-  return data;
+  if (!orderData) return null;
+
+  const { data: returnRequests } = await supabase
+    .from("return_requests")
+    .select("id, status")
+    .eq("order_id", orderId)
+    .in("status", ["pending", "approved", "shipping_back"]);
+
+  return { ...orderData, return_requests: returnRequests ?? [] };
 }
 
 export async function createReturnRequest(params: {
