@@ -477,6 +477,18 @@ export default function CheckoutScreen() {
       return;
     }
 
+    // 🔒 BƯỚC 3: Kiểm tra địa chỉ đã có mã GHN chưa
+    // Nếu chưa có → chặn đặt hàng, yêu cầu user cập nhật địa chỉ
+    if (!userAddress.ghn_district_id || !userAddress.ghn_ward_code) {
+      setPaymentStatus("idle");
+      alert(
+        "⚠️ Địa chỉ giao hàng chưa được cập nhật theo chuẩn mới.\n\n" +
+        "Vui lòng vào Cài đặt → Địa chỉ giao hàng → Chỉnh sửa lại địa chỉ " +
+        "và chọn lại Quận/Huyện, Phường/Xã từ danh sách để hệ thống tính phí vận chuyển chính xác."
+      );
+      return;
+    }
+
     setPaymentStatus("processing");
 
     try {
@@ -486,6 +498,8 @@ export default function CheckoutScreen() {
       if (!user) throw new Error("Chưa đăng nhập");
 
       // 1. Tạo đơn hàng trong bảng public.orders
+      // Lưu snapshot mã GHN (shipping_district_id / shipping_ward_code) vào chính đơn hàng
+      // để admin luôn có đủ thông tin dù user sau này sửa/xóa địa chỉ gốc.
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert([
@@ -493,14 +507,19 @@ export default function CheckoutScreen() {
             user_id: user.id,
             total_amount: finalTotal,
             shipping_address: `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`,
+            full_shipping_address: `${userAddress.street_address}, ${userAddress.ward_commune ? userAddress.ward_commune + ', ' : ''}${userAddress.district}, ${userAddress.province_city}`,
             phone_contact: userProfile?.phone,
             receiver_name: userProfile?.name,
+            receiver_phone: userProfile?.phone,
             address_id: userAddress.id,
             status: "pending", // Trạng thái chờ xử lý
             platform_voucher_id: selectedVoucher?.id || null,
             discount_amount: finalDiscount,
             shipping_fee: shippingFee,
             shipping_method_id: selectedShippingId, // Lưu id dịch vụ từ GHN
+            // 📌 SNAPSHOT mã GHN tại thời điểm đặt hàng
+            shipping_district_id: userAddress.ghn_district_id ? Number(userAddress.ghn_district_id) : null,
+            shipping_ward_code: userAddress.ghn_ward_code ? String(userAddress.ghn_ward_code) : null,
           },
         ])
         .select()

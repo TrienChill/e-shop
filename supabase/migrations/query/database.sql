@@ -111,12 +111,12 @@ CREATE TABLE public.order_vouchers (
   voucher_id uuid NOT NULL,
   discount_type character varying NOT NULL,
   discount_amount numeric NOT NULL CHECK (discount_amount >= 0::numeric),
-  applied_on_item_id uuid,
   created_at timestamp with time zone DEFAULT now(),
+  applied_on_item_id bigint,
   CONSTRAINT order_vouchers_pkey PRIMARY KEY (id),
   CONSTRAINT order_vouchers_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id),
   CONSTRAINT order_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES public.vouchers(id),
-  CONSTRAINT order_vouchers_applied_on_item_id_fkey FOREIGN KEY (applied_on_item_id) REFERENCES public.cart_items(id)
+  CONSTRAINT order_vouchers_applied_on_item_id_fkey FOREIGN KEY (applied_on_item_id) REFERENCES public.order_items(id)
 );
 CREATE TABLE public.orders (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -133,18 +133,22 @@ CREATE TABLE public.orders (
   receiver_name text,
   receiver_phone text,
   full_shipping_address text,
-  shipping_method_id uuid,
+  shipping_method_id text,
   shipping_fee numeric DEFAULT 0,
   time_finished timestamp with time zone,
   processing_at timestamp with time zone,
   shipping_at timestamp with time zone,
   completed_at timestamp with time zone,
   cancelled_at timestamp with time zone,
+  discount_amount numeric DEFAULT 0,
+  ghn_order_code text,
+  ghn_sort_code text,
+  shipping_district_id integer,
+  shipping_ward_code text,
   CONSTRAINT orders_pkey PRIMARY KEY (id),
   CONSTRAINT orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT orders_platform_voucher_id_fkey FOREIGN KEY (platform_voucher_id) REFERENCES public.vouchers(id),
-  CONSTRAINT orders_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.user_addresses(id),
-  CONSTRAINT orders_shipping_method_id_fkey FOREIGN KEY (shipping_method_id) REFERENCES public.shipping_methods(id)
+  CONSTRAINT orders_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.user_addresses(id)
 );
 CREATE TABLE public.posts (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
@@ -287,6 +291,9 @@ CREATE TABLE public.user_addresses (
   is_default boolean DEFAULT false,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  ghn_district_id integer,
+  ghn_ward_code text,
+  ghn_province_id integer,
   CONSTRAINT user_addresses_pkey PRIMARY KEY (id),
   CONSTRAINT user_addresses_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id)
 );
@@ -297,9 +304,11 @@ CREATE TABLE public.user_vouchers (
   is_used boolean DEFAULT false,
   used_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
+  order_id bigint,
   CONSTRAINT user_vouchers_pkey PRIMARY KEY (id),
   CONSTRAINT user_vouchers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
-  CONSTRAINT user_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES public.vouchers(id)
+  CONSTRAINT user_vouchers_voucher_id_fkey FOREIGN KEY (voucher_id) REFERENCES public.vouchers(id),
+  CONSTRAINT user_vouchers_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id)
 );
 CREATE TABLE public.vouchers (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

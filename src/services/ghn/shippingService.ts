@@ -143,3 +143,63 @@ export const fetchWards = async (districtId: number): Promise<GHNWard[]> => {
     return [];
   }
 };
+
+// -------------------------------------------------------------
+// CREATE ORDER — Đẩy đơn hàng lên GHN để lấy mã vận đơn
+// -------------------------------------------------------------
+
+export interface GHNOrderItem {
+  name: string;
+  quantity: number;
+  price: number;    // Đơn vị: VNĐ
+  weight?: number;  // Đơn vị: gram (mặc định 500g)
+}
+
+export interface GHNCreateOrderRequest {
+  to_name: string;
+  to_phone: string;
+  to_address: string;
+  to_ward_code: string;
+  to_district_id: number;
+  weight: number;          // Tổng trọng lượng đơn hàng (gram)
+  service_type_id: number; // 1: Nhanh, 2: Chuẩn
+  payment_type_id: number; // 1: Shop trả phí, 2: Người nhận trả (COD)
+  required_note: string;   // CHOTHUHANG | CHOXEMHANGKHONGTHU | KHONGCHOXEMHANG
+  items: GHNOrderItem[];
+  insurance_value?: number; // Giá trị bảo hiểm (VNĐ)
+  cod_amount?: number;      // Tiền thu hộ COD (VNĐ)
+}
+
+export interface GHNCreateOrderResponse {
+  code: number;
+  message: string;
+  data: {
+    order_code: string;
+    sort_code: string;
+    trans_type: string;
+    ward_encode: string;
+    district_encode: string;
+    expected_delivery_time: string;
+    total_fee: number;
+    fee: Record<string, number>;
+  } | null;
+}
+
+/**
+ * Tạo đơn hàng trên GHN và nhận mã vận đơn (Tracking Code).
+ * Được gọi khi Admin nhấn "Duyệt" hoặc "Giao" trong trang Quản lý Đơn hàng.
+ */
+export const createGHNOrder = async (
+  payload: GHNCreateOrderRequest
+): Promise<GHNCreateOrderResponse["data"]> => {
+  const response = await ghnApi.post<GHNCreateOrderResponse>(
+    "/shipping-order/create",
+    payload
+  );
+
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data;
+  }
+
+  throw new Error(`GHN API lỗi [${response.data.code}]: ${response.data.message}`);
+};
