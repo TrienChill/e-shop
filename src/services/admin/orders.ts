@@ -206,7 +206,7 @@ export async function pushOrderToGHN(order: any): Promise<string> {
     to_district_id: districtId,
     weight:         totalWeight,
     service_type_id: 2,    // 2 = Giao Hàng Chuẩn (mặc định)
-    payment_type_id: 2,    // 2 = Người nhận trả phí (COD)
+    payment_type_id: 1,    // 1 = Shop trả phí (vì tổng COD đã cộng sẵn phí ship trong app)
     required_note:  "CHOTHUHANG", // Cho thử hàng
     cod_amount:     Math.round(order.total_amount ?? 0),
     insurance_value: Math.round(order.total_amount ?? 0),
