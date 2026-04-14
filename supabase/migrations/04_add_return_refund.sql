@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS public.return_requests (
   id                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   order_id          bigint NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
   user_id           uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  profiles_id       uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   request_type      varchar(20) DEFAULT 'return' CHECK (request_type IN ('return','exchange')),
   reason_category   public.return_reason_type NOT NULL,
   reason            text NOT NULL,
@@ -87,10 +88,19 @@ CREATE OR REPLACE FUNCTION public.create_return_request(
   p_bank_account_name   text DEFAULT NULL,
   p_bank_account_number text DEFAULT NULL,
   p_bank_name           text DEFAULT NULL,
-  p_items           jsonb DEFAULT '[]'::jsonb
+  p_items           text DEFAULT '[]'
 ) RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE v_id bigint; v_total numeric := 0; r record;
+DECLARE v_id bigint; v_total numeric := 0; v_items_data jsonb; r record;
 BEGIN
+  v_items_data := COALESCE(p_items, '[]');
+  IF jsonb_typeof(v_items_data::jsonb) = 'string' THEN
+    v_items_data := v_items_data::jsonb;
+  ELSE
+    v_items_data := v_items_data::jsonb;
+  END IF;
+  IF jsonb_typeof(v_items_data) != 'array' THEN
+    v_items_data := '[]'::jsonb;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM orders WHERE id=p_order_id AND user_id=p_user_id) THEN
     RAISE EXCEPTION 'Order không tồn tại hoặc không thuộc về bạn';
   END IF;
@@ -100,15 +110,15 @@ BEGIN
   IF EXISTS (SELECT 1 FROM return_requests WHERE order_id=p_order_id AND status IN ('pending','approved','shipping_back')) THEN
     RAISE EXCEPTION 'Đơn hàng này đang có yêu cầu trả hàng đang xử lý';
   END IF;
-  FOR r IN SELECT * FROM jsonb_array_elements(p_items) LOOP
-    v_total := v_total + (r.value->>'refund_amount')::numeric;
+  FOR r IN SELECT * FROM jsonb_array_elements(v_items_data) LOOP
+    v_total := v_total + COALESCE((r.value->>'refund_amount')::numeric, 0);
   END LOOP;
-  INSERT INTO return_requests (order_id,user_id,request_type,reason_category,reason,description,evidence_images,refund_amount,refund_method,bank_account_name,bank_account_number,bank_name,status)
-    VALUES (p_order_id,p_user_id,p_request_type,p_reason_category,p_reason,p_description,p_evidence_images,v_total,p_refund_method,p_bank_account_name,p_bank_account_number,p_bank_name,'pending')
+  INSERT INTO return_requests (order_id,user_id,profiles_id,request_type,reason_category,reason,description,evidence_images,refund_amount,refund_method,bank_account_name,bank_account_number,bank_name,status)
+    VALUES (p_order_id,p_user_id,p_user_id,p_request_type,p_reason_category,p_reason,p_description,p_evidence_images,v_total,p_refund_method,p_bank_account_name,p_bank_account_number,p_bank_name,'pending')
     RETURNING id INTO v_id;
   INSERT INTO return_items (return_request_id,order_item_id,product_id,quantity,refund_amount)
     SELECT v_id,(item->>'order_item_id')::bigint,(item->>'product_id')::bigint,(item->>'quantity')::integer,(item->>'refund_amount')::numeric
-    FROM jsonb_array_elements(p_items) item;
+    FROM jsonb_array_elements(v_items_data) item;
   UPDATE orders SET status='return_requested',return_requested_at=now(),active_return_id=v_id,refund_amount=v_total WHERE id=p_order_id;
   RETURN v_id;
 END;
@@ -131,7 +141,15 @@ $$;
 
 -- 8. RLS
 ALTER TABLE public.return_requests ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users own returns" ON public.return_requests FOR ALL USING (auth.uid()=user_id OR EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff')));
+CREATE POLICY "Users own returns" ON public.return_requests FOR ALL USING (
+  auth.uid()=user_id OR EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff'))
+);
 ALTER TABLE public.return_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users own return items" ON public.return_items FOR SELECT USING (EXISTS(SELECT 1 FROM return_requests rr WHERE rr.id=return_items.return_request_id AND (rr.user_id=auth.uid() OR EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff')))));
-CREATE POLICY "Admins insert ri" ON public.return_items FOR INSERT WITH CHECK (EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff')));
+CREATE POLICY "Users own return items" ON public.return_items FOR SELECT USING (
+  EXISTS(SELECT 1 FROM return_requests rr WHERE rr.id=return_items.return_request_id AND (
+    rr.user_id=auth.uid() OR EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff'))
+  ))
+);
+CREATE POLICY "Admins insert ri" ON public.return_items FOR INSERT WITH CHECK (
+  EXISTS(SELECT 1 FROM profiles WHERE id=auth.uid() AND role IN('admin','staff'))
+);

@@ -183,6 +183,14 @@ export async function createReturnRequest(params: {
     reason?: string;
   }>;
 }) {
+  const itemsData = params.items.map((item) => ({
+    order_item_id: item.orderItemId,
+    product_id: item.productId,
+    quantity: item.quantity,
+    refund_amount: item.refundAmount,
+    reason: item.reason || "",
+  }));
+
   const { data, error } = await supabase.rpc("create_return_request", {
     p_order_id: params.orderId,
     p_user_id: params.userId,
@@ -195,15 +203,7 @@ export async function createReturnRequest(params: {
     p_bank_account_name: params.bankAccountName || null,
     p_bank_account_number: params.bankAccountNumber || null,
     p_bank_name: params.bankName || null,
-    p_items: JSON.stringify(
-      params.items.map((item) => ({
-        order_item_id: item.orderItemId,
-        product_id: item.productId,
-        quantity: item.quantity,
-        refund_amount: item.refundAmount,
-        reason: item.reason || "",
-      }))
-    ),
+    p_items: itemsData,
   });
 
   if (error) throw error;
