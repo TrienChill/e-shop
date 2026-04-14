@@ -64,7 +64,6 @@ export default function AdminLayout() {
     { href: "/(admin)/vouchers", label: "Mã giảm giá", icon: Ticket },
     { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
     { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
-    { href: "/(admin)/shipping", label: "Vận chuyển", icon: Truck },
     { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
   ];
 
