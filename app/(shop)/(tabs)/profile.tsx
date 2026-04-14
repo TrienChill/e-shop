@@ -13,7 +13,8 @@ import {
   Star,
   Ticket,
   Truck,
-  Wallet
+  Wallet,
+  RotateCcw
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
@@ -297,6 +298,16 @@ export default function ProfileScreen() {
               onPress={() => {
                 router.push({
                   pathname: "/reviews",
+                });
+              }}
+            />
+            <OrderIconButton
+              title="Trả hàng"
+              icon={RotateCcw}
+              hasNotification={false}
+              onPress={() => {
+                router.push({
+                  pathname: "/(shop)/my-returns" as any,
                 });
               }}
             />

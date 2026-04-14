@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   Filter,
   PackageX,
+  RotateCcw,
   X
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -490,20 +491,33 @@ export default function ToReceiveScreen() {
             {/* Nút hành động nhanh bên dưới */}
             <View style={styles.actionRow}>
               {isDelivered ? (
-                <TouchableOpacity
-                  style={[
-                    styles.reviewButton,
-                    isAllReviewed && styles.reviewButtonCompleted,
-                  ]}
-                  activeOpacity={0.7}
-                  onPress={() => handleReviewPress(item)}
-                >
-                  <Text
-                    style={[
-                      styles.reviewButtonText,
-                      isAllReviewed && styles.reviewButtonTextCompleted,
-                    ]}
+                <>
+                  <TouchableOpacity
+                    style={styles.returnButton}
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(shop)/request-return" as any,
+                        params: { orderId: item.id },
+                      })
+                    }
                   >
+                    <Text style={styles.returnButtonText}>Trả hàng</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.reviewButton,
+                      isAllReviewed && styles.reviewButtonCompleted,
+                    ]}
+                    activeOpacity={0.7}
+                    onPress={() => handleReviewPress(item)}
+                  >
+                    <Text
+                      style={[
+                        styles.reviewButtonText,
+                        isAllReviewed && styles.reviewButtonTextCompleted,
+                      ]}
+                    >
                       {isAllReviewed ? "Xem đánh giá" : "Đánh giá"}
                   </Text>
                   {isAllReviewed && (
@@ -514,6 +528,7 @@ export default function ToReceiveScreen() {
                     />
                   )}
                 </TouchableOpacity>
+                </>
               ) : (
                 <TouchableOpacity
                   style={styles.trackButton}
@@ -1041,6 +1056,21 @@ const styles = StyleSheet.create({
   },
   reviewButtonTextCompleted: {
     color: COLORS.primary,
+  },
+  returnButton: {
+    backgroundColor: "#FFF5F5",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#FF4D4D",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  returnButtonText: {
+    color: "#FF4D4D",
+    fontWeight: "bold",
+    fontSize: 14,
   },
   centerContainer: {
     flex: 1,
