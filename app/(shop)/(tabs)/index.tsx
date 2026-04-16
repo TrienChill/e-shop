@@ -44,6 +44,34 @@ const HomeScreen = () => {
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // --- REALTIME HOOKS (FULL FOR INDEX) ---
+  // Trang index hiển thị: top-selling (orders/order_items),
+  // just-for-you (cart_items/wishlist),
+  // most-popular (có khả năng phụ thuộc reviews/view history).
+  useSupabaseRealtime({
+    table: 'wishlist',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+  });
+  useSupabaseRealtime({
+    table: 'orders',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+  });
+  useSupabaseRealtime({
+    table: 'order_items',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+  });
+  useSupabaseRealtime({
+    table: 'reviews',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+  });
+  useSupabaseRealtime({
+    table: 'product_view_history',
+    onUpdate: (payload) => {
+      // view history thường update liên tục; chỉ re-fetch khi có lượt xem mới
+      if (payload.eventType === 'INSERT') setRefreshTrigger(prev => prev + 1);
+    },
+  });
+
   // --- REALTIME HOOKS ---
   // Với sản phẩm: nếu DELETE thì lọc ngay ra khỏi tất cả state, không cần re-fetch
   useSupabaseRealtime({
@@ -66,7 +94,11 @@ const HomeScreen = () => {
   });
   useSupabaseRealtime({
     table: 'banners',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    onUpdate: () => {
+      getActiveBanners()
+        .then((data) => setBanners(data))
+        .catch((err) => console.error("Lỗi realtime banners:", err));
+    }
   });
   useSupabaseRealtime({
     table: 'cart_items',
@@ -74,7 +106,46 @@ const HomeScreen = () => {
   });
   useSupabaseRealtime({
     table: 'product_discounts',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    onUpdate: () => {
+      Promise.all([
+        getTopSellingProducts().catch((err) => {
+          console.error("Lỗi realtime top products:", err);
+          return [];
+        }),
+        getLatestProducts().catch((err) => {
+          console.error("Lỗi realtime new products:", err);
+          return [];
+        }),
+        getMostPopularProducts().catch((err) => {
+          console.error("Lỗi realtime most popular:", err);
+          return [];
+        }),
+        getFlashSaleProducts().catch((err) => {
+          console.error("Lỗi realtime flash sale:", err);
+          return [];
+        }),
+        getJustForYouProducts(1).catch((err) => {
+          console.error("Lỗi realtime just for you:", err);
+          return [];
+        }),
+      ]).then(([
+        top,
+        latest,
+        popular,
+        flash,
+        justForYou,
+      ]) => {
+        setTopProducts(top);
+        setNewItems(latest);
+        setPopularItems(popular);
+        setFlashSaleProducts((flash || []).slice(0, 4));
+
+        // reset pagination cho Just For You
+        pageRef.current = 1;
+        hasMoreRef.current = true;
+        setJustForYouItems(justForYou);
+      });
+    }
   });
   useSupabaseRealtime({
     table: 'product_variants',
@@ -265,6 +336,8 @@ const HomeScreen = () => {
   // Cập nhật mỗi khi màn hình index được focus hoặc refreshTrigger đổi
   useFocusEffect(
     useCallback(() => {
+      // Dùng ngầm để đảm bảo callback được recreate khi realtime update
+      void refreshTrigger;
       fetchCartCount();
     }, [refreshTrigger]),
   );
@@ -327,7 +400,7 @@ const HomeScreen = () => {
             >
               {displayBanners.map((banner, index) => (
                 <TouchableOpacity
-                  key={`${banner.id}-${index}`}
+                  key={`${banner.id}-${banner.updated_at}-${index}`}
                   style={[styles.bannerContent, { width: width - 32 }]}
                   activeOpacity={0.9}
                   onPress={() => {

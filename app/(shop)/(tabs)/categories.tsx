@@ -148,40 +148,52 @@ export default function CategoriesScreen() {
         .order("display_order", { ascending: true });
       if (error) throw error;
       setAllCategories(data || []);
-      const roots = data?.filter(cat => cat.parent_id === null) || [];
-
-      // Nếu có categoryId từ banner, tự động chọn đúng danh mục
-      if (categoryId) {
-        const targetId = parseInt(categoryId, 10);
-        const target = data?.find(cat => cat.id === targetId);
-        if (target) {
-          if (target.parent_id === null) {
-            // Là root category -> chọn root
-            setSelectedRootId(target.id);
-          } else {
-            // Là sub category -> tìm root cha
-            const parent = data?.find(cat => cat.id === target.parent_id);
-            if (parent && parent.parent_id === null) {
-              setSelectedRootId(parent.id);
-              setSelectedSubId(target.id);
-            } else if (parent) {
-              // Cấp 3: tìm root của parent
-              const grandParent = data?.find(cat => cat.id === parent.parent_id);
-              if (grandParent) setSelectedRootId(grandParent.id);
-              setSelectedSubId(parent.id);
-              setSelectedChildId(target.id);
-            }
-          }
-        }
-      } else if (roots.length > 0) {
-        setSelectedRootId(roots[0].id);
-      }
     } catch (error) {
       console.error("Lỗi lấy danh mục:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Logic đồng bộ categoryId từ banner/route vào state selection
+  useEffect(() => {
+    if (!allCategories.length) return;
+
+    // Trường hợp 1: Không có categoryId -> mặc định chọn root đầu tiên
+    if (!categoryId) {
+      const roots = allCategories.filter(cat => cat.parent_id === null);
+      if (roots.length > 0 && selectedRootId === null) {
+        setSelectedRootId(roots[0].id);
+      }
+      return;
+    }
+
+    // Trường hợp 2: Có categoryId từ banner
+    const targetId = parseInt(categoryId, 10);
+    const target = allCategories.find(cat => cat.id === targetId);
+    if (!target) return;
+
+    if (target.parent_id === null) {
+      // Cấp 1 (Root)
+      setSelectedRootId(target.id);
+      setSelectedSubId(null);
+      setSelectedChildId(null);
+    } else {
+      const parent = allCategories.find(cat => cat.id === target.parent_id);
+      if (parent && parent.parent_id === null) {
+        // Cấp 2 (Sub)
+        setSelectedRootId(parent.id);
+        setSelectedSubId(target.id);
+        setSelectedChildId(null);
+      } else if (parent) {
+        // Cấp 3 (Child)
+        const grandParent = allCategories.find(cat => cat.id === parent.parent_id);
+        if (grandParent) setSelectedRootId(grandParent.id);
+        setSelectedSubId(parent.id);
+        setSelectedChildId(target.id);
+      }
+    }
+  }, [categoryId, allCategories]);
 
   const fetchWishlist = async () => {
     try {
@@ -279,14 +291,10 @@ export default function CategoriesScreen() {
     }
   };
 
+  // Đồng bộ sản phẩm khi selection thay đổi
   useEffect(() => {
     if (selectedSubId) fetchProducts(true);
   }, [selectedSubId, sortBy, selectedChildId, refreshTrigger]);
-
-  // Reset chip cấp 3 mỗi khi đổi subId
-  useEffect(() => {
-    setSelectedChildId(null);
-  }, [selectedSubId]);
 
   const addToCart = async () => {
     if (!selectedQuickProduct) return;
@@ -350,7 +358,11 @@ export default function CategoriesScreen() {
   const renderRootItem = ({ item }: { item: Category }) => (
     <TouchableOpacity
       style={[styles.rootTab, selectedRootId === item.id && styles.rootTabActive]}
-      onPress={() => { setSelectedRootId(item.id); setSelectedSubId(null); }}
+      onPress={() => { 
+        setSelectedRootId(item.id); 
+        setSelectedSubId(null); 
+        setSelectedChildId(null);
+      }}
     >
       <Text style={[styles.rootTabText, selectedRootId === item.id && styles.rootTabTextActive]}>
         {item.name_vi || item.name}
@@ -362,7 +374,10 @@ export default function CategoriesScreen() {
   const renderSubCategoryItem = ({ item }: { item: Category }) => (
     <TouchableOpacity
       style={styles.subCatCard}
-      onPress={() => setSelectedSubId(item.id)}
+      onPress={() => {
+        setSelectedSubId(item.id);
+        setSelectedChildId(null);
+      }}
     >
       <Image source={{ uri: item.image_url || "https://via.placeholder.com/150" }} style={styles.subCatImg} />
       <Text style={styles.subCatName} numberOfLines={2}>{item.name_vi || item.name}</Text>
@@ -487,7 +502,13 @@ export default function CategoriesScreen() {
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           {selectedSubId && (
-            <TouchableOpacity onPress={() => setSelectedSubId(null)} style={{ marginRight: 15 }}>
+            <TouchableOpacity 
+              onPress={() => {
+                setSelectedSubId(null);
+                setSelectedChildId(null);
+              }} 
+              style={{ marginRight: 15 }}
+            >
               <ArrowLeft size={24} color="#000" />
             </TouchableOpacity>
           )}

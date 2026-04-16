@@ -63,6 +63,12 @@ const EditAddressScreen = () => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // --- REALTIME HOOKS ---
+  useSupabaseRealtime({
+    table: 'user_addresses',
+    onUpdate: () => fetchAddresses(),
+  });
+
   useEffect(() => {
     fetchAddresses();
   }, []);
