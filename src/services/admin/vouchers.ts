@@ -45,7 +45,7 @@ export async function listAllVouchers(): Promise<VoucherRow[]> {
   return (data ?? []) as unknown as VoucherRow[];
 }
 
-export async function createVoucher(data: Partial<VoucherRow>, productIds?: number[]) {
+export async function createVoucher(data: Partial<VoucherRow>) {
   const { error, data: insertedVoucher } = await supabase
     .from("vouchers")
     .insert([data])
@@ -53,21 +53,6 @@ export async function createVoucher(data: Partial<VoucherRow>, productIds?: numb
     .single();
     
   if (error) throw error;
-  
-  if (data.voucher_type === "shop" && productIds && productIds.length > 0) {
-    const discounts = productIds.map(id => ({
-      product_id: id,
-      discount_type: data.discount_type || "percentage",
-      discount_value: data.discount_value || 0,
-      start_date: data.start_date,
-      end_date: data.expired_at,
-      is_active: data.is_active ?? true
-    }));
-    const { error: pdError } = await supabase.from("product_discounts").insert(discounts);
-    if (pdError) {
-      console.error("Failed to append discount to products", pdError);
-    }
-  }
 }
 
 export async function updateVoucher(id: string, data: Partial<VoucherRow>) {
@@ -111,5 +96,47 @@ export async function distributeVoucherToUsers(voucherId: string, userIds: strin
     is_used: false,
   }));
   const { error } = await supabase.from("user_vouchers").insert(payload);
+  if (error) throw error;
+}
+
+// ==========================================
+// API Cho bảng product_discounts (Tab 2)
+// ==========================================
+export async function listAllProductDiscounts(): Promise<ProductDiscountRow[]> {
+  const { data, error } = await supabase
+    .from("product_discounts")
+    .select("*")
+    .order("start_date", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as ProductDiscountRow[];
+}
+
+export async function createProductDiscount(data: Partial<ProductDiscountRow>) {
+  const { error } = await supabase
+    .from("product_discounts")
+    .insert([data]);
+  
+  if (error) throw error;
+}
+
+export async function updateProductDiscount(id: string, data: Partial<ProductDiscountRow>) {
+  const { error } = await supabase
+    .from("product_discounts")
+    .update(data)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteProductDiscount(id: string) {
+  const { error } = await supabase.from("product_discounts").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function setProductDiscountActive(id: string, isActive: boolean) {
+  const { error } = await supabase
+    .from("product_discounts")
+    .update({ is_active: isActive })
+    .eq("id", id);
   if (error) throw error;
 }

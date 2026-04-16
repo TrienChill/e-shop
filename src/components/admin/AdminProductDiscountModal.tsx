@@ -1,4 +1,4 @@
-import { VoucherRow } from "@/src/services/admin/vouchers";
+import { ProductDiscountRow } from "@/src/services/admin/vouchers";
 import { X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -6,54 +6,40 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onSave: (data: Partial<VoucherRow>) => void;
-  initialData?: VoucherRow | null;
+  onSave: (data: Partial<ProductDiscountRow>) => void;
+  initialData?: ProductDiscountRow | null;
 }
 
-export default function AdminVoucherModal({ visible, onClose, onSave, initialData }: Props) {
-  const [code, setCode] = useState("");
+export default function AdminProductDiscountModal({ visible, onClose, onSave, initialData }: Props) {
+  const [productId, setProductId] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixed_amount">("percentage");
   const [discountValue, setDiscountValue] = useState("");
-  const [minOrderValue, setMinOrderValue] = useState("");
-  const [maxDiscount, setMaxDiscount] = useState("");
-  const [usageLimit, setUsageLimit] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [expiredAt, setExpiredAt] = useState("");
+  const [endDate, setEndDate] = useState("");
 
   useEffect(() => {
     if (initialData) {
-      setCode(initialData.code || "");
+      setProductId(initialData.product_id?.toString() || "");
       setDiscountType((initialData.discount_type as any) || "percentage");
       setDiscountValue(initialData.discount_value?.toString() || "");
-      setMinOrderValue(initialData.min_order_value?.toString() || "0");
-      setMaxDiscount(initialData.max_discount?.toString() || "0");
-      setUsageLimit(initialData.usage_limit?.toString() || "100");
       setStartDate(initialData.start_date ? new Date(initialData.start_date).toISOString().split("T")[0] : "");
-      setExpiredAt(initialData.expired_at ? new Date(initialData.expired_at).toISOString().split("T")[0] : "");
+      setEndDate(initialData.end_date ? new Date(initialData.end_date).toISOString().split("T")[0] : "");
     } else {
-      setCode("");
+      setProductId("");
       setDiscountType("percentage");
       setDiscountValue("");
-      setMinOrderValue("0");
-      setMaxDiscount("0");
-      setUsageLimit("100");
       setStartDate(new Date().toISOString().split("T")[0]);
-      setExpiredAt("");
+      setEndDate("");
     }
   }, [initialData, visible]);
 
   const handleSave = () => {
     onSave({
-      code: code.trim().toUpperCase() || null,
+      product_id: parseInt(productId, 10) || 0,
       discount_type: discountType,
-      discount_value: parseFloat(discountValue) || null,
-      voucher_type: "platform", // Cố định
-      min_order_value: parseFloat(minOrderValue) || 0,
-      max_discount: parseFloat(maxDiscount) || 0,
-      usage_limit: parseInt(usageLimit, 10) || 0,
-      start_date: startDate ? new Date(startDate).toISOString() : null,
-      expired_at: expiredAt ? new Date(expiredAt).toISOString() : null,
-      conditions: null,
+      discount_value: parseFloat(discountValue) || 0,
+      start_date: startDate ? new Date(startDate).toISOString() : new Date().toISOString(),
+      end_date: endDate ? new Date(endDate).toISOString() : new Date("2099-12-31").toISOString(),
       is_active: initialData ? initialData.is_active : true, // default active
     });
   };
@@ -63,14 +49,14 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
       <View style={styles.overlay}>
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>{initialData ? "Chỉnh sửa Voucher" : "Thêm Voucher Mới"}</Text>
+            <Text style={styles.title}>{initialData ? "Chỉnh sửa Giảm giá SP" : "Thêm Giảm giá SP"}</Text>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <X size={20} color="#6B7280" />
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.scroll}>
-            <Text style={styles.label}>Mã Code</Text>
-            <TextInput style={styles.input} value={code} onChangeText={setCode} placeholder="VD: SUMMER10" />
+            <Text style={styles.label}>ID Sản phẩm</Text>
+            <TextInput style={styles.input} value={productId} onChangeText={setProductId} keyboardType="numeric" placeholder="VD: 1" />
 
             <View style={styles.rowWrapper}>
               <View style={styles.halfWidth}>
@@ -90,28 +76,10 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
                   </Pressable>
                 </View>
               </View>
-            </View>
 
-
-
-            <Text style={styles.label}>Giá trị giảm ({discountType === "percentage" ? "%" : "VNĐ"})</Text>
-            <TextInput style={styles.input} value={discountValue} onChangeText={setDiscountValue} keyboardType="numeric" placeholder="VD: 10 hay 50000" />
-
-            <View style={styles.rowWrapper}>
               <View style={styles.halfWidth}>
-                <Text style={styles.label}>Đơn tối thiểu (VNĐ)</Text>
-                <TextInput style={styles.input} value={minOrderValue} onChangeText={setMinOrderValue} keyboardType="numeric" />
-              </View>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Giảm giá tối đa (VNĐ)</Text>
-                <TextInput style={styles.input} value={maxDiscount} onChangeText={setMaxDiscount} keyboardType="numeric" />
-              </View>
-            </View>
-
-            <View style={styles.rowWrapper}>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Số lượt phát hành</Text>
-                <TextInput style={styles.input} value={usageLimit} onChangeText={setUsageLimit} keyboardType="numeric" />
+                <Text style={styles.label}>Giá trị giảm</Text>
+                <TextInput style={styles.input} value={discountValue} onChangeText={setDiscountValue} keyboardType="numeric" placeholder="VD: 10 hay 50000" />
               </View>
             </View>
 
@@ -121,8 +89,8 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
                 <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="2026-01-01" />
               </View>
               <View style={styles.halfWidth}>
-                <Text style={styles.label}>Ngày hết hạn (Y-M-D)</Text>
-                <TextInput style={styles.input} value={expiredAt} onChangeText={setExpiredAt} placeholder="2026-12-31" />
+                <Text style={styles.label}>Ngày kết thúc (Y-M-D)</Text>
+                <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="2026-12-31" />
               </View>
             </View>
 
@@ -132,7 +100,7 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
               <Text style={styles.cancelText}>Hủy</Text>
             </Pressable>
             <Pressable style={styles.saveBtn} onPress={handleSave}>
-              <Text style={styles.saveText}>Lưu Voucher</Text>
+              <Text style={styles.saveText}>Lưu Cài đặt</Text>
             </Pressable>
           </View>
         </View>
