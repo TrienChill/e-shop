@@ -16,6 +16,7 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
   const [discountValue, setDiscountValue] = useState("");
   const [voucherType, setVoucherType] = useState<"platform" | "shop">("platform");
   const [minOrderValue, setMinOrderValue] = useState("");
+  const [maxDiscount, setMaxDiscount] = useState("");
   const [usageLimit, setUsageLimit] = useState("");
   const [startDate, setStartDate] = useState("");
   const [expiredAt, setExpiredAt] = useState("");
@@ -29,6 +30,7 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
       setDiscountValue(initialData.discount_value?.toString() || "");
       setVoucherType((initialData.voucher_type as any) || "platform");
       setMinOrderValue(initialData.min_order_value?.toString() || "0");
+      setMaxDiscount(initialData.max_discount?.toString() || "0");
       setUsageLimit(initialData.usage_limit?.toString() || "100");
       setStartDate(initialData.start_date ? new Date(initialData.start_date).toISOString().split("T")[0] : "");
       setExpiredAt(initialData.expired_at ? new Date(initialData.expired_at).toISOString().split("T")[0] : "");
@@ -41,6 +43,7 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
       setDiscountValue("");
       setVoucherType("platform");
       setMinOrderValue("0");
+      setMaxDiscount("0");
       setUsageLimit("100");
       setStartDate(new Date().toISOString().split("T")[0]);
       setExpiredAt("");
@@ -58,6 +61,7 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
       discount_value: parseFloat(discountValue) || null,
       voucher_type: voucherType,
       min_order_value: parseFloat(minOrderValue) || 0,
+      max_discount: parseFloat(maxDiscount) || 0,
       usage_limit: parseInt(usageLimit, 10) || 0,
       start_date: startDate ? new Date(startDate).toISOString() : null,
       expired_at: expiredAt ? new Date(expiredAt).toISOString() : null,
@@ -130,11 +134,18 @@ export default function AdminVoucherModal({ visible, onClose, onSave, initialDat
 
             <View style={styles.rowWrapper}>
               <View style={styles.halfWidth}>
-                <Text style={styles.label}>Giảm giá tối đa (VNĐ)</Text>
+                <Text style={styles.label}>Đơn tối thiểu (VNĐ)</Text>
                 <TextInput style={styles.input} value={minOrderValue} onChangeText={setMinOrderValue} keyboardType="numeric" />
               </View>
               <View style={styles.halfWidth}>
-                <Text style={styles.label}>Số lượt tối đa</Text>
+                <Text style={styles.label}>Giảm giá tối đa (VNĐ)</Text>
+                <TextInput style={styles.input} value={maxDiscount} onChangeText={setMaxDiscount} keyboardType="numeric" />
+              </View>
+            </View>
+
+            <View style={styles.rowWrapper}>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Số lượt phát hành</Text>
                 <TextInput style={styles.input} value={usageLimit} onChangeText={setUsageLimit} keyboardType="numeric" />
               </View>
             </View>

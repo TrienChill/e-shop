@@ -11,6 +11,7 @@ export type VoucherRow = {
   expired_at: string | null;
   usage_limit: number | null;
   min_order_value: number | null;
+  max_discount: number | null;
   conditions: any | null; // For holding "product_ids"
   created_at?: string;
   order_vouchers?: { count: number }[];

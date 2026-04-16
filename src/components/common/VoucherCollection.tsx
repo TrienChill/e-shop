@@ -113,7 +113,9 @@ export default function VoucherCollection({ onVoucherCollected, titleStyle, styl
                   ? `Giảm ${v.discount_value}%${v.max_discount ? ` tối đa ${v.max_discount.toLocaleString("vi-VN")}đ` : ''}` 
                   : `Giảm ${v.discount_value.toLocaleString('vi-VN')}đ`}
               </Text>
-              <Text style={styles.voucherCode}>Mã: {v.code}</Text>
+              <Text style={styles.voucherCode}>
+                Mã: {v.code} {v.usage_limit ? `• Lượt: ${v.usage_limit}` : ''}
+              </Text>
               <TouchableOpacity 
                 style={styles.collectBtn} 
                 onPress={() => handleCollect(v.id)}
