@@ -1,0 +1,2 @@
+id,order_id,voucher_id,discount_type,discount_amount,created_at,applied_on_item_id
+98300370-7557-40f4-af8c-129f3729e69b,1,e16e9081-ffe5-43a1-8593-f5c4d10c8c67,fixed,15000.00,2026-01-19 08:19:43.914416+00,
