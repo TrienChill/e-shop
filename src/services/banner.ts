@@ -20,18 +20,25 @@ export interface Banner {
  */
 export const getActiveBanners = async (): Promise<Banner[]> => {
   try {
-    const now = new Date().toISOString();
-    
+    // Chỉ filter is_active=true trên DB, tránh dùng .or() với timestamp dạng ISO
+    // vì ký tự đặc biệt trong URL gây lỗi 502 từ CDN/proxy
     const { data, error } = await supabase
       .from("banners")
       .select("*")
       .eq("is_active", true)
-      .or(`start_date.is.null,start_date.lte.${now}`)
-      .or(`end_date.is.null,end_date.gte.${now}`)
       .order("display_order", { ascending: true });
 
     if (error) throw error;
-    return data || [];
+
+    // Lọc theo ngày tháng trong JavaScript để tránh URL encoding issues
+    const now = new Date();
+    const filtered = (data || []).filter((banner) => {
+      const afterStart = !banner.start_date || new Date(banner.start_date) <= now;
+      const beforeEnd = !banner.end_date || new Date(banner.end_date) >= now;
+      return afterStart && beforeEnd;
+    });
+
+    return filtered;
   } catch (error) {
     console.error("Lỗi lấy danh sách banner:", error);
     return [];
