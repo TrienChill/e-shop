@@ -33,6 +33,10 @@ export type ProductDiscountRow = {
   start_date: string;
   end_date: string;
   is_active?: boolean;
+  products?: {
+    name: string;
+    images: string[] | null;
+  };
 };
 
 export async function listAllVouchers(): Promise<VoucherRow[]> {
@@ -105,7 +109,7 @@ export async function distributeVoucherToUsers(voucherId: string, userIds: strin
 export async function listAllProductDiscounts(): Promise<ProductDiscountRow[]> {
   const { data, error } = await supabase
     .from("product_discounts")
-    .select("*")
+    .select("*, products(name, images)")
     .order("start_date", { ascending: false });
 
   if (error) throw error;

@@ -1,7 +1,8 @@
 import { ProductDiscountRow } from "@/src/services/admin/vouchers";
-import { X } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { X, Search, Check } from "lucide-react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Image, ActivityIndicator } from "react-native";
+import { supabase } from "@/src/lib/supabase";
 
 interface Props {
   visible: boolean;
@@ -17,21 +18,72 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // Product Search State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (initialData) {
       setProductId(initialData.product_id?.toString() || "");
+      setSelectedProduct(initialData.products ? { 
+        id: initialData.product_id, 
+        name: initialData.products.name, 
+        image: initialData.products.images && initialData.products.images[0] 
+      } : { id: initialData.product_id, name: `ID: ${initialData.product_id}` });
       setDiscountType((initialData.discount_type as any) || "percentage");
       setDiscountValue(initialData.discount_value?.toString() || "");
       setStartDate(initialData.start_date ? new Date(initialData.start_date).toISOString().split("T")[0] : "");
       setEndDate(initialData.end_date ? new Date(initialData.end_date).toISOString().split("T")[0] : "");
     } else {
       setProductId("");
+      setSelectedProduct(null);
+      setSearchQuery("");
+      setSearchResults([]);
       setDiscountType("percentage");
       setDiscountValue("");
       setStartDate(new Date().toISOString().split("T")[0]);
       setEndDate("");
     }
   }, [initialData, visible]);
+
+  // Handle Search Debounce
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    if (!text.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    
+    setIsSearching(true);
+    searchTimeout.current = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, images')
+        .ilike('name', `%${text}%`)
+        .limit(5);
+        
+      if (!error && data) {
+        setSearchResults(data);
+      }
+      setIsSearching(false);
+    }, 500);
+  };
+
+  const selectProduct = (item: any) => {
+    setSelectedProduct({
+      id: item.id,
+      name: item.name,
+      image: item.images && item.images[0]
+    });
+    setProductId(item.id.toString());
+    setSearchQuery("");
+    setSearchResults([]);
+  };
 
   const handleSave = () => {
     onSave({
@@ -55,8 +107,56 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.scroll}>
-            <Text style={styles.label}>ID Sản phẩm</Text>
-            <TextInput style={styles.input} value={productId} onChangeText={setProductId} keyboardType="numeric" placeholder="VD: 1" />
+            
+            {/* PRODUCT SELECTION UI */}
+            <View style={styles.productSelectionSection}>
+              <Text style={styles.label}>Sản phẩm áp dụng</Text>
+              
+              {!selectedProduct ? (
+                <View style={styles.searchContainer}>
+                  <View style={styles.searchInputWrapper}>
+                    <Search color="#9CA3AF" size={18} />
+                    <TextInput 
+                      style={styles.searchInput} 
+                      value={searchQuery} 
+                      onChangeText={handleSearch} 
+                      placeholder="Nhập tên sản phẩm để tìm..." 
+                    />
+                    {isSearching && <ActivityIndicator size="small" color="#2563EB" />}
+                  </View>
+                  
+                  {searchResults.length > 0 && (
+                    <View style={styles.searchResultsContainer}>
+                      {searchResults.map((item) => (
+                        <Pressable key={item.id} style={styles.searchResultItem} onPress={() => selectProduct(item)}>
+                          <Image 
+                            source={{ uri: (item.images && item.images[0]) || "https://placehold.co/100" }} 
+                            style={styles.searchResultImage} 
+                          />
+                          <Text style={styles.searchResultName} numberOfLines={2}>{item.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.selectedProductCard}>
+                  <View style={styles.selectedProductInfo}>
+                    <Image 
+                      source={{ uri: selectedProduct.image || "https://placehold.co/100" }} 
+                      style={styles.selectedProductImage} 
+                    />
+                    <Text style={styles.selectedProductName} numberOfLines={2}>{selectedProduct.name}</Text>
+                  </View>
+                  <Pressable 
+                    style={styles.changeProductBtn} 
+                    onPress={() => setSelectedProduct(null)}
+                  >
+                    <Text style={styles.changeProductText}>Đổi</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
 
             <View style={styles.rowWrapper}>
               <View style={styles.halfWidth}>
@@ -129,5 +229,21 @@ const styles = StyleSheet.create({
   cancelBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
   cancelText: { color: "#4B5563", fontWeight: "600" },
   saveBtn: { backgroundColor: "#2563EB", paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
-  saveText: { color: "white", fontWeight: "600" }
+  saveText: { color: "white", fontWeight: "600" },
+
+  // New UI Styles
+  productSelectionSection: { marginBottom: 8 },
+  searchContainer: { position: "relative", zIndex: 50 },
+  searchInputWrapper: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, paddingHorizontal: 12, backgroundColor: "#FFF" },
+  searchInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, fontSize: 14, color: "#111827" },
+  searchResultsContainer: { backgroundColor: "white", borderWidth: 1, borderColor: "#D1D5DB", borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, maxHeight: 200, elevation: 5, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { height: 2, width: 0 } },
+  searchResultItem: { flexDirection: "row", alignItems: "center", padding: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", gap: 12 },
+  searchResultImage: { width: 36, height: 36, borderRadius: 6, backgroundColor: "#E5E7EB" },
+  searchResultName: { flex: 1, fontSize: 13, fontWeight: "500", color: "#374151" },
+  selectedProductCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderWidth: 1, borderColor: "#93C5FD", backgroundColor: "#EFF6FF", borderRadius: 8 },
+  selectedProductInfo: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
+  selectedProductImage: { width: 40, height: 40, borderRadius: 6, backgroundColor: "#FFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#D1D5DB" },
+  selectedProductName: { flex: 1, fontSize: 13, fontWeight: "600", color: "#1E3A8A" },
+  changeProductBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#DBEAFE", borderRadius: 6 },
+  changeProductText: { fontSize: 12, fontWeight: "600", color: "#1D4ED8" },
 });

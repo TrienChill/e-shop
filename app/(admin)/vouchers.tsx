@@ -1,23 +1,23 @@
 import { useAuth } from "@/src/auth/AuthContext";
-import {
-  listAllVouchers,
-  createVoucher,
-  updateVoucher,
-  deleteVoucher,
-  setVoucherActive,
-  listAllProductDiscounts,
-  createProductDiscount,
-  updateProductDiscount,
-  deleteProductDiscount,
-  setProductDiscountActive,
-  type VoucherRow,
-  type ProductDiscountRow,
-} from "@/src/services/admin/vouchers";
-import { RefreshCcw, Plus, Edit2, Trash2 } from "lucide-react-native";
-import React, { useState, useEffect, useCallback } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View, Alert, ScrollView } from "react-native";
-import AdminVoucherModal from "@/src/components/admin/AdminVoucherModal";
 import AdminProductDiscountModal from "@/src/components/admin/AdminProductDiscountModal";
+import AdminVoucherModal from "@/src/components/admin/AdminVoucherModal";
+import {
+  createProductDiscount,
+  createVoucher,
+  deleteProductDiscount,
+  deleteVoucher,
+  listAllProductDiscounts,
+  listAllVouchers,
+  setProductDiscountActive,
+  setVoucherActive,
+  updateProductDiscount,
+  updateVoucher,
+  type ProductDiscountRow,
+  type VoucherRow,
+} from "@/src/services/admin/vouchers";
+import { Edit2, Plus, RefreshCcw, Trash2, Search } from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View, Image, TextInput } from "react-native";
 
 // Helper to determine status string
 const getStatus = (v: VoucherRow) => {
@@ -30,7 +30,7 @@ const getStatus = (v: VoucherRow) => {
 
 export default function AdminVouchersScreen() {
   const { role } = useAuth();
-  
+
   // Tab State
   const [activeTab, setActiveTab] = useState<"VOUCHERS" | "PRODUCT_DISCOUNTS">("VOUCHERS");
 
@@ -46,6 +46,11 @@ export default function AdminVouchersScreen() {
 
   const [isDiscountModalVisible, setDiscountModalVisible] = useState(false);
   const [editingDiscount, setEditingDiscount] = useState<ProductDiscountRow | null>(null);
+
+  // Discount Filters State
+  const [searchDiscount, setSearchDiscount] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "percentage" | "fixed_amount">("all");
+  const [sortBy, setSortBy] = useState<"none" | "value_desc" | "value_asc">("none");
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -183,6 +188,43 @@ export default function AdminVouchersScreen() {
         </Pressable>
       </View>
 
+      {/* FILTER TOOLBAR FOR DISCOUNTS */}
+      {activeTab === "PRODUCT_DISCOUNTS" && (
+        <View style={styles.toolbar}>
+          <View style={styles.searchBox}>
+            <Search color="#9CA3AF" size={16} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Tìm theo ID hoặc tên sản phẩm..."
+              value={searchDiscount}
+              onChangeText={setSearchDiscount}
+            />
+          </View>
+          <View style={styles.filterGroup}>
+            <Pressable 
+              style={[styles.filterBtn, filterType === "percentage" && styles.filterBtnActive]} 
+              onPress={() => setFilterType(filterType === "percentage" ? "all" : "percentage")}
+            >
+              <Text style={[styles.filterText, filterType === "percentage" && styles.filterTextActive]}>Loại: %</Text>
+            </Pressable>
+            <Pressable 
+              style={[styles.filterBtn, filterType === "fixed_amount" && styles.filterBtnActive]} 
+              onPress={() => setFilterType(filterType === "fixed_amount" ? "all" : "fixed_amount")}
+            >
+              <Text style={[styles.filterText, filterType === "fixed_amount" && styles.filterTextActive]}>Loại: VNĐ</Text>
+            </Pressable>
+            <Pressable 
+              style={[styles.filterBtn, sortBy !== "none" && styles.filterBtnActive]} 
+              onPress={() => setSortBy(sortBy === "none" ? "value_desc" : sortBy === "value_desc" ? "value_asc" : "none")}
+            >
+              <Text style={[styles.filterText, sortBy !== "none" && styles.filterTextActive]}>
+                Xếp: {sortBy === "none" ? "Mặc định" : sortBy === "value_desc" ? "Giảm dần" : "Tăng dần"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
       {error ? (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>{error}</Text>
@@ -213,32 +255,30 @@ export default function AdminVouchersScreen() {
 
         {/* BODY */}
         <ScrollView>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#2563EB" />
-            </View>
-          ) : activeTab === "VOUCHERS" && vouchers.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Không có voucher nào.</Text>
-            </View>
-          ) : activeTab === "PRODUCT_DISCOUNTS" && productDiscounts.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Không có sản phẩm nào được giảm giá.</Text>
-            </View>
-          ) : activeTab === "VOUCHERS" ? (
-            vouchers.map((v) => {
+          {(() => {
+            if (loading) {
+              return (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#2563EB" />
+                </View>
+              );
+            }
+
+            if (activeTab === "VOUCHERS") {
+              if (vouchers.length === 0) return <View style={styles.emptyContainer}><Text style={styles.emptyText}>Không có voucher nào.</Text></View>;
+              return vouchers.map((v) => {
               const status = getStatus(v);
               const usageCount = v.order_vouchers?.[0]?.count || 0;
               return (
                 <View key={v.id} style={styles.row}>
                   <View style={styles.columnCode}>
                     <Text style={styles.columnCodeText}>{v.code ?? "-"}</Text>
-                    <Text style={{fontSize: 10, color: "#6B7280", marginTop: 4, textTransform: "capitalize"}}>{v.voucher_type}</Text>
+                    <Text style={{ fontSize: 10, color: "#6B7280", marginTop: 4, textTransform: "capitalize" }}>{v.voucher_type}</Text>
                   </View>
                   <View style={styles.columnUsage}>
-                     <Text style={{fontSize: 13, color: "#4B5563", fontWeight: "600"}}>
-                       {usageCount} / {v.usage_limit || "∞"}
-                     </Text>
+                    <Text style={{ fontSize: 13, color: "#4B5563", fontWeight: "600" }}>
+                      {usageCount} / {v.usage_limit || "∞"}
+                    </Text>
                   </View>
                   <Text style={styles.columnValueText}>
                     {v.discount_value?.toLocaleString() ?? "0"}{v.discount_type === 'percentage' ? '%' : '₫'}
@@ -250,8 +290,8 @@ export default function AdminVouchersScreen() {
                     <Pressable
                       style={StyleSheet.flatten([
                         styles.statusBadge,
-                        status.color === "active" ? styles.statusActive : 
-                        status.color === "inactive" ? styles.statusInactive : styles.statusExpired
+                        status.color === "active" ? styles.statusActive :
+                          status.color === "inactive" ? styles.statusInactive : styles.statusExpired
                       ])}
                       onPress={() => {
                         if (status.color !== "expired") {
@@ -260,16 +300,16 @@ export default function AdminVouchersScreen() {
                       }}
                     >
                       <Text style={StyleSheet.flatten([
-                        styles.statusText, 
-                        status.color === "active" ? styles.statusTextActive : 
-                        status.color === "inactive" ? styles.statusTextInactive : styles.statusTextExpired
+                        styles.statusText,
+                        status.color === "active" ? styles.statusTextActive :
+                          status.color === "inactive" ? styles.statusTextInactive : styles.statusTextExpired
                       ])}>
                         {status.text}
                       </Text>
                     </Pressable>
                   </View>
                   <View style={styles.columnActionsContainer}>
-                    <Pressable onPress={() => { setEditingVoucher(v); setVoucherModalVisible(true); }} style={{marginRight: 12}}>
+                    <Pressable onPress={() => { setEditingVoucher(v); setVoucherModalVisible(true); }} style={{ marginRight: 12 }}>
                       <Edit2 size={18} color="#4B5563" />
                     </Pressable>
                     <Pressable onPress={() => handleDelete(v.id, v.code, "voucher")}>
@@ -278,50 +318,90 @@ export default function AdminVouchersScreen() {
                   </View>
                 </View>
               );
-            })
-          ) : (
-            productDiscounts.map((d) => (
-              <View key={d.id} style={styles.row}>
-                <View style={styles.columnCode}>
-                  <Text style={styles.columnCodeText}>ID: {d.product_id}</Text>
-                </View>
-                <Text style={styles.columnValueText}>
-                  {d.discount_value?.toLocaleString() ?? "0"}{d.discount_type === 'percentage' ? '%' : '₫'}
-                </Text>
-                <Text style={styles.columnExpiredText}>
-                  {d.start_date ? new Date(d.start_date).toLocaleDateString("vi-VN") : "-"}
-                  {"\nđến\n"}
-                  {d.end_date ? new Date(d.end_date).toLocaleDateString("vi-VN") : "-"}
-                </Text>
-                <View style={styles.columnStatusContainer}>
-                  <Pressable
-                    style={StyleSheet.flatten([
-                      styles.statusBadge,
-                      d.is_active ? styles.statusActive : styles.statusInactive
-                    ])}
-                    onPress={() => {
-                      setProductDiscountActive(d.id!, !d.is_active).then(() => refresh()).catch((e) => setError((e as Error).message));
-                    }}
-                  >
-                    <Text style={StyleSheet.flatten([
-                      styles.statusText, 
-                      d.is_active ? styles.statusTextActive : styles.statusTextInactive
-                    ])}>
-                      {d.is_active ? "Đang chạy" : "Tạm dừng"}
-                    </Text>
-                  </Pressable>
-                </View>
-                <View style={styles.columnActionsContainer}>
-                  <Pressable onPress={() => { setEditingDiscount(d); setDiscountModalVisible(true); }} style={{marginRight: 12}}>
-                    <Edit2 size={18} color="#4B5563" />
-                  </Pressable>
-                  <Pressable onPress={() => handleDelete(d.id!, d.product_id.toString(), "discount")}>
-                    <Trash2 size={18} color="#EF4444" />
-                  </Pressable>
+            });
+          }
+
+          // PRODUCT DISCOUNTS RENDER
+          let filteredDiscounts = [...productDiscounts];
+          
+          // Apply Search
+          if (searchDiscount.trim()) {
+            const lowerQuery = searchDiscount.toLowerCase();
+            filteredDiscounts = filteredDiscounts.filter(d => 
+              d.product_id.toString().includes(lowerQuery) || 
+              (d.products?.name && d.products.name.toLowerCase().includes(lowerQuery))
+            );
+          }
+
+          // Apply Filter
+          if (filterType !== "all") {
+            filteredDiscounts = filteredDiscounts.filter(d => d.discount_type === filterType);
+          }
+
+          // Apply Sort
+          if (sortBy !== "none") {
+            filteredDiscounts.sort((a, b) => {
+              if (sortBy === "value_desc") return (b.discount_value || 0) - (a.discount_value || 0);
+              if (sortBy === "value_asc") return (a.discount_value || 0) - (b.discount_value || 0);
+              return 0;
+            });
+          }
+
+          if (filteredDiscounts.length === 0) return <View style={styles.emptyContainer}><Text style={styles.emptyText}>Không có sản phẩm nào phù hợp.</Text></View>;
+
+          return filteredDiscounts.map((d) => (
+            <View key={d.id} style={styles.row}>
+              <View style={[styles.columnCode, { flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                <Image 
+                  source={{ uri: (d.products?.images && d.products.images[0]) || "https://placehold.co/100" }} 
+                  style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: "#E5E7EB" }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#111827" }} numberOfLines={2}>
+                    {d.products?.name || `Sản phẩm #${d.product_id}`}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>ID: {d.product_id}</Text>
                 </View>
               </View>
-            ))
-          )}
+              <Text style={styles.columnValueText}>
+                <Text style={{ color: "#2563EB" }}>
+                  {d.discount_type === "percentage" ? `-${d.discount_value}%` : `-${(d.discount_value || 0).toLocaleString()}đ`}
+                </Text>
+              </Text>
+              <Text style={styles.columnExpiredText}>
+                {d.start_date ? new Date(d.start_date).toLocaleDateString("vi-VN") : "-"}
+                {"\nđến\n"}
+                {d.end_date ? new Date(d.end_date).toLocaleDateString("vi-VN") : "-"}
+              </Text>
+              <View style={styles.columnStatusContainer}>
+                <Pressable
+                  style={StyleSheet.flatten([
+                    styles.statusBadge,
+                    d.is_active ? { backgroundColor: "#DBEAFE", borderColor: "#BFDBFE" } : { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" }
+                  ])}
+                  onPress={() => {
+                    setProductDiscountActive(d.id!, !d.is_active).then(() => refresh()).catch((e) => setError((e as Error).message));
+                  }}
+                >
+                  <Text style={StyleSheet.flatten([
+                    styles.statusText, 
+                    d.is_active ? { color: "#1D4ED8" } : { color: "#6B7280" }
+                  ])}>
+                    {d.is_active ? "Đang chạy" : "Tạm dừng"}
+                  </Text>
+                </Pressable>
+              </View>
+              <View style={styles.columnActionsContainer}>
+                <Pressable onPress={() => { setEditingDiscount(d); setDiscountModalVisible(true); }} style={{ marginRight: 12 }}>
+                  <Edit2 size={18} color="#4B5563" />
+                </Pressable>
+                <Pressable onPress={() => handleDelete(d.id!, d.product_id.toString(), "discount")}>
+                  <Trash2 size={18} color="#EF4444" />
+                </Pressable>
+              </View>
+            </View>
+          ));
+        })()}
         </ScrollView>
       </View>
 
@@ -352,6 +432,14 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: "white", shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
   tabText: { fontSize: 14, fontWeight: "600", color: "#6B7280" },
   tabTextActive: { color: "#2563EB" },
+  toolbar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16, backgroundColor: "white", padding: 12, borderRadius: 12, shadowColor: "#000", shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
+  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: "#F3F4F6", borderRadius: 8, paddingHorizontal: 12, width: 250 },
+  searchInput: { flex: 1, paddingVertical: 8, paddingHorizontal: 8, fontSize: 13, color: "#111827" },
+  filterGroup: { flexDirection: "row", gap: 8 },
+  filterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#E5E7EB" },
+  filterBtnActive: { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
+  filterText: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
+  filterTextActive: { color: "#1D4ED8" },
   refreshButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -378,6 +466,7 @@ const styles = StyleSheet.create({
   errorCard: { padding: 16, borderRadius: 12, backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FEE2E2" },
   errorText: { color: "#B91C1C", fontWeight: "500" },
   tableCard: {
+    flex: 1,
     backgroundColor: "white",
     borderRadius: 20,
     borderWidth: 1,
@@ -412,14 +501,14 @@ const styles = StyleSheet.create({
   columnExpired: { flex: 1 },
   columnStatus: { flex: 1.2 },
   columnActions: { flex: 1 },
-  
+
   columnCodeText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontWeight: "700", color: "#2563EB", textTransform: "uppercase" },
   columnValueText: { flex: 1, textAlign: "right", fontWeight: "700", color: "#111827" },
   columnExpiredText: { flex: 1, textAlign: "center", fontSize: 12, color: "#6B7280" },
-  
+
   columnStatusContainer: { flex: 1.2, alignItems: "center" },
   columnActionsContainer: { flex: 1, flexDirection: "row", justifyContent: "flex-end" },
-  
+
   textRight: { textAlign: "right" },
   textCenter: { textAlign: "center" },
   loadingContainer: { padding: 80, alignItems: "center" },
