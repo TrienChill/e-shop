@@ -327,9 +327,9 @@ const HomeScreen = () => {
                       router.push(`/(shop)/product/${banner.action_value}` as any);
                     } else if (banner.action_type === "category" && banner.action_value) {
                       router.push({
-                        pathname: "/(shop)/(tabs)/search",
+                        pathname: "/(shop)/(tabs)/categories",
                         params: { categoryId: banner.action_value },
-                      });
+                      } as any);
                     } else if (banner.action_type === "external_url" && banner.action_value) {
                       import("react-native").then(({ Linking }) => {
                         Linking.openURL(banner.action_value!).catch(() =>

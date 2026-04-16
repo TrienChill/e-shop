@@ -1,6 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import { calculateDiscountedPrice } from "@/src/services/product";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Check, Grid, Heart, List, Minus, Plus, Search, ShoppingBag, ShoppingCart, X } from "lucide-react-native";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useEffect, useState, useCallback } from "react";
@@ -54,6 +54,7 @@ const SORT_CHIPS = [
 
 export default function CategoriesScreen() {
   const router = useRouter();
+  const { categoryId } = useLocalSearchParams<{ categoryId?: string }>();
 
   // States cho Danh mục
   const [loading, setLoading] = useState(true);
@@ -148,7 +149,33 @@ export default function CategoriesScreen() {
       if (error) throw error;
       setAllCategories(data || []);
       const roots = data?.filter(cat => cat.parent_id === null) || [];
-      if (roots.length > 0) setSelectedRootId(roots[0].id);
+
+      // Nếu có categoryId từ banner, tự động chọn đúng danh mục
+      if (categoryId) {
+        const targetId = parseInt(categoryId, 10);
+        const target = data?.find(cat => cat.id === targetId);
+        if (target) {
+          if (target.parent_id === null) {
+            // Là root category -> chọn root
+            setSelectedRootId(target.id);
+          } else {
+            // Là sub category -> tìm root cha
+            const parent = data?.find(cat => cat.id === target.parent_id);
+            if (parent && parent.parent_id === null) {
+              setSelectedRootId(parent.id);
+              setSelectedSubId(target.id);
+            } else if (parent) {
+              // Cấp 3: tìm root của parent
+              const grandParent = data?.find(cat => cat.id === parent.parent_id);
+              if (grandParent) setSelectedRootId(grandParent.id);
+              setSelectedSubId(parent.id);
+              setSelectedChildId(target.id);
+            }
+          }
+        }
+      } else if (roots.length > 0) {
+        setSelectedRootId(roots[0].id);
+      }
     } catch (error) {
       console.error("Lỗi lấy danh mục:", error);
     } finally {
