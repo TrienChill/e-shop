@@ -59,25 +59,45 @@ export default function AdminVouchersScreen() {
   };
 
   const handleDelete = (id: string, code: string | null) => {
-    Alert.alert(
-      "Xóa Voucher",
-      `Bạn có chắc chắn muốn xóa voucher ${code || ""}?\nĐiều này sẽ xóa cả dữ liệu đã áp dụng.`,
-      [
-        { text: "Hủy", style: "cancel" },
-        { 
-          text: "Xóa", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteVoucher(id);
-              refresh();
-            } catch (e: any) {
-              Alert.alert("Lỗi", e.message || "Không thể xóa voucher");
-            }
-          }
+    const confirmMessage = `Bạn có chắc chắn muốn xóa voucher ${code || ""}?\nĐiều này sẽ xóa cả dữ liệu đã áp dụng.`;
+
+    // 1. Hàm thực thi việc xóa (Gọi API và Refresh giao diện)
+    const executeDelete = async () => {
+      try {
+        await deleteVoucher(id);
+        refresh(); // Tải lại danh sách sau khi xóa thành công
+      } catch (e: any) {
+        // Nếu xóa bị lỗi (ví dụ lỗi khóa ngoại database), báo lỗi ra màn hình
+        if (Platform.OS === "web") {
+          window.alert(e.message || "Không thể xóa voucher");
+        } else {
+          Alert.alert("Lỗi", e.message || "Không thể xóa voucher");
         }
-      ]
-    );
+      }
+    };
+
+    // 2. Xử lý hiển thị Pop-up xác nhận tùy theo nền tảng (Web vs Mobile)
+    if (Platform.OS === "web") {
+      // Dùng Pop-up mặc định của trình duyệt (Chrome/Edge/Safari)
+      const confirmed = window.confirm(confirmMessage);
+      if (confirmed) {
+        executeDelete();
+      }
+    } else {
+      // Dùng Pop-up gốc của iOS/Android
+      Alert.alert(
+        "Xóa Voucher",
+        confirmMessage,
+        [
+          { text: "Hủy", style: "cancel" },
+          { 
+            text: "Xóa", 
+            style: "destructive",
+            onPress: executeDelete
+          }
+        ]
+      );
+    }
   };
 
   if (role !== "admin") {

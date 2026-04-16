@@ -87,11 +87,19 @@ export async function setVoucherActive(id: string, isActive: boolean) {
 }
 
 export async function deleteVoucher(id: string) {
-  // Try to delete cascade, assume supabase will handle it if FK cascade is present.
-  // If not, we manually delete dependencies.
+  // 1. Gỡ liên kết voucher khỏi bảng orders để tránh lỗi Foreign Key (nếu có)
+  // Chúng ta set null thay vì xóa orders để giữ lại lịch sử đơn hàng
+  try {
+    await supabase.from("orders").update({ platform_voucher_id: null }).eq("platform_voucher_id", id);
+  } catch (e) {
+    console.error("Lỗi khi gỡ liên kết đơn hàng:", e);
+  }
+
+  // 2. Xóa dữ liệu ở các bảng liên quan (log và ví người dùng)
   await supabase.from("order_vouchers").delete().eq("voucher_id", id);
   await supabase.from("user_vouchers").delete().eq("voucher_id", id);
   
+  // 3. Cuối cùng mới xóa voucher chính
   const { error } = await supabase.from("vouchers").delete().eq("id", id);
   if (error) throw error;
 }
