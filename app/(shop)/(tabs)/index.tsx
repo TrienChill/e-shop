@@ -72,6 +72,14 @@ const HomeScreen = () => {
     table: 'cart_items',
     onUpdate: () => setRefreshTrigger(prev => prev + 1)
   });
+  useSupabaseRealtime({
+    table: 'product_discounts',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'product_variants',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   useEffect(() => {
     const fetchTopProducts = async () => {

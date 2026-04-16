@@ -6,6 +6,7 @@ import {
   CheckCircle2, Search, X 
 } from 'lucide-react-native';
 import React, { useEffect, useState, useMemo } from 'react';
+import { useSupabaseRealtime } from '@/src/services/useSupabaseRealtime';
 import {
   ActivityIndicator,
   Alert,

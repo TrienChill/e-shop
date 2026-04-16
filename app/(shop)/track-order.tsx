@@ -1,6 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ChevronLeft, MoveRight } from "lucide-react-native";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -86,6 +87,12 @@ export default function TrackOrderScreen() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'orders',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   // Ánh xạ trạng thái từ database sang tiếng Việt
   const statusMap: Record<string, string> = {
@@ -118,7 +125,7 @@ export default function TrackOrderScreen() {
 
   useEffect(() => {
     fetchOrderDetails();
-  }, [orderId]);
+  }, [orderId, refreshTrigger]);
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>

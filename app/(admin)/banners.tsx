@@ -73,7 +73,7 @@ export default function AdminBannersScreen() {
       const { data: pData } = await supabase.from("products").select("id, name");
       if (pData) setProducts(pData);
       
-      const { data: cData } = await supabase.from("categories").select("id, name");
+      const { data: cData } = await supabase.from("categories").select("id, name, name_vi");
       if (cData) setCategories(cData);
     } catch (e) {
       console.error(e);
@@ -223,7 +223,7 @@ export default function AdminBannersScreen() {
 
   const getCategoryName = (idStr: string) => {
     const c = categories.find(cat => cat.id.toString() === idStr);
-    return c ? c.name : "Chọn danh mục...";
+    return c ? (c.name_vi || c.name) : "Chọn danh mục...";
   };
 
   return (
@@ -426,7 +426,7 @@ export default function AdminBannersScreen() {
                           <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={{ maxHeight: 200 }}>
                             {categories.map(c => (
                               <Pressable key={c.id} style={styles.dropdownItem} onPress={() => { setActionValue(c.id.toString()); setShowCategoryDropdown(false); }}>
-                                <Text style={styles.dropdownItemText}>{c.name}</Text>
+                                <Text style={styles.dropdownItemText}>{c.name_vi || c.name}</Text>
                               </Pressable>
                             ))}
                           </ScrollView>

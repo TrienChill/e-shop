@@ -13,6 +13,7 @@ import {
   Star,
   Ticket
 } from 'lucide-react-native';
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useState } from 'react';
 import CommonHeader from '@/src/components/layout/Header';
 import VoucherCollection from '@/src/components/common/VoucherCollection';
@@ -187,6 +188,15 @@ export default function VouchersScreen() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useSupabaseRealtime({
+    table: 'user_vouchers',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
+  useSupabaseRealtime({
+    table: 'vouchers',
+    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+  });
 
   // Mock data as fallback
   const mockVouchers: Voucher[] = [
