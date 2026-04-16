@@ -323,14 +323,21 @@ const HomeScreen = () => {
                   style={[styles.bannerContent, { width: width - 32 }]}
                   activeOpacity={0.9}
                   onPress={() => {
-                    if (banner.action_type === "product") {
-                      router.push(`/(shop)/product/${banner.action_value}`);
-                    } else if (banner.action_type === "category") {
+                    if (banner.action_type === "product" && banner.action_value) {
+                      router.push(`/(shop)/product/${banner.action_value}` as any);
+                    } else if (banner.action_type === "category" && banner.action_value) {
                       router.push({
                         pathname: "/(shop)/(tabs)/search",
                         params: { categoryId: banner.action_value },
                       });
+                    } else if (banner.action_type === "external_url" && banner.action_value) {
+                      import("react-native").then(({ Linking }) => {
+                        Linking.openURL(banner.action_value!).catch(() =>
+                          console.warn("Không thể mở URL:", banner.action_value)
+                        );
+                      });
                     }
+                    // action_type === "none": không làm gì
                   }}
                 >
                   <View style={styles.bannerTextContainer}>
