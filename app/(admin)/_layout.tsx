@@ -1,6 +1,7 @@
 import { useAuth } from "@/src/auth/AuthContext";
 import { Link, Redirect, Slot, usePathname, useRouter } from "expo-router";
 import {
+  Image as ImageIcon,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -65,6 +66,7 @@ export default function AdminLayout() {
     { href: "/(admin)/revenue", label: "Doanh thu", icon: TrendingUp },
     { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
     { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
+    { href: "/(admin)/banners", label: "Banner", icon: ImageIcon },
   ];
 
   if (role === "admin") {
