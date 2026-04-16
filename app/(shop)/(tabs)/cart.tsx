@@ -373,23 +373,30 @@ export default function CartScreen() {
   // ── State tích chọn sản phẩm ──────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = async (id: string) => {
+    const willBeSelected = !selectedIds.has(id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    // Đồng bộ xuống DB để checkout đọc đúng
+    await supabase.from("cart_items").update({ is_selected: willBeSelected }).eq("id", id);
   };
 
   const isAllSelected =
     cartItems.length > 0 && selectedIds.size === cartItems.length;
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = async () => {
     if (isAllSelected) {
       setSelectedIds(new Set());
+      // Bỏ chọn tất cả trong DB
+      await supabase.from("cart_items").update({ is_selected: false }).in("id", cartItems.map(i => i.id));
     } else {
       setSelectedIds(new Set(cartItems.map((i) => i.id)));
+      // Chọn tất cả trong DB
+      await supabase.from("cart_items").update({ is_selected: true }).in("id", cartItems.map(i => i.id));
     }
   };
 
@@ -421,7 +428,7 @@ export default function CartScreen() {
         return;
       }
 
-      // 1. Fetch cart_items join với products
+      // 1. Fetch cart_items join với products (bao gồm cả is_selected từ DB)
       const { data, error } = await supabase
         .from("cart_items")
         .select(
@@ -431,6 +438,7 @@ export default function CartScreen() {
         size,
         color,
         product_id,
+        is_selected,
         products (
           name,
           price,
@@ -450,9 +458,8 @@ export default function CartScreen() {
       // 2. Định dạng lại dữ liệu để lấy đúng ảnh theo màu
       const formattedCart: CartItem[] = (data || []).map((item: any) => {
         const productInfo = item.products;
-        const selectedColor = item.color; // Ví dụ: "White"
+        const selectedColor = item.color;
 
-        // Tính giá giảm giá dựa trên product_discounts
         const withDiscount = calculateDiscountedPrice(productInfo);
 
         return {
@@ -470,8 +477,11 @@ export default function CartScreen() {
       });
 
       setCartItems(formattedCart);
-      // Mặc định tích chọn tất cả sản phẩm khi load
-      setSelectedIds(new Set(formattedCart.map((i) => i.id)));
+      // Khởi tạo selectedIds từ giá trị is_selected trong DB (không mặc định chọn tất cả)
+      const preSelected = new Set(
+        (data || []).filter((item: any) => item.is_selected).map((item: any) => item.id)
+      );
+      setSelectedIds(preSelected);
     } catch (error) {
       console.error("Lỗi tải giỏ hàng:", error);
     } finally {
