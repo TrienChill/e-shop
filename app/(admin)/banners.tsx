@@ -287,7 +287,7 @@ export default function AdminBannersScreen() {
               <Pressable onPress={() => setModalVisible(false)}><X size={24} color="#6B7280" /></Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalScroll}>
+            <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
               {/* IMAGE UPLOAD */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Ảnh Banner *</Text>
@@ -385,54 +385,54 @@ export default function AdminBannersScreen() {
 
               {/* DYNAMIC ACTION INPUT */}
               {actionType !== "none" && (
-                <View style={[styles.inputGroup, { marginTop: 12, backgroundColor: "#F9FAFB", padding: 12, borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" }]}>
+                <View style={[styles.inputGroup, { marginTop: 12, backgroundColor: "#F9FAFB", padding: 12, borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB", zIndex: 100 }]}>
                   {actionType === "external_url" && (
                     <>
                       <Text style={styles.label}>Link Website (URL)</Text>
                       <TextInput style={styles.input} value={actionValue} onChangeText={setActionValue} placeholder="https://..." />
                     </>
                   )}
-                  
+
                   {actionType === "product" && (
-                     <View style={{zIndex: 50}}>
-                       <Text style={styles.label}>Chọn Sản phẩm</Text>
-                       <Pressable style={styles.dropdownSelector} onPress={() => setShowProductDropdown(!showProductDropdown)}>
-                         <Text style={{ color: actionValue ? "#111827" : "#9CA3AF" }}>{getProductName(actionValue)}</Text>
-                         <ChevronDown size={16} color="#6B7280" />
-                       </Pressable>
-                       {showProductDropdown && (
-                         <View style={styles.dropdownList}>
-                           <ScrollView nestedScrollEnabled style={{maxHeight: 150}}>
-                             {products.map(p => (
-                               <Pressable key={p.id} style={styles.dropdownItem} onPress={() => { setActionValue(p.id.toString()); setShowProductDropdown(false); }}>
-                                 <Text style={styles.dropdownItemText}>{p.name}</Text>
-                               </Pressable>
-                             ))}
-                           </ScrollView>
-                         </View>
-                       )}
-                     </View>
+                    <View style={{ zIndex: 1000 }}>
+                      <Text style={styles.label}>Chọn Sản phẩm</Text>
+                      <Pressable style={styles.dropdownSelector} onPress={() => { setShowProductDropdown(!showProductDropdown); setShowCategoryDropdown(false); }}>
+                        <Text style={{ color: actionValue ? "#111827" : "#9CA3AF" }}>{getProductName(actionValue)}</Text>
+                        <ChevronDown size={16} color="#6B7280" />
+                      </Pressable>
+                      {showProductDropdown && (
+                        <View style={styles.dropdownList}>
+                          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={{ maxHeight: 200 }}>
+                            {products.map(p => (
+                              <Pressable key={p.id} style={styles.dropdownItem} onPress={() => { setActionValue(p.id.toString()); setShowProductDropdown(false); }}>
+                                <Text style={styles.dropdownItemText}>{p.name}</Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
                   )}
 
                   {actionType === "category" && (
-                     <View style={{zIndex: 40}}>
-                       <Text style={styles.label}>Chọn Danh mục</Text>
-                       <Pressable style={styles.dropdownSelector} onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}>
-                         <Text style={{ color: actionValue ? "#111827" : "#9CA3AF" }}>{getCategoryName(actionValue)}</Text>
-                         <ChevronDown size={16} color="#6B7280" />
-                       </Pressable>
-                       {showCategoryDropdown && (
-                         <View style={styles.dropdownList}>
-                           <ScrollView nestedScrollEnabled style={{maxHeight: 150}}>
-                             {categories.map(c => (
-                               <Pressable key={c.id} style={styles.dropdownItem} onPress={() => { setActionValue(c.id.toString()); setShowCategoryDropdown(false); }}>
-                                 <Text style={styles.dropdownItemText}>{c.name}</Text>
-                               </Pressable>
-                             ))}
-                           </ScrollView>
-                         </View>
-                       )}
-                     </View>
+                    <View style={{ zIndex: 900 }}>
+                      <Text style={styles.label}>Chọn Danh mục</Text>
+                      <Pressable style={styles.dropdownSelector} onPress={() => { setShowCategoryDropdown(!showCategoryDropdown); setShowProductDropdown(false); }}>
+                        <Text style={{ color: actionValue ? "#111827" : "#9CA3AF" }}>{getCategoryName(actionValue)}</Text>
+                        <ChevronDown size={16} color="#6B7280" />
+                      </Pressable>
+                      {showCategoryDropdown && (
+                        <View style={styles.dropdownList}>
+                          <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={{ maxHeight: 200 }}>
+                            {categories.map(c => (
+                              <Pressable key={c.id} style={styles.dropdownItem} onPress={() => { setActionValue(c.id.toString()); setShowCategoryDropdown(false); }}>
+                                <Text style={styles.dropdownItemText}>{c.name}</Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
               )}
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: "white" },
 
   dropdownSelector: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, padding: 12, backgroundColor: "white" },
-  dropdownList: { position: "absolute", top: "100%", left: 0, right: 0, backgroundColor: "white", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, marginTop: 4, zIndex: 100, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, elevation: 5 },
+  dropdownList: { position: "absolute", top: "100%" as any, left: 0, right: 0, backgroundColor: "white", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4, maxHeight: 200, zIndex: 9999, elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
   dropdownItemText: { fontSize: 14, color: "#374151" },
 
