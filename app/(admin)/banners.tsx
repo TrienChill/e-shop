@@ -1,26 +1,25 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Image,
-  ActivityIndicator,
-  Platform,
-  Alert,
-  Modal,
-  TextInput,
-} from "react-native";
-import { Plus, Edit2, Trash2, Check, Upload, X, ChevronDown, CheckCircle2, Clock } from "lucide-react-native";
 import { supabase } from "@/src/lib/supabase";
 import {
   Banner,
-  getAllBanners,
   createBanner,
-  updateBanner,
   deleteBanner,
+  getAllBanners,
+  updateBanner,
 } from "@/src/services/banner";
+import { CheckCircle2, ChevronDown, Edit2, Plus, Trash2, Upload, X } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
+} from "react-native";
 
 export default function AdminBannersScreen() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -29,16 +28,21 @@ export default function AdminBannersScreen() {
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
-  
+
   // Form State
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [displayOrder, setDisplayOrder] = useState("1");
-  const [actionType, setActionType] = useState<"none" | "product" | "category" | "external_url">("none");
+  const [actionType, setActionType] = useState<"none" | "product" | "category" | "external_url" | "campaign">("none");
   const [actionValue, setActionValue] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Campaign Multi-product State
+  const [campaignProducts, setCampaignProducts] = useState<number[]>([]);
+  const [campaignSearch, setCampaignSearch] = useState("");
+  const [showCampaignDropdown, setShowCampaignDropdown] = useState(false);
 
   // Image Upload State
   const [imageUrl, setImageUrl] = useState("");
@@ -72,7 +76,7 @@ export default function AdminBannersScreen() {
     try {
       const { data: pData } = await supabase.from("products").select("id, name");
       if (pData) setProducts(pData);
-      
+
       const { data: cData } = await supabase.from("categories").select("id, name, name_vi");
       if (cData) setCategories(cData);
     } catch (e) {
@@ -91,6 +95,9 @@ export default function AdminBannersScreen() {
     setEndDate("");
     setImageUrl("");
     setEditingBanner(null);
+    setCampaignProducts([]);
+    setCampaignSearch("");
+    setShowCampaignDropdown(false);
   };
 
   const handleOpenModal = (banner?: Banner) => {
@@ -100,14 +107,23 @@ export default function AdminBannersScreen() {
       setTitle(banner.title || "");
       setSubtitle(banner.subtitle || "");
       setDisplayOrder(banner.display_order.toString());
-      setActionType(banner.action_type || "none");
-      setActionValue(banner.action_value || "");
+      const aType = (banner.action_type as any) || "none";
+      setActionType(aType);
+
+      // Nếu là chiến dịch, bóc tách ID sản phẩm từ action_value
+      if (aType === "campaign") {
+        const ids = banner.action_value ? banner.action_value.split(",").map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id)) : [];
+        setCampaignProducts(ids);
+        setActionValue("");
+      } else {
+        setActionValue(banner.action_value || "");
+      }
+
       setIsActive(banner.is_active);
       setStartDate(banner.start_date ? new Date(banner.start_date).toISOString().split("T")[0] : "");
       setEndDate(banner.end_date ? new Date(banner.end_date).toISOString().split("T")[0] : "");
       setImageUrl(banner.image_url || "");
     } else {
-      // Default order = max + 1
       const maxOrder = banners.reduce((max, b) => Math.max(max, b.display_order), 0);
       setDisplayOrder((maxOrder + 1).toString());
     }
@@ -149,12 +165,23 @@ export default function AdminBannersScreen() {
       return;
     }
 
+    // Xử lý action_value tùy theo actionType
+    let finalActionValue = actionValue;
+    if (actionType === "campaign") {
+      if (campaignProducts.length === 0) {
+        alert("Vui lòng chọn ít nhất 1 sản phẩm cho chiến dịch.");
+        return;
+      }
+      // Nối các ID thành chuỗi (VD: "1,4,10")
+      finalActionValue = campaignProducts.join(",");
+    }
+
     const payload: Partial<Banner> = {
       title,
       subtitle,
       display_order: parseInt(displayOrder, 10),
-      action_type: actionType,
-      action_value: actionValue,
+      action_type: actionType as any,
+      action_value: finalActionValue,
       is_active: isActive,
       image_url: imageUrl,
       start_date: startDate ? new Date(startDate).toISOString() : undefined,
@@ -178,8 +205,8 @@ export default function AdminBannersScreen() {
   };
 
   const handleDelete = async (banner: Banner) => {
-    const confirm = Platform.OS === "web" 
-      ? window.confirm(`Bạn có chắc muốn xóa banner "${banner.title}"?`) 
+    const confirm = Platform.OS === "web"
+      ? window.confirm(`Bạn có chắc muốn xóa banner "${banner.title}"?`)
       : true;
     if (!confirm) return;
 
@@ -210,9 +237,10 @@ export default function AdminBannersScreen() {
 
   const getActionLabel = (type: string, value: string) => {
     if (type === "none") return "Không có hành động";
-    if (type === "product") return `Mở Sản phẩm (ID: ${value})`;
-    if (type === "category") return `Mở Danh mục (ID: ${value})`;
-    if (type === "external_url") return `Mở Link (${value})`;
+    if (type === "product") return `Sản phẩm (ID: ${value})`;
+    if (type === "category") return `Danh mục (ID: ${value})`;
+    if (type === "external_url") return `Link (${value})`;
+    if (type === "campaign") return `Chiến dịch (${value ? value.split(',').length : 0} SP)`;
     return value;
   };
 
@@ -225,6 +253,14 @@ export default function AdminBannersScreen() {
     const c = categories.find(cat => cat.id.toString() === idStr);
     return c ? (c.name_vi || c.name) : "Chọn danh mục...";
   };
+
+  const toggleCampaignProduct = (pid: number) => {
+    setCampaignProducts(prev =>
+      prev.includes(pid) ? prev.filter(id => id !== pid) : [...prev, pid]
+    );
+  };
+
+  const filteredCampaignProducts = products.filter(p => p.name.toLowerCase().includes(campaignSearch.toLowerCase()));
 
   return (
     <View style={styles.container}>
@@ -356,8 +392,8 @@ export default function AdminBannersScreen() {
                 </View>
                 <View style={[styles.inputGroup, { flex: 1 }]}>
                   <Text style={styles.label}>Trạng thái</Text>
-                  <Pressable 
-                    style={[styles.statusToggleBtn, isActive ? styles.statusToggleActive : styles.statusToggleInactive]} 
+                  <Pressable
+                    style={[styles.statusToggleBtn, isActive ? styles.statusToggleActive : styles.statusToggleInactive]}
                     onPress={() => setIsActive(!isActive)}
                   >
                     <Text style={isActive ? styles.statusToggleTextActive : styles.statusToggleTextInactive}>
@@ -367,8 +403,9 @@ export default function AdminBannersScreen() {
                 </View>
               </View>
 
-              <Text style={[styles.label, { marginTop: 10, marginBottom: 8 }]}>Hành động khi nhấn vào Banner</Text>
-              <View style={styles.actionTypeSegment}>
+              <Text style={[styles.label, { marginTop: 10, marginBottom: 6 }]}>Hành động khi nhấn vào Banner</Text>
+              {/* SỬA ĐOẠN NÀY THÀNH FLEX-WRAP ĐỂ ĐƯỢC NHIỀU NÚT HƠN */}
+              <View style={[styles.actionTypeSegment, { flexWrap: 'wrap', height: 'auto' }]}>
                 <Pressable style={[styles.segmentBtn, actionType === "none" && styles.segmentActive]} onPress={() => setActionType("none")}>
                   <Text style={[styles.segmentText, actionType === "none" && styles.segmentTextActive]}>Không</Text>
                 </Pressable>
@@ -381,10 +418,13 @@ export default function AdminBannersScreen() {
                 <Pressable style={[styles.segmentBtn, actionType === "external_url" && styles.segmentActive]} onPress={() => setActionType("external_url")}>
                   <Text style={[styles.segmentText, actionType === "external_url" && styles.segmentTextActive]}>URL Web</Text>
                 </Pressable>
+                <Pressable style={[styles.segmentBtn, actionType === "campaign" && styles.segmentActive]} onPress={() => setActionType("campaign")}>
+                  <Text style={[styles.segmentText, actionType === "campaign" && styles.segmentTextActive]}>Chiến dịch  </Text>
+                </Pressable>
               </View>
 
-              {/* DYNAMIC ACTION INPUT */}
-              {actionType !== "none" && (
+              {/* DYNAMIC ACTION INPUT (Dành cho Link, Danh mục, 1 Sản phẩm) */}
+              {actionType !== "none" && actionType !== "campaign" && (
                 <View style={[styles.inputGroup, { marginTop: 12, backgroundColor: "#F9FAFB", padding: 12, borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB", zIndex: 100 }]}>
                   {actionType === "external_url" && (
                     <>
@@ -401,11 +441,11 @@ export default function AdminBannersScreen() {
                         <ChevronDown size={16} color="#6B7280" />
                       </Pressable>
                       {showProductDropdown && (
-                        <View style={styles.dropdownList}>
+                        <View style={[styles.dropdownList, { position: 'absolute', top: '100%', zIndex: 9999, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8 }]}>
                           <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={{ maxHeight: 200 }}>
                             {products.map(p => (
-                              <Pressable key={p.id} style={styles.dropdownItem} onPress={() => { setActionValue(p.id.toString()); setShowProductDropdown(false); }}>
-                                <Text style={styles.dropdownItemText}>{p.name}</Text>
+                              <Pressable key={p.id} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }} onPress={() => { setActionValue(p.id.toString()); setShowProductDropdown(false); }}>
+                                <Text style={{ color: '#374151' }}>{p.name}</Text>
                               </Pressable>
                             ))}
                           </ScrollView>
@@ -422,11 +462,11 @@ export default function AdminBannersScreen() {
                         <ChevronDown size={16} color="#6B7280" />
                       </Pressable>
                       {showCategoryDropdown && (
-                        <View style={styles.dropdownList}>
+                        <View style={[styles.dropdownList, { position: 'absolute', top: '100%', zIndex: 9999, left: 0, right: 0, backgroundColor: 'white', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8 }]}>
                           <ScrollView nestedScrollEnabled showsVerticalScrollIndicator style={{ maxHeight: 200 }}>
                             {categories.map(c => (
-                              <Pressable key={c.id} style={styles.dropdownItem} onPress={() => { setActionValue(c.id.toString()); setShowCategoryDropdown(false); }}>
-                                <Text style={styles.dropdownItemText}>{c.name_vi || c.name}</Text>
+                              <Pressable key={c.id} style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }} onPress={() => { setActionValue(c.id.toString()); setShowCategoryDropdown(false); }}>
+                                <Text style={{ color: '#374151' }}>{c.name_vi || c.name}</Text>
                               </Pressable>
                             ))}
                           </ScrollView>
@@ -437,16 +477,80 @@ export default function AdminBannersScreen() {
                 </View>
               )}
 
-              <Text style={[styles.label, { marginTop: 12 }]}>Lên Lịch (Tùy chọn)</Text>
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Ngày bắt đầu (Y-M-D)</Text>
-                  <TextInput style={styles.input} value={startDate} onChangeText={setStartDate} placeholder="Tuỳ chọn" />
+              {/* ── LÊN LỊCH & CHIẾN DỊCH TÙY CHỌN ── */}
+              <View style={{ marginTop: 24, padding: 16, backgroundColor: actionType === "campaign" ? "#EFF6FF" : "#F9FAFB", borderRadius: 8, borderWidth: 1, borderColor: actionType === "campaign" ? "#BFDBFE" : "#E5E7EB" }}>
+                <Text style={[styles.label, { fontSize: 15, fontWeight: "700", marginBottom: 12, color: actionType === "campaign" ? "#1E3A8A" : "#374151" }]}>
+                  {actionType === "campaign" ? "📅 Lên lịch & Thêm sản phẩm cho chiến dịch" : "Lên Lịch (Tùy chọn)"}
+                </Text>
+
+                <View style={styles.row}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>Ngày bắt đầu (Y-M-D)</Text>
+                    <TextInput style={[styles.input, { backgroundColor: 'white' }]} value={startDate} onChangeText={setStartDate} placeholder="VD: 2026-04-16" />
+                  </View>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.label}>Ngày kết thúc (Y-M-D)</Text>
+                    <TextInput style={[styles.input, { backgroundColor: 'white' }]} value={endDate} onChangeText={setEndDate} placeholder="VD: 2026-05-16" />
+                  </View>
                 </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.label}>Ngày kết thúc (Y-M-D)</Text>
-                  <TextInput style={styles.input} value={endDate} onChangeText={setEndDate} placeholder="Tuỳ chọn" />
-                </View>
+
+                {/* Giao diện chọn nhiều sản phẩm khi chọn hành động Chiến dịch */}
+                {actionType === "campaign" && (
+                  <View style={{ marginTop: 12, zIndex: 1000 }}>
+                    <Text style={styles.label}>Danh sách sản phẩm tham gia chiến dịch</Text>
+
+                    {/* Hiển thị các Chip sản phẩm đã chọn */}
+                    {campaignProducts.length > 0 && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8, gap: 8 }}>
+                        {campaignProducts.map(pid => {
+                          const p = products.find(pr => pr.id === pid);
+                          return p ? (
+                            <View key={pid} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2563EB', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 16 }}>
+                              <Text style={{ color: 'white', fontSize: 12, maxWidth: 150 }} numberOfLines={1}>{p.name}</Text>
+                              <Pressable onPress={() => toggleCampaignProduct(pid)} style={{ marginLeft: 6, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 2 }}>
+                                <X size={10} color="#fff" />
+                              </Pressable>
+                            </View>
+                          ) : null;
+                        })}
+                      </View>
+                    )}
+
+                    <Pressable
+                      style={[styles.dropdownSelector, { backgroundColor: 'white' }]}
+                      onPress={() => setShowCampaignDropdown(!showCampaignDropdown)}
+                    >
+                      <Text style={{ color: "#6B7280" }}>+ Bấm để chọn sản phẩm...</Text>
+                      <ChevronDown size={16} color="#6B7280" />
+                    </Pressable>
+
+                    {showCampaignDropdown && (
+                      <View style={[styles.dropdownList, { position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 9999, backgroundColor: 'white', borderColor: '#E5E7EB', borderWidth: 1, borderRadius: 8 }]}>
+                        <TextInput
+                          style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#F9FAFB' }}
+                          placeholder="Tìm sản phẩm..."
+                          value={campaignSearch}
+                          onChangeText={setCampaignSearch}
+                        />
+                        <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }}>
+                          {filteredCampaignProducts.map(p => {
+                            const isSelected = campaignProducts.includes(p.id);
+                            return (
+                              <Pressable
+                                key={p.id}
+                                style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', backgroundColor: isSelected ? '#EFF6FF' : 'white' }}
+                                onPress={() => toggleCampaignProduct(p.id)}
+                              >
+                                {isSelected && <CheckCircle2 size={16} color="#2563EB" style={{ marginRight: 8 }} />}
+                                <Text style={{ color: isSelected ? '#2563EB' : '#374151', fontWeight: isSelected ? '600' : '400', flex: 1 }}>{p.name}</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
 
             </ScrollView>
@@ -462,7 +566,6 @@ export default function AdminBannersScreen() {
           </View>
         </View>
       </Modal>
-
     </View>
   );
 }
@@ -514,7 +617,7 @@ const styles = StyleSheet.create({
   statusToggleInactive: { backgroundColor: "#F3F4F6", borderColor: "#D1D5DB" },
   statusToggleTextActive: { color: "#166534", fontWeight: "600" },
   statusToggleTextInactive: { color: "#6B7280", fontWeight: "600" },
-  
+
   actionTypeSegment: { flexDirection: "row", borderRadius: 8, borderWidth: 1, borderColor: "#D1D5DB", overflow: "hidden" },
   segmentBtn: { flex: 1, paddingVertical: 10, alignItems: "center", backgroundColor: "#F9FAFB", borderRightWidth: 1, borderColor: "#D1D5DB" },
   segmentActive: { backgroundColor: "#2563EB" },

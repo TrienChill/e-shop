@@ -24,9 +24,9 @@ import {
   getMostPopularProducts,
   getTopSellingProducts,
 } from "@/src/services/product";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 
 const { width } = Dimensions.get("window");
 
@@ -419,6 +419,16 @@ const HomeScreen = () => {
                       });
                     }
                     // action_type === "none": không làm gì
+                    // 👇 THÊM ĐOẠN NÀY ĐỂ BẮT SỰ KIỆN CHIẾN DỊCH 👇
+                    else if (banner.action_type === "campaign" && banner.action_value) {
+                      router.push({
+                        pathname: "/(shop)/campaign",
+                        params: {
+                          ids: banner.action_value, // Truyền chuỗi ID (VD: "1,4,10") sang trang mới
+                          title: banner.title       // Truyền thêm tiêu đề để làm Header
+                        }
+                      } as any);
+                    }
                   }}
                 >
                   <View style={styles.bannerTextContainer}>

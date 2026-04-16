@@ -5,7 +5,7 @@ export interface Banner {
   image_url: string;
   title: string;
   subtitle: string;
-  action_type: "product" | "category" | "external_url" | "none";
+  action_type: "product" | "category" | "external_url" | "none" | "campaign";
   action_value?: string;
   display_order: number;
   is_active: boolean;
@@ -62,7 +62,7 @@ export const deleteBannerImage = async (imageUrl: string) => {
   if (!imageUrl || !imageUrl.includes("storage/v1/object/public/images/")) return;
   try {
     // URL format: .../images/banners/banner_123.jpg
-    const filename = imageUrl.split("images/").pop(); 
+    const filename = imageUrl.split("images/").pop();
     if (filename) {
       const { error } = await supabase.storage.from("images").remove([filename]);
       if (error) console.error("Lỗi xóa ảnh cũ:", error);
