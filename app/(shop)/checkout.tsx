@@ -395,7 +395,7 @@ export default function CheckoutScreen() {
             id,
             is_used,
             vouchers!inner (
-              id, code, discount_type, discount_value, min_order_value, max_discount, expired_at, is_active
+              id, code, discount_type, discount_value, min_order_value, max_discount, expired_at, is_active, usage_limit, used_count
             )
           `)
           .eq("user_id", user.id)
@@ -429,6 +429,8 @@ export default function CheckoutScreen() {
               type: v.discount_type,
               minOrderValue: Number(v.min_order_value || 0),
               maxDiscount: Number(v.max_discount || 0),
+              usageLimit: v.usage_limit,
+              usedCount: v.used_count || 0,
               icon: Number(v.discount_value) > 10 ? Gift : ShoppingBag,
             };
           });
@@ -1105,6 +1107,29 @@ export default function CheckoutScreen() {
                       <Text style={[styles.voucherDesc, !isEligible && { marginBottom: 4 }]}>
                         {voucher.description}
                       </Text>
+
+                      {/* Hiển thị số lượt còn lại */}
+                      <View style={{ marginBottom: 12 }}>
+                        {voucher.usageLimit ? (
+                          <>
+                            <View style={{ height: 4, backgroundColor: '#E2E8F0', borderRadius: 2, overflow: 'hidden', marginBottom: 4 }}>
+                              <View 
+                                style={{ 
+                                  height: '100%', 
+                                  backgroundColor: COLORS.primary, 
+                                  width: `${Math.min(100, (voucher.usedCount / voucher.usageLimit) * 100)}%` 
+                                }} 
+                              />
+                            </View>
+                            <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>
+                              Đã dùng {voucher.usedCount}/{voucher.usageLimit} lượt (Còn {Math.max(0, voucher.usageLimit - voucher.usedCount)})
+                            </Text>
+                          </>
+                        ) : (
+                          <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>Lượt dùng vô hạn</Text>
+                        )}
+                      </View>
+
                       {!isEligible && missingAmount > 0 && (
                         <Text style={{ fontSize: 12, color: '#EF4444', marginBottom: 16, fontStyle: 'italic', fontWeight: "500" }}>
                           * Mua thêm {missingAmount.toLocaleString("vi-VN")}đ để sử dụng mã này

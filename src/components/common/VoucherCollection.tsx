@@ -113,9 +113,26 @@ export default function VoucherCollection({ onVoucherCollected, titleStyle, styl
                   ? `Giảm ${v.discount_value}%${v.max_discount ? ` tối đa ${v.max_discount.toLocaleString("vi-VN")}đ` : ''}` 
                   : `Giảm ${v.discount_value.toLocaleString('vi-VN')}đ`}
               </Text>
-              <Text style={styles.voucherCode}>
-                Mã: {v.code} {v.usage_limit ? `• Lượt: ${v.usage_limit}` : ''}
-              </Text>
+              <Text style={styles.voucherCode}>Mã: {v.code}</Text>
+              
+              {v.usage_limit ? (
+                <View style={styles.limitContainer}>
+                  <View style={styles.limitBarBg}>
+                    <View 
+                      style={[
+                        styles.limitBarFill, 
+                        { width: `${Math.min(100, ((v.used_count || 0) / v.usage_limit) * 100)}%` }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.limitText}>
+                    Còn lại {Math.max(0, v.usage_limit - (v.used_count || 0))} lượt
+                  </Text>
+                </View>
+              ) : (
+                <Text style={styles.limitText}>Lượt dùng vô hạn</Text>
+              )}
+
               <TouchableOpacity 
                 style={styles.collectBtn} 
                 onPress={() => handleCollect(v.id)}
@@ -175,8 +192,30 @@ const styles = StyleSheet.create({
   },
   voucherCode: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#1E293B',
+    fontWeight: '700',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  limitContainer: {
     marginBottom: 8,
+    gap: 4,
+  },
+  limitBarBg: {
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  limitBarFill: {
+    height: '100%',
+    backgroundColor: '#2563EB',
+    borderRadius: 2,
+  },
+  limitText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
   },
   collectBtn: {
     backgroundColor: '#2563EB',
