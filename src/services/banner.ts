@@ -72,15 +72,15 @@ export const deleteBannerImage = async (imageUrl: string) => {
   }
 };
 
-/**
- * Khởi tạo/Tạo mới Banner
- */
 export const createBanner = async (data: Partial<Banner>) => {
-  const { error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("banners")
-    .insert([data]);
+    .insert([data])
+    .select()
+    .single();
 
   if (error) throw error;
+  return inserted;
 };
 
 /**

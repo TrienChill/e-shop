@@ -44,6 +44,27 @@ export default function AdminBannersScreen() {
   const [campaignSearch, setCampaignSearch] = useState("");
   const [showCampaignDropdown, setShowCampaignDropdown] = useState(false);
 
+  // --- Campaign Product Slots (Dynamic Array based on Dates) ---
+  const [numberOfSlots, setNumberOfSlots] = useState(0);
+  const [campaignSlots, setCampaignSlots] = useState<Record<number, number[]>>({});
+  const [showSlotDropdown, setShowSlotDropdown] = useState<number | null>(null);
+  const [slotSearch, setSlotSearch] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (startDate && endDate) {
+      const s = new Date(startDate);
+      const e = new Date(endDate);
+      if (e >= s) {
+        const diff = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+        setNumberOfSlots(diff > 0 ? diff : 0);
+      } else {
+        setNumberOfSlots(0);
+      }
+    } else {
+      setNumberOfSlots(0);
+    }
+  }, [startDate, endDate]);
+
   // Image Upload State
   const [imageUrl, setImageUrl] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -98,6 +119,9 @@ export default function AdminBannersScreen() {
     setCampaignProducts([]);
     setCampaignSearch("");
     setShowCampaignDropdown(false);
+    setCampaignSlots({});
+    setShowSlotDropdown(null);
+    setSlotSearch({});
   };
 
   const handleOpenModal = (banner?: Banner) => {
@@ -123,6 +147,26 @@ export default function AdminBannersScreen() {
       setStartDate(banner.start_date ? new Date(banner.start_date).toISOString().split("T")[0] : "");
       setEndDate(banner.end_date ? new Date(banner.end_date).toISOString().split("T")[0] : "");
       setImageUrl(banner.image_url || "");
+
+      // Load existing product slots
+      try {
+        supabase
+          .from("banner_product_slots")
+          .select("slot, product_id")
+          .eq("banner_id", banner.id)
+          .then(({ data: slotsData }) => {
+            if (slotsData && slotsData.length > 0) {
+              const initialSlots: Record<number, number[]> = {};
+              slotsData.forEach(s => {
+                if (!initialSlots[s.slot]) initialSlots[s.slot] = [];
+                initialSlots[s.slot].push(s.product_id);
+              });
+              setCampaignSlots(initialSlots);
+            }
+          });
+      } catch (e) {
+        console.error("Lỗi tải product slots:", e);
+      }
     } else {
       const maxOrder = banners.reduce((max, b) => Math.max(max, b.display_order), 0);
       setDisplayOrder((maxOrder + 1).toString());
@@ -152,6 +196,22 @@ export default function AdminBannersScreen() {
       alert("Lỗi upload ảnh: " + err.message);
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const saveProductSlots = async (bannerId: string) => {
+    await supabase.from("banner_product_slots").delete().eq("banner_id", bannerId);
+    const rows: { banner_id: string; product_id: number; slot: number }[] = [];
+    Object.keys(campaignSlots).forEach(slotKey => {
+      const slotNum = parseInt(slotKey, 10);
+      if (slotNum <= numberOfSlots) {
+        campaignSlots[slotNum].forEach(pid => {
+          rows.push({ banner_id: bannerId, product_id: pid, slot: slotNum });
+        });
+      }
+    });
+    if (rows.length > 0) {
+      await supabase.from("banner_product_slots").insert(rows);
     }
   };
 
@@ -190,10 +250,16 @@ export default function AdminBannersScreen() {
 
     setLoading(true);
     try {
+      let savedBannerId: string;
       if (editingBanner) {
         await updateBanner(editingBanner.id, payload, editingBanner.image_url);
+        savedBannerId = editingBanner.id;
       } else {
-        await createBanner(payload);
+        const newBanner = await createBanner(payload);
+        savedBannerId = (newBanner as any)?.id;
+      }
+      if (savedBannerId) {
+        await saveProductSlots(savedBannerId);
       }
       setModalVisible(false);
       fetchBanners();
@@ -258,6 +324,17 @@ export default function AdminBannersScreen() {
     setCampaignProducts(prev =>
       prev.includes(pid) ? prev.filter(id => id !== pid) : [...prev, pid]
     );
+  };
+
+  const toggleProductSlot = (slotNum: number, pid: number) => {
+    setCampaignSlots(prev => {
+      const currentProducts = prev[slotNum] || [];
+      const isSelected = currentProducts.includes(pid);
+      const updatedProducts = isSelected
+        ? currentProducts.filter(id => id !== pid)
+        : [...currentProducts, pid];
+      return { ...prev, [slotNum]: updatedProducts };
+    });
   };
 
   const filteredCampaignProducts = products.filter(p => p.name.toLowerCase().includes(campaignSearch.toLowerCase()));
@@ -551,6 +628,8 @@ export default function AdminBannersScreen() {
                     )}
                   </View>
                 )}
+
+
               </View>
 
             </ScrollView>
@@ -592,7 +671,6 @@ const styles = StyleSheet.create({
   iconBtnEdit: { padding: 8, backgroundColor: "#DBEAFE", borderRadius: 8 },
   iconBtnDelete: { padding: 8, backgroundColor: "#FEE2E2", borderRadius: 8 },
   emptyText: { textAlign: "center", marginTop: 50, color: "#9CA3AF" },
-
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   badgeGreen: { backgroundColor: "#DCFCE7" },
   badgeTextGreen: { color: "#166534", fontSize: 11, fontWeight: "700" },
@@ -602,7 +680,6 @@ const styles = StyleSheet.create({
   badgeTextYellow: { color: "#854D0E", fontSize: 11, fontWeight: "700" },
   badgeGray: { backgroundColor: "#F3F4F6" },
   badgeTextGray: { color: "#4B5563", fontSize: 11, fontWeight: "700" },
-
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   modalContent: { width: 600, maxHeight: "90%", backgroundColor: "white", borderRadius: 16, overflow: "hidden" },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, borderBottomWidth: 1, borderColor: "#E5E7EB" },
@@ -617,21 +694,35 @@ const styles = StyleSheet.create({
   statusToggleInactive: { backgroundColor: "#F3F4F6", borderColor: "#D1D5DB" },
   statusToggleTextActive: { color: "#166534", fontWeight: "600" },
   statusToggleTextInactive: { color: "#6B7280", fontWeight: "600" },
-
   actionTypeSegment: { flexDirection: "row", borderRadius: 8, borderWidth: 1, borderColor: "#D1D5DB", overflow: "hidden" },
   segmentBtn: { flex: 1, paddingVertical: 10, alignItems: "center", backgroundColor: "#F9FAFB", borderRightWidth: 1, borderColor: "#D1D5DB" },
   segmentActive: { backgroundColor: "#2563EB" },
   segmentText: { fontSize: 12, fontWeight: "600", color: "#4B5563" },
   segmentTextActive: { color: "white" },
-
   dropdownSelector: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, padding: 12, backgroundColor: "white" },
   dropdownList: { position: "absolute", top: "100%" as any, left: 0, right: 0, backgroundColor: "white", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4, maxHeight: 200, zIndex: 9999, elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
   dropdownItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
   dropdownItemText: { fontSize: 14, color: "#374151" },
-
   modalFooter: { flexDirection: "row", justifyContent: "flex-end", gap: 12, padding: 16, borderTopWidth: 1, borderColor: "#E5E7EB", backgroundColor: "#F9FAFB" },
   btnCancel: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: "white", borderWidth: 1, borderColor: "#D1D5DB" },
   btnCancelText: { fontWeight: "600", color: "#4B5563" },
   btnSave: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, backgroundColor: "#2563EB", minWidth: 120, alignItems: "center" },
   btnSaveText: { fontWeight: "600", color: "white" },
+
+  // Product Slots
+  slotSection: { marginTop: 16, backgroundColor: "#F8FAFF", borderRadius: 12, borderWidth: 1, borderColor: "#DBEAFE", padding: 16, gap: 12 },
+  slotSectionTitle: { fontSize: 14, fontWeight: "700", color: "#1D4ED8", marginBottom: 2 },
+  slotSectionDesc: { fontSize: 12, color: "#6B7280", lineHeight: 18, marginBottom: 8 },
+  slotBox: { backgroundColor: "white", borderRadius: 10, borderWidth: 1, borderColor: "#E5E7EB", padding: 12, gap: 8, position: "relative" },
+  slotLabel: { fontSize: 13, fontWeight: "700", color: "#374151" },
+  selectedChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: { flexDirection: "row", alignItems: "center", backgroundColor: "#2563EB", borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, gap: 5, maxWidth: 180 },
+  chipText: { color: "white", fontSize: 12, fontWeight: "600", flex: 1 },
+  chipRemove: { backgroundColor: "rgba(255,255,255,0.3)", borderRadius: 99, padding: 2 },
+  slotDropdownBtn: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: "#F9FAFB" },
+  slotDropdownList: { position: "absolute", top: "100%" as any, left: 0, right: 0, backgroundColor: "white", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB", marginTop: 4, zIndex: 9999, elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8 },
+  slotSearchInput: { borderBottomWidth: 1, borderColor: "#E5E7EB", padding: 10, fontSize: 13, color: "#111" },
+  slotDropdownItem: { flexDirection: "row", alignItems: "center", padding: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
+  slotDropdownItemSelected: { backgroundColor: "#EFF6FF" },
+
 });
