@@ -1,6 +1,6 @@
-import { ProductDiscountRow } from "@/src/services/admin/vouchers";
-import { X, Search, Check } from "lucide-react-native";
-import React, { useEffect, useState, useRef } from "react";
+import { ProductDiscountRow, getProductsWithDiscounts, ProductWithDiscount } from "@/src/services/admin/vouchers";
+import { X, Search, Plus } from "lucide-react-native";
+import React, { useEffect, useState, useMemo } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Image, ActivityIndicator } from "react-native";
 import { supabase } from "@/src/lib/supabase";
 
@@ -20,10 +20,10 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
 
   // Product Search State
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [smartProducts, setSmartProducts] = useState<ProductWithDiscount[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "no_discount" | "expired">("all");
 
   useEffect(() => {
     if (initialData) {
@@ -41,7 +41,6 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
       setProductId("");
       setSelectedProduct(null);
       setSearchQuery("");
-      setSearchResults([]);
       setDiscountType("percentage");
       setDiscountValue("");
       setStartDate(new Date().toISOString().split("T")[0]);
@@ -49,30 +48,46 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
     }
   }, [initialData, visible]);
 
-  // Handle Search Debounce
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    if (!text.trim()) {
-      setSearchResults([]);
-      return;
+  useEffect(() => {
+    if (visible) {
+      setLoadingProducts(true);
+      getProductsWithDiscounts()
+        .then(setSmartProducts)
+        .catch(console.error)
+        .finally(() => setLoadingProducts(false));
     }
-    
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
-    setIsSearching(true);
-    searchTimeout.current = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, images')
-        .ilike('name', `%${text}%`)
-        .limit(5);
-        
-      if (!error && data) {
-        setSearchResults(data);
+  }, [visible]);
+
+  // Handle Local Search & Status Filter
+  const filteredSmartProducts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const now = new Date().getTime();
+
+    // Map and attach status
+    const processed = smartProducts.map(p => {
+      const latestDiscount = p.product_discounts && p.product_discounts.length > 0 
+        ? [...p.product_discounts].sort((a,b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime())[0] 
+        : null;
+
+      let status = "no_discount";
+      if (latestDiscount) {
+         if (latestDiscount.is_active && new Date(latestDiscount.end_date).getTime() > now) {
+            status = "active";
+         } else {
+            status = "expired";
+         }
       }
-      setIsSearching(false);
-    }, 500);
-  };
+      return { ...p, _status: status, _latestDiscount: latestDiscount };
+    });
+
+    return processed.filter(p => {
+      // Name/ID query match
+      if (query && !p.name.toLowerCase().includes(query) && !p.id.toString().includes(query)) return false;
+      // Filter tab
+      if (filterStatus !== "all" && p._status !== filterStatus) return false;
+      return true;
+    });
+  }, [smartProducts, searchQuery, filterStatus]);
 
   const selectProduct = (item: any) => {
     setSelectedProduct({
@@ -82,7 +97,15 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
     });
     setProductId(item.id.toString());
     setSearchQuery("");
-    setSearchResults([]);
+    
+    // Auto populate existing discount if any
+    if (item._latestDiscount) {
+      const d = item._latestDiscount;
+      setDiscountType(d.discount_type);
+      setDiscountValue(d.discount_value.toString());
+      setStartDate(d.start_date ? new Date(d.start_date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+      setEndDate(d.end_date ? new Date(d.end_date).toISOString().split("T")[0] : "");
+    }
   };
 
   const handleSave = () => {
@@ -119,24 +142,66 @@ export default function AdminProductDiscountModal({ visible, onClose, onSave, in
                     <TextInput 
                       style={styles.searchInput} 
                       value={searchQuery} 
-                      onChangeText={handleSearch} 
-                      placeholder="Nhập tên sản phẩm để tìm..." 
+                      onChangeText={setSearchQuery} 
+                      placeholder="Nhập tên tải hoặc ID sản phẩm..." 
                     />
-                    {isSearching && <ActivityIndicator size="small" color="#2563EB" />}
                   </View>
                   
-                  {searchResults.length > 0 && (
-                    <View style={styles.searchResultsContainer}>
-                      {searchResults.map((item) => (
-                        <Pressable key={item.id} style={styles.searchResultItem} onPress={() => selectProduct(item)}>
-                          <Image 
-                            source={{ uri: (item.images && item.images[0]) || "https://placehold.co/100" }} 
-                            style={styles.searchResultImage} 
-                          />
-                          <Text style={styles.searchResultName} numberOfLines={2}>{item.name}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                  {/* Status Filters */}
+                  <View style={styles.filterGroup}>
+                    <Pressable style={filterStatus === "all" ? styles.filterBtnActive : styles.filterBtn} onPress={() => setFilterStatus("all")}>
+                      <Text style={filterStatus === "all" ? styles.filterTextActive : styles.filterText}>Tất cả</Text>
+                    </Pressable>
+                    <Pressable style={filterStatus === "no_discount" ? styles.filterBtnActive : styles.filterBtn} onPress={() => setFilterStatus("no_discount")}>
+                      <Text style={filterStatus === "no_discount" ? styles.filterTextActive : styles.filterText}>Chưa giảm giá</Text>
+                    </Pressable>
+                    <Pressable style={filterStatus === "active" ? styles.filterBtnActive : styles.filterBtn} onPress={() => setFilterStatus("active")}>
+                      <Text style={filterStatus === "active" ? styles.filterTextActive : styles.filterText}>Đang giảm</Text>
+                    </Pressable>
+                    <Pressable style={filterStatus === "expired" ? styles.filterBtnActive : styles.filterBtn} onPress={() => setFilterStatus("expired")}>
+                      <Text style={filterStatus === "expired" ? styles.filterTextActive : styles.filterText}>Hết hạn</Text>
+                    </Pressable>
+                  </View>
+
+                  {loadingProducts ? (
+                    <ActivityIndicator size="small" color="#2563EB" style={{ marginVertical: 20 }} />
+                  ) : (
+                    <ScrollView style={styles.searchResultsContainer} nestedScrollEnabled={true}>
+                      {filteredSmartProducts.map((item) => {
+                        return (
+                          <View key={item.id} style={styles.searchResultItem}>
+                            <Image 
+                              source={{ uri: (item.images && item.images[0]) || "https://placehold.co/100" }} 
+                              style={styles.searchResultImage} 
+                            />
+                            <View style={styles.searchResultInfo}>
+                              <Text style={styles.searchResultName} numberOfLines={1}>{item.name}</Text>
+                              <View style={styles.badgeRow}>
+                                {item._status === "no_discount" && (
+                                  <View style={[styles.statusBadge, styles.badgeGray]}><Text style={[styles.badgeText, styles.textGray]}>Chưa giảm giá</Text></View>
+                                )}
+                                {item._status === "active" && (
+                                  <View style={[styles.statusBadge, styles.badgeGreen]}>
+                                    <Text style={[styles.badgeText, styles.textGreen]}>
+                                      Đang giảm: {item._latestDiscount?.discount_type === "percentage" ? `${item._latestDiscount?.discount_value}%` : `${item._latestDiscount?.discount_value.toLocaleString()}đ`}
+                                    </Text>
+                                  </View>
+                                )}
+                                {item._status === "expired" && (
+                                  <View style={[styles.statusBadge, styles.badgeYellow]}><Text style={[styles.badgeText, styles.textYellow]}>Hết hạn</Text></View>
+                                )}
+                              </View>
+                            </View>
+                            <Pressable style={styles.selectActionBtn} onPress={() => selectProduct(item)}>
+                              <Text style={styles.selectActionText}>Chọn</Text>
+                            </Pressable>
+                          </View>
+                        );
+                      })}
+                      {filteredSmartProducts.length === 0 && (
+                        <Text style={styles.emptyText}>Không tìm thấy sản phẩm nào.</Text>
+                      )}
+                    </ScrollView>
                   )}
                 </View>
               ) : (
@@ -233,17 +298,35 @@ const styles = StyleSheet.create({
 
   // New UI Styles
   productSelectionSection: { marginBottom: 8 },
-  searchContainer: { position: "relative", zIndex: 50 },
+  searchContainer: { backgroundColor: "#F9FAFB", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB" },
   searchInputWrapper: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#D1D5DB", borderRadius: 8, paddingHorizontal: 12, backgroundColor: "#FFF" },
-  searchInput: { flex: 1, paddingVertical: 12, paddingHorizontal: 8, fontSize: 14, color: "#111827" },
-  searchResultsContainer: { backgroundColor: "white", borderWidth: 1, borderColor: "#D1D5DB", borderTopWidth: 0, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, maxHeight: 200, elevation: 5, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { height: 2, width: 0 } },
-  searchResultItem: { flexDirection: "row", alignItems: "center", padding: 10, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", gap: 12 },
-  searchResultImage: { width: 36, height: 36, borderRadius: 6, backgroundColor: "#E5E7EB" },
-  searchResultName: { flex: 1, fontSize: 13, fontWeight: "500", color: "#374151" },
-  selectedProductCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderWidth: 1, borderColor: "#93C5FD", backgroundColor: "#EFF6FF", borderRadius: 8 },
+  searchInput: { flex: 1, paddingVertical: 10, paddingHorizontal: 8, fontSize: 13, color: "#111827" },
+  filterGroup: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
+  filterBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: "#FFF", borderWidth: 1, borderColor: "#D1D5DB" },
+  filterBtnActive: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, backgroundColor: "#DBEAFE", borderWidth: 1, borderColor: "#BFDBFE" },
+  filterText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
+  filterTextActive: { fontSize: 11, fontWeight: "600", color: "#1D4ED8" },
+  searchResultsContainer: { marginTop: 12, maxHeight: 220, backgroundColor: "white", borderRadius: 8, borderWidth: 1, borderColor: "#E5E7EB" },
+  searchResultItem: { flexDirection: "row", alignItems: "center", padding: 12, borderBottomWidth: 1, borderBottomColor: "#F3F4F6", gap: 12 },
+  searchResultImage: { width: 44, height: 44, borderRadius: 6, backgroundColor: "#E5E7EB" },
+  searchResultInfo: { flex: 1, gap: 4 },
+  searchResultName: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  badgeRow: { flexDirection: "row" },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1 },
+  badgeGray: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
+  badgeGreen: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" },
+  badgeYellow: { backgroundColor: "#FEF9C3", borderColor: "#FEF08A" },
+  badgeText: { fontSize: 10, fontWeight: "600" },
+  textGray: { color: "#6B7280" },
+  textGreen: { color: "#166534" },
+  textYellow: { color: "#854D0E" },
+  selectActionBtn: { backgroundColor: "#EFF6FF", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  selectActionText: { color: "#2563EB", fontSize: 12, fontWeight: "600" },
+  selectedProductCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12, borderWidth: 1, borderColor: "#93C5FD", backgroundColor: "#EFF6FF", borderRadius: 12 },
   selectedProductInfo: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
-  selectedProductImage: { width: 40, height: 40, borderRadius: 6, backgroundColor: "#FFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#D1D5DB" },
-  selectedProductName: { flex: 1, fontSize: 13, fontWeight: "600", color: "#1E3A8A" },
-  changeProductBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: "#DBEAFE", borderRadius: 6 },
-  changeProductText: { fontSize: 12, fontWeight: "600", color: "#1D4ED8" },
+  selectedProductImage: { width: 48, height: 48, borderRadius: 8, backgroundColor: "#FFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#D1D5DB" },
+  selectedProductName: { flex: 1, fontSize: 14, fontWeight: "700", color: "#1E3A8A" },
+  changeProductBtn: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: "#DBEAFE", borderRadius: 8 },
+  changeProductText: { fontSize: 13, fontWeight: "700", color: "#1D4ED8" },
+  emptyText: { textAlign: "center", padding: 20, color: "#9CA3AF" },
 });

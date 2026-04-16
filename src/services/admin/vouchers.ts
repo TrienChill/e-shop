@@ -144,3 +144,20 @@ export async function setProductDiscountActive(id: string, isActive: boolean) {
     .eq("id", id);
   if (error) throw error;
 }
+
+export type ProductWithDiscount = {
+  id: number;
+  name: string;
+  images: string[] | null;
+  price: number;
+  product_discounts: ProductDiscountRow[];
+};
+
+export async function getProductsWithDiscounts(): Promise<ProductWithDiscount[]> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, name, images, price, product_discounts(*)");
+
+  if (error) throw error;
+  return (data ?? []) as unknown as ProductWithDiscount[];
+}
