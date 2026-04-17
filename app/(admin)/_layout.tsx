@@ -73,7 +73,7 @@ export default function AdminLayout() {
 
   if (role === "admin") {
     menuItems.push({
-      href: "/(admin)/users",
+      href: "/(admin)/permissions",
       label: "Phân quyền",
       icon: ShieldCheck,
     });
