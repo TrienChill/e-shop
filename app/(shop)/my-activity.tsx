@@ -1,11 +1,10 @@
-import CommonHeader from "@/src/components/layout/Header";
+import { CommonHeader } from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { router, useFocusEffect } from "expo-router";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ChevronLeft,
   ChevronRight,
-  LayoutGrid,
   PackageX,
   PieChart,
   Settings,
@@ -15,7 +14,6 @@ import {
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
   ScrollView,
   StatusBar,
@@ -28,8 +26,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, G } from "react-native-svg";
-
-const { width } = Dimensions.get("window");
 const CHART_SIZE = 240;
 const STROKE_WIDTH = 25;
 const RADIUS = (CHART_SIZE - STROKE_WIDTH) / 2;
@@ -210,7 +206,34 @@ export default function MyActivityScreen() {
 
       setStats({ total, delivered, pending: pendingCount });
 
-      // 3. Fetch toàn bộ order items của user
+      // 3. Fetch toàn bộ order items của user (KHÔNG FILTER theo thời gian - để tính total_spending all-time)
+      const { data: allItems, error: allItemsError } = await supabase
+        .from("order_items")
+        .select(
+          `
+          quantity,
+          price_at_purchase,
+          orders!inner (id, status)
+        `,
+        )
+        .eq("orders.user_id", user.id);
+
+      if (allItemsError) throw allItemsError;
+
+      // Tính tổng chi tiêu TẤT CẢ đơn hàng completed (all-time, không filter thời gian)
+      // → Trigger DB đã tự động cập nhật total_spending, chỉ tính để hiển thị (nếu cần)
+      const totalSpendingAllTime = allItems
+        .filter((item: any) => item.orders?.status === 'completed')
+        .reduce((sum: number, item: any) => {
+          return sum + ((item.price_at_purchase || 0) * (item.quantity || 0));
+        }, 0);
+
+      // (Debug) Kiểm tra tổng chi tiêu trong session này
+      if (__DEV__) {
+        console.log(`📊 Tổng chi tiêu all-time (completed orders): ${totalSpendingAllTime.toLocaleString('vi-VN')}₫`);
+      }
+
+      // 3. Fetch toàn bộ order items của user (CHO HIỂN THỊ - với filter thời gian)
       const { data: items, error: itemsError } = await supabase
         .from("order_items")
         .select(
@@ -287,6 +310,7 @@ export default function MyActivityScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchActivityData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchActivityData, refreshTrigger]),
   );
 
