@@ -8,6 +8,7 @@ import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ArrowRight,
   Bell,
+  Lock,
   Package,
   Settings,
   Star,
@@ -218,6 +219,14 @@ export default function ProfileScreen() {
           <Text style={styles.welcomeText}>
             Chào, {profile?.full_name || "Triển Chill"}!
           </Text>
+          {profile?.is_locked && (
+            <View style={styles.lockWarningBanner}>
+              <Lock size={16} color="#fff" />
+              <Text style={styles.lockWarningText}>
+                Tài khoản đang bị khóa
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Khung Thông báo (Announcement Card) */}
@@ -393,6 +402,22 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLOR.dark,
     letterSpacing: -0.5,
+  },
+  lockWarningBanner: {
+    backgroundColor: "#dc2626",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  lockWarningText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
   },
   announcementCard: {
     backgroundColor: "#F7F8FA",

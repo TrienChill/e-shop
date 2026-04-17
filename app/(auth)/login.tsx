@@ -89,11 +89,36 @@ const App = () => {
       try {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, is_locked, lock_reason, locked_at')
           .eq('id', userId)
           .maybeSingle();
 
         const role = (profileData?.role as UserRole | null) ?? null;
+
+        // ── KIỂM TRA TÀI KHOẢN BỊ KHÓA ─────────────────────────────────
+        if (profileData?.is_locked) {
+          authLogger.loginError({
+            email,
+            reason: 'Account locked',
+            errorCode: 'account_locked',
+            errorMessage: `Account locked: ${profileData.lock_reason || 'No reason provided'}`,
+            platform,
+          });
+
+          // Đăng xuất ngay
+          await supabase.auth.signOut();
+          setLoading(false);
+
+          // Chuyển đến màn hình locked-account với thông tin lý do
+          router.push({
+            pathname: "/(auth)/locked-account",
+            params: {
+              reason: profileData.lock_reason || "Không có lý do cụ thể",
+              locked_at: profileData.locked_at || "",
+            },
+          });
+          return;
+        }
 
         // ── Kiểm tra chính sách nền tảng ─────────────────────────────────
         if (!isRoleAllowedOnPlatform(role, platform)) {

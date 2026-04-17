@@ -7,13 +7,12 @@ import {
   LogOut,
   MessageSquare,
   Package,
-  ShieldCheck,
+  Shield,
   ShoppingBag,
   Store,
   Ticket,
   TrendingUp,
   Truck,
-  User,
 } from "lucide-react-native";
 import React from "react";
 import {
@@ -68,16 +67,8 @@ export default function AdminLayout() {
     { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
     { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
     { href: "/(admin)/banners", label: "Banner", icon: ImageIcon },
-    { href: "/(admin)/users", label: "Người dùng", icon: User },
+    { href: "/(admin)/users", label: "Người dùng & Quyền", icon: Shield },
   ];
-
-  if (role === "admin") {
-    menuItems.push({
-      href: "/(admin)/permissions",
-      label: "Phân quyền",
-      icon: ShieldCheck,
-    });
-  }
 
   // BƯỚC 6: Render Giao diện chính cho Web Admin
   return (
