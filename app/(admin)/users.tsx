@@ -1,34 +1,76 @@
-import { listProfiles, updateUserRole } from "@/src/services/admin/profiles";
-import { Mail, Search, Shield, User as UserIcon } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  StyleSheet,
+  View,
   Text,
   TextInput,
-  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  Alert,
+  ScrollView,
+  Modal,
+  Image,
 } from "react-native";
+import { 
+  Search, 
+  UserPlus, 
+  Lock, 
+  Shield, 
+  Edit, 
+  X,
+  User as UserIcon,
+  Filter,
+  CheckCircle2,
+  Mail,
+  DollarSign
+} from "lucide-react-native";
+import { listProfiles, updateUserRole, createStaffAccount, toggleLockUser } from "@/src/services/admin/profiles";
 
-const ROLE_OPTIONS = [
-  { value: "user", label: "Người dùng", color: "#6B7280" },
-  { value: "staff", label: "Nhân viên", color: "#8B5CF6" },
-  { value: "admin", label: "Quản trị viên", color: "#EF4444" },
+const ROLES = [
+  { id: 'admin', name: 'Quản trị viên', color: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
+  { id: 'staff', name: 'Nhân viên', color: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200' },
+  { id: 'user', name: 'Khách hàng', color: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' }
 ];
+
+const formatVND = (amount: number) => {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
+};
 
 export default function AdminUsersScreen() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  
+  // Modal state
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    full_name: '',
+    role: 'staff'
+  });
+
+  // Edit State
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+
+  // Toast
+  const [toastMessage, setToastMessage] = useState("");
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(""), 3000);
+  };
 
   const fetchProfiles = async () => {
     try {
       setLoading(true);
       const data = await listProfiles();
       setProfiles(data);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      if (Platform.OS === 'web') alert("Lỗi: " + e.message);
+      else Alert.alert("Lỗi", e.message);
     } finally {
       setLoading(false);
     }
@@ -41,300 +83,296 @@ export default function AdminUsersScreen() {
   const handleUpdateRole = async (userId: string, newRole: string) => {
     try {
       await updateUserRole(userId, newRole);
+      showToast("Cập nhật quyền thành công!");
       fetchProfiles();
+      setEditingUserId(null); // Thoát chế độ sửa
     } catch (e: any) {
-      alert("Lỗi: " + e.message);
+      if (Platform.OS === 'web') alert("Lỗi cập nhật: " + e.message);
+      else Alert.alert("Lỗi", e.message);
     }
   };
 
-  const filteredProfiles = profiles.filter((p) =>
-    p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleLockAccount = async (userId: string, isCurrentlyLocked: boolean) => {
+    try {
+      await toggleLockUser(userId, !isCurrentlyLocked);
+      showToast(isCurrentlyLocked ? "Đã mở khóa tài khoản!" : "Đã khóa tài khoản thành công!");
+      // Thực tế cần có cột is_locked trong profile để update trạng thái trên UI
+    } catch (e: any) {
+      if (Platform.OS === 'web') alert("Lỗi khóa tài khoản: " + e.message);
+      else Alert.alert("Lỗi", e.message);
+    }
+  };
 
-  if (Platform.OS !== "web") {
-    return <View style={styles.p10}><Text>Vui lòng dùng trình duyệt Web.</Text></View>;
-  }
+  const handleCreateAccount = async () => {
+    if (!formData.email || !formData.password || !formData.full_name) {
+      if (Platform.OS === 'web') alert("Vui lòng điền đủ thông tin.");
+      else Alert.alert("Lỗi", "Vui lòng điền đủ thông tin.");
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      await createStaffAccount(formData);
+      showToast("Tạo tài khoản " + formData.role + " thành công!");
+      setIsModalVisible(false);
+      setFormData({ email: '', password: '', full_name: '', role: 'staff' });
+      fetchProfiles();
+    } catch (e: any) {
+      if (Platform.OS === 'web') alert("Lỗi tạo user: " + e.message);
+      else Alert.alert("Lỗi tạo user", e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredProfiles = profiles.filter((p) => {
+    const matchSearch = p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                        p.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchRole = roleFilter === 'all' || p.role === roleFilter;
+    return matchSearch && matchRole;
+  });
 
   return (
-    <View style={styles.container}>
-      {/* HEADER */}
-      <View style={styles.header}>
+    <View className="flex-1 bg-gray-50 p-6 md:p-10">
+      {/* TOAST */}
+      {toastMessage ? (
+        <View className="absolute top-10 mx-auto left-0 right-0 z-50 flex-row justify-center pointer-events-none">
+          <View className="bg-emerald-500 rounded-full px-6 py-3 flex-row items-center shadow-lg">
+            <CheckCircle2 color="white" size={20} />
+            <Text className="text-white font-bold ml-2">{toastMessage}</Text>
+          </View>
+        </View>
+      ) : null}
+
+      {/* HEADER SECTION */}
+      <View className="flex-col md:flex-row justify-between md:items-center mb-8 gap-4">
         <View>
-          <Text style={styles.title}>Quản lý Người dùng</Text>
-          <Text style={styles.subtitle}>
-            Phân quyền hệ thống cho nhân viên và quản lý danh sách khách hàng.
-          </Text>
+          <Text className="text-3xl font-extrabold text-gray-900 tracking-tight">Quản lý Cấp quyền</Text>
+          <Text className="text-gray-500 mt-1">Quản trị nhân viên và khách hàng trong hệ thống</Text>
         </View>
 
-        <View style={styles.searchContainer}>
-          <Search size={20} color="#9CA3AF" />
+        <TouchableOpacity 
+          className="bg-indigo-600 flex-row flex-none items-center self-start md:self-auto px-5 py-3 rounded-xl shadow-sm"
+          onPress={() => setIsModalVisible(true)}
+        >
+          <UserPlus size={18} color="white" />
+          <Text className="text-white font-bold ml-2">Tạo tài khoản</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* FILTER & SEARCH */}
+      <View className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex-col md:flex-row items-center gap-4 mb-6">
+        <View className="flex-1 flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+          <Search size={20} color="#9ca3af" />
           <TextInput
-            placeholder="Tìm theo tên hoặc email..."
-            style={styles.searchInput}
+            className="flex-1 ml-2 outline-none text-gray-800"
+            placeholder="Tìm theo tên hoặc email (nếu có)..."
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
+
+        <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl p-1 shrink-0 overflow-hidden overflow-x-auto w-full md:w-auto">
+          <TouchableOpacity 
+            onPress={() => setRoleFilter('all')}
+            className={`px-4 py-2 rounded-lg ${roleFilter === 'all' ? 'bg-white shadow-sm' : ''}`}
+          >
+            <Text className={`font-semibold ${roleFilter === 'all' ? 'text-gray-900' : 'text-gray-500'}`}>Tất cả</Text>
+          </TouchableOpacity>
+          {ROLES.map(role => (
+            <TouchableOpacity 
+              key={role.id}
+              onPress={() => setRoleFilter(role.id)}
+              className={`px-4 py-2 rounded-lg flex-row items-center ${roleFilter === role.id ? 'bg-white shadow-sm' : ''}`}
+            >
+              <Text className={`font-semibold ${roleFilter === role.id ? role.text : 'text-gray-500'}`}>
+                {role.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* TABLE */}
+      {/* DATA TABLE */}
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color="#4f46e5" />
+          <Text className="text-gray-400 mt-4 font-semibold">Đang tải dữ liệu...</Text>
         </View>
       ) : (
-        <View style={styles.tableCard}>
-          {/* HEADER ROW */}
-          <View style={styles.tableHeader}>
-            <Text style={StyleSheet.flatten([styles.columnUser, styles.headerText])}>Người dùng</Text>
-            <Text style={StyleSheet.flatten([styles.columnEmail, styles.headerText])}>Email</Text>
-            <Text style={StyleSheet.flatten([styles.columnRole, styles.headerText, styles.textCenter])}>Vai trò</Text>
-            <Text style={StyleSheet.flatten([styles.columnJoin, styles.headerText, styles.textCenter])}>Ngày tham gia</Text>
-            <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Thay đổi quyền</Text>
+        <View className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex-1">
+          {/* Table Header */}
+          <View className="flex-row bg-gray-50 border-b border-gray-200 px-6 py-4">
+            <Text className="flex-[2] font-semibold text-gray-500 text-sm uppercase tracking-wider">Khách hàng / Nhân viên</Text>
+            <Text className="flex-[1] font-semibold text-gray-500 text-sm uppercase tracking-wider text-center">Vai trò</Text>
+            <Text className="flex-[1.5] font-semibold text-gray-500 text-sm uppercase tracking-wider text-right">Tổng chi tiêu</Text>
+            <Text className="flex-[1.5] font-semibold text-gray-500 text-sm uppercase tracking-wider text-right">Thao tác</Text>
           </View>
 
-          {/* BODY ROWS */}
-          <View>
-            {filteredProfiles.map((user) => (
-              <View 
-                key={user.id} 
-                style={styles.row}
-              >
-                <View style={StyleSheet.flatten([styles.columnUser, styles.rowItem])}>
-                  <View style={styles.avatar}>
-                    <UserIcon size={20} color="#2563EB" />
-                  </View>
-                  <View style={styles.userNameContainer}>
-                    <Text style={styles.userName}>{user.full_name || "Chưa cập nhật"}</Text>
-                    <Text style={styles.userId}>ID: {user.id.slice(0, 8)}...</Text>
-                  </View>
-                </View>
-
-                <View style={StyleSheet.flatten([styles.columnEmail, styles.rowItem])}>
-                   <Mail size={14} color="#9CA3AF" />
-                   <Text style={styles.emailText} numberOfLines={1}>{user.email || "N/A"}</Text>
-                </View>
-
-                <View style={StyleSheet.flatten([styles.columnRole, styles.itemsCenter])}>
-                  <View 
-                    style={StyleSheet.flatten([
-                      styles.roleBadge,
-                      { backgroundColor: `${ROLE_OPTIONS.find(r => r.value === user.role)?.color}20` }
-                    ])}
-                  >
-                    <Text 
-                      style={StyleSheet.flatten([
-                        styles.roleText,
-                        { color: ROLE_OPTIONS.find(r => r.value === user.role)?.color }
-                      ])}
-                    >
-                      {ROLE_OPTIONS.find(r => r.value === user.role)?.label || user.role}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={StyleSheet.flatten([styles.columnJoin, styles.itemsCenter])}>
-                  <Text style={styles.dateText}>
-                    {new Date(user.created_at).toLocaleDateString("vi-VN")}
-                  </Text>
-                </View>
-
-                <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
-                  {ROLE_OPTIONS.map((opt) => (
-                    <Pressable
-                      key={opt.value}
-                      onPress={() => handleUpdateRole(user.id, opt.value)}
-                      disabled={user.role === opt.value}
-                      style={({ hovered }: any) => StyleSheet.flatten([
-                        styles.roleButton,
-                        user.role === opt.value ? styles.roleButtonActive : styles.roleButtonInactive,
-                        hovered && user.role !== opt.value && styles.roleButtonHover
-                      ])}
-                    >
-                      <Text style={StyleSheet.flatten([
-                        styles.roleButtonText,
-                        user.role === opt.value ? styles.roleButtonTextActive : styles.roleButtonTextInactive
-                      ])}>
-                        {opt.label.split(' ')[0]}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
+          {/* Table Body */}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {filteredProfiles.length === 0 ? (
+              <View className="py-20 justify-center items-center">
+                <Text className="text-gray-400 italic">Không tìm thấy người dùng phù hợp.</Text>
               </View>
-            ))}
-          </View>
+            ) : (
+              filteredProfiles.map((user) => {
+                const userRoleInfo = ROLES.find(r => r.id === user.role) || ROLES[2];
+                const isEditing = editingUserId === user.id;
+
+                return (
+                  <View key={user.id} className="flex-row items-center border-b border-gray-50 px-6 py-4 hover:bg-gray-50">
+                    
+                    {/* INFO COLUMN */}
+                    <View className="flex-[2] flex-row items-center">
+                      <View className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 items-center justify-center mr-3 overflow-hidden">
+                        {user.avatar_url ? (
+                          <Image source={{ uri: user.avatar_url }} className="w-full h-full" />
+                        ) : (
+                          <UserIcon size={20} color="#4f46e5" />
+                        )}
+                      </View>
+                      <View className="flex-1 pr-2">
+                        <Text className="font-bold text-gray-900" numberOfLines={1}>{user.full_name || "Chưa có tên"}</Text>
+                        <Text className="text-gray-400 text-xs mt-0.5" numberOfLines={1}>{user.email || user.id}</Text>
+                      </View>
+                    </View>
+
+                    {/* ROLE COLUMN */}
+                    <View className="flex-[1] items-center">
+                      {isEditing ? (
+                        <View className="flex-row border border-gray-200 rounded-lg overflow-hidden bg-white">
+                          <TouchableOpacity onPress={() => handleUpdateRole(user.id, 'user')} className={`px-2 py-1 ${user.role === 'user' ? 'bg-blue-50' : ''}`}>
+                            <Text className="text-xs font-semibold text-blue-700">Khách</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleUpdateRole(user.id, 'staff')} className={`px-2 py-1 border-l border-r border-gray-200 ${user.role === 'staff' ? 'bg-purple-50' : ''}`}>
+                            <Text className="text-xs font-semibold text-purple-700">Staff</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleUpdateRole(user.id, 'admin')} className={`px-2 py-1 ${user.role === 'admin' ? 'bg-red-50' : ''}`}>
+                            <Text className="text-xs font-semibold text-red-700">Admin</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View className={`px-3 py-1 rounded-full border ${userRoleInfo.color} ${userRoleInfo.border}`}>
+                          <Text className={`text-xs font-bold ${userRoleInfo.text}`}>
+                            {userRoleInfo.name}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* SPENDING COLUMN */}
+                    <View className="flex-[1.5] flex-row justify-end items-center">
+                      <Text className="font-semibold text-gray-800">{formatVND(user.total_spending || 0)}</Text>
+                    </View>
+
+                    {/* ACTIONS COLUMN */}
+                    <View className="flex-[1.5] flex-row justify-end items-center gap-2">
+                      <TouchableOpacity 
+                        onPress={() => setEditingUserId(isEditing ? null : user.id)}
+                        className={`p-2 rounded-lg border ${isEditing ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-200'} hover:bg-gray-50`}
+                      >
+                        <Shield size={16} color={isEditing ? "#4f46e5" : "#6b7280"} />
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        onPress={() => handleLockAccount(user.id, false)}
+                        className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-red-50"
+                      >
+                         <Lock size={16} color="#ef4444" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
         </View>
       )}
+
+      {/* CREATE ACCOUNT MODAL */}
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="fade"
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-xl font-extrabold text-gray-900">Tạo tài khoản nội bộ</Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)} className="p-2 bg-gray-100 rounded-full">
+                <X size={18} color="#4b5563" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="space-y-4">
+              <View>
+                <Text className="text-sm font-semibold text-gray-700 mb-2">Họ và tên</Text>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
+                  placeholder="Vd: Nguyễn Văn A"
+                  value={formData.full_name}
+                  onChangeText={(text) => setFormData(prev => ({...prev, full_name: text}))}
+                />
+              </View>
+
+              <View>
+                <Text className="text-sm font-semibold text-gray-700 mb-2">Email đăng nhập</Text>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
+                  placeholder="admin@domain.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={formData.email}
+                  onChangeText={(text) => setFormData(prev => ({...prev, email: text}))}
+                />
+              </View>
+
+              <View>
+                <Text className="text-sm font-semibold text-gray-700 mb-2">Mật khẩu</Text>
+                <TextInput
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800"
+                  placeholder="Phải có ít nhất 6 ký tự"
+                  secureTextEntry
+                  value={formData.password}
+                  onChangeText={(text) => setFormData(prev => ({...prev, password: text}))}
+                />
+              </View>
+
+              <View>
+                <Text className="text-sm font-semibold text-gray-700 mb-2">Vai trò (Role)</Text>
+                <View className="flex-row gap-2">
+                  <TouchableOpacity 
+                    onPress={() => setFormData(prev => ({...prev, role: 'staff'}))}
+                    className={`flex-1 py-3 items-center border rounded-xl ${formData.role === 'staff' ? 'bg-purple-50 border-purple-400' : 'bg-white border-gray-200'}`}
+                  >
+                    <Text className={`font-bold ${formData.role === 'staff' ? 'text-purple-700' : 'text-gray-500'}`}>Nhân viên</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    onPress={() => setFormData(prev => ({...prev, role: 'admin'}))}
+                    className={`flex-1 py-3 items-center border rounded-xl ${formData.role === 'admin' ? 'bg-red-50 border-red-400' : 'bg-white border-gray-200'}`}
+                  >
+                    <Text className={`font-bold ${formData.role === 'admin' ? 'text-red-700' : 'text-gray-500'}`}>Quản trị</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              onPress={handleCreateAccount}
+              disabled={isSubmitting}
+              className={`mt-8 py-4 rounded-xl flex-row justify-center items-center ${isSubmitting ? 'bg-indigo-400' : 'bg-indigo-600'}`}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white font-bold text-base">Khởi tạo tài khoản</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F9FAFB", padding: 40 },
-  p10: { padding: 40 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "between" as any,
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: "#111827",
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 16,
-    height: 48,
-    width: 384,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 14,
-    outlineStyle: "none" as any,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 80,
-  },
-  tableCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#F9FAFB",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-  },
-  headerText: {
-    fontWeight: "700",
-    color: "#4B5563",
-    fontSize: 13,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-  },
-  rowItem: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  columnUser: { flex: 1.5 },
-  columnEmail: { flex: 1.5 },
-  columnRole: { flex: 1 },
-  columnJoin: { flex: 1 },
-  columnActions: { flex: 1.5 },
-  textCenter: { textAlign: "center" },
-  textRight: { textAlign: "right" },
-  itemsCenter: { alignItems: "center" },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  userNameContainer: {
-    marginLeft: 16,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  userId: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  emailText: {
-    color: "#4B5563",
-    marginLeft: 8,
-    flex: 1,
-  },
-  roleBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 9999,
-  },
-  roleText: {
-    fontSize: 10,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  dateText: {
-    color: "#6B7280",
-    fontSize: 13,
-  },
-  actionsContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: 8,
-  },
-  roleButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  roleButtonInactive: {
-    backgroundColor: "white",
-    borderColor: "#E5E7EB",
-  },
-  roleButtonActive: {
-    backgroundColor: "#F9FAFB",
-    borderColor: "#E5E7EB",
-  },
-  roleButtonHover: {
-    borderColor: "#2563EB",
-  },
-  roleButtonText: {
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  roleButtonTextInactive: {
-    color: "#374151",
-  },
-  roleButtonTextActive: {
-    color: "#9CA3AF",
-  }
-});
-

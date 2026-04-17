@@ -20,4 +20,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+const serviceRoleKey = process.env.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+export const supabaseAdmin = supabaseUrl && serviceRoleKey 
+  ? createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
+
+
 // ... phần code AppState lắng nghe trạng thái (giữ nguyên)

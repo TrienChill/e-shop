@@ -13,6 +13,7 @@ import {
   Ticket,
   TrendingUp,
   Truck,
+  User,
 } from "lucide-react-native";
 import React from "react";
 import {
@@ -67,6 +68,7 @@ export default function AdminLayout() {
     { href: "/(admin)/reviews", label: "Đánh giá", icon: MessageSquare },
     { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
     { href: "/(admin)/banners", label: "Banner", icon: ImageIcon },
+    { href: "/(admin)/users", label: "Người dùng", icon: User },
   ];
 
   if (role === "admin") {
