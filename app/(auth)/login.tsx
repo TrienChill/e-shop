@@ -1,17 +1,17 @@
-import { supabase } from '@/src/lib/supabase';
 import {
   authLogger,
   getCurrentPlatform,
   getRolePlatformErrorMessage,
   isRoleAllowedOnPlatform,
-} from '@/src/auth/authLogger';
-import type { UserRole } from '@/src/auth/types';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+} from "@/src/auth/authLogger";
+import type { UserRole } from "@/src/auth/types";
+import { supabase } from "@/src/lib/supabase";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
+  InteractionManager,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -21,37 +21,61 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { AlertDialog, AlertButton } from "@/src/components/AlertDialog";
 
 // Constants for colors to match the design exactly
 const COLORS = {
-  background: '#FFFFFF',
-  textMain: '#1A1A1A',
-  textSecondary: '#6B7280',
-  textPlaceholder: '#9CA3AF',
-  primary: '#1A1A1A',
-  accent: '#6467f2',
-  border: '#E5E7EB',
-  inputBg: '#FFFFFF',
-  googleBlue: '#4285F4',
-  facebookBlue: '#1877F2',
+  background: "#FFFFFF",
+  textMain: "#1A1A1A",
+  textSecondary: "#6B7280",
+  textPlaceholder: "#9CA3AF",
+  primary: "#1A1A1A",
+  accent: "#6467f2",
+  border: "#E5E7EB",
+  inputBg: "#FFFFFF",
+  googleBlue: "#4285F4",
+  facebookBlue: "#1877F2",
 };
 
 const SOCIAL_LOGOS = {
-  google: 'https://cdn-icons-png.flaticon.com/512/300/300221.png',
-  facebook: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/1024px-Facebook_Logo_%282019%29.png',
+  google: "https://cdn-icons-png.flaticon.com/512/300/300221.png",
+  facebook:
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/1024px-Facebook_Logo_%282019%29.png",
 };
 
 const App = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Alert dialog state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
+  const [onAlertClose, setOnAlertClose] = useState<(() => void) | null>(null);
+
+  // Helper function to show alert dialog
+  const showAlert = (
+    title: string,
+    message: string,
+    buttons: AlertButton[],
+    onClose?: () => void,
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertButtons(buttons);
+    setOnAlertClose(() => onClose || (() => {}));
+    // Sử dụng setTimeout để đảm bảo state update đầy đủ
+    setTimeout(() => setAlertVisible(true), 0);
+  };
 
   // Xử lý đăng nhập bằng Email/Password
   async function handleLogin() {
@@ -59,102 +83,206 @@ const App = () => {
     authLogger.loginAttempt({ email, platform });
     setLoading(true);
 
-    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      // ── BƯỚC 1: Kiểm tra trạng thái khóa bằng RPC (vượt qua RLS an toàn) ─────
+      const { data: lockStatus, error: rpcError } = await supabase.rpc(
+        "check_user_lock_status",
+        {
+          p_email: email.trim().toLowerCase(),
+        },
+      );
 
-    if (error) {
-      setLoading(false);
-      // ── Ghi log lỗi đăng nhập ────────────────────────────────────────────
-      authLogger.loginError({
-        email,
-        reason: error.message,
-        errorCode: (error as any).code ?? null,
-        errorMessage: error.message,
-        platform,
+      // BẮT LỖI NGẦM NẾU CÓ:
+      if (rpcError) {
+        console.error("🚨 Lỗi khi gọi RPC check_user_lock_status:", rpcError);
+        // Nếu terminal báo lỗi ở đây, nghĩa là DB của bạn sai tên cột (is_locked hay is_banned)
+      }
+
+      console.log("👉 Dữ liệu trả về từ RPC:", lockStatus);
+
+      // Bắt buộc so sánh === true để tránh lỗi định dạng JSON
+      if (lockStatus && lockStatus.is_locked === true) {
+        authLogger.loginError({
+          email,
+          reason: "Account locked (pre-check)",
+          errorCode: "account_locked",
+          errorMessage: `Account locked: ${lockStatus.lock_reason || "No reason provided"}`,
+          platform,
+        });
+
+        setLoading(false);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // HIỂN THỊ ALERT THÔNG BÁO LÝ DO KHÓA
+        // Dùng InteractionManager + setTimeout để tránh Expo Router conflict
+        // ═══════════════════════════════════════════════════════════════════════
+        InteractionManager.runAfterInteractions(() => {
+          setTimeout(() => {
+            showAlert(
+              "Tài khoản đã bị khóa",
+              lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa bởi Quản trị viên.",
+              [
+                {
+                  text: "Đã hiểu",
+                  style: "default",
+                  onPress: () => {
+                    setAlertVisible(false);
+                    router.push({
+                      pathname: "/(auth)/locked-account",
+                      params: {
+                        reason: lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa bởi Quản trị viên.",
+                        locked_at: lockStatus.locked_at || "",
+                      },
+                    });
+                  },
+                },
+              ],
+              () => {
+                // onClose handler
+              }
+            );
+          }, 300);
+        });
+
+        return; // Dừng hoàn toàn quá trình login
+      }
+
+      // ── BƯỚC 2: Thực hiện đăng nhập ───────────────────────────────────────────
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
       });
 
-      if (error.message.includes('Email not confirmed')) {
-        Alert.alert(
-          'Chưa xác thực email',
-          'Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.',
-        );
-      } else {
-        Alert.alert('Đăng nhập thất bại', error.message);
+      if (error) {
+        authLogger.loginError({
+          email,
+          reason: error.message,
+          errorCode: (error as any).code ?? null,
+          errorMessage: error.message,
+          platform,
+        });
+
+        setLoading(false);
+        if (error.message.includes("Email not confirmed")) {
+          showAlert(
+            "Chưa xác thực email",
+            "Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.",
+            [{ text: "Đã hiểu", style: "default" }],
+          );
+        } else {
+          showAlert(
+            "Đăng nhập thất bại",
+            error.message,
+            [{ text: "Đã hiểu", style: "default" }],
+          );
+        }
+        return;
       }
-      return;
-    }
 
-    // ── Đăng nhập Supabase thành công → kiểm tra role & platform ─────────
-    const userId = authData.user?.id;
-    if (userId) {
-      try {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('role, is_locked, lock_reason, locked_at')
-          .eq('id', userId)
-          .maybeSingle();
+      // ── BƯỚC 3: Đăng nhập thành công → kiểm tra role & platform ─────────────────
+      const userId = authData.user?.id;
+      if (userId) {
+        try {
+          const { data: fullProfileData } = await supabase
+            .from("profiles")
+            .select("role, is_locked, lock_reason, locked_at")
+            .eq("id", userId)
+            .maybeSingle();
 
-        const role = (profileData?.role as UserRole | null) ?? null;
+          // Lớp phòng thủ số 2: Đề phòng Admin vừa bấm khóa đúng lúc User đang đăng nhập
+          if (fullProfileData?.is_locked) {
+            authLogger.loginError({
+              email,
+              reason: "Account locked (post-check)",
+              errorCode: "account_locked",
+              errorMessage: `Account locked: ${fullProfileData.lock_reason || "No reason provided"}`,
+              platform,
+            });
 
-        // ── KIỂM TRA TÀI KHOẢN BỊ KHÓA ─────────────────────────────────
-        if (profileData?.is_locked) {
-          authLogger.loginError({
+            // ═══════════════════════════════════════════════════════════════════════
+            // HIỂN THỊ ALERT + CHUYỂN TRANG (dùng InteractionManager cho web)
+            // ═══════════════════════════════════════════════════════════════════════
+            InteractionManager.runAfterInteractions(() => {
+              setTimeout(() => {
+                showAlert(
+                  "Tài khoản đã bị khóa",
+                  fullProfileData.lock_reason || "Tài khoản của bạn đã bị khóa.",
+                  [
+                    {
+                      text: "Đã hiểu",
+                      style: "default",
+                      onPress: async () => {
+                        setAlertVisible(false);
+                        await supabase.auth.signOut();
+                        router.replace({
+                          pathname: "/(auth)/locked-account",
+                          params: {
+                            reason:
+                              fullProfileData.lock_reason ||
+                              "Tài khoản của bạn đã bị khóa.",
+                            locked_at: fullProfileData.locked_at || "",
+                          },
+                        });
+                      },
+                    },
+                  ],
+                  () => {}
+                );
+              }, 300);
+            });
+
+            setLoading(false);
+            return;
+          }
+
+          const role = (fullProfileData?.role as UserRole | null) ?? null;
+
+          // ── Kiểm tra chính sách nền tảng ─────────────────────────────────────
+          if (!isRoleAllowedOnPlatform(role, platform)) {
+          authLogger.rolePolicyViolation({
+            userId,
+            role: role!,
             email,
-            reason: 'Account locked',
-            errorCode: 'account_locked',
-            errorMessage: `Account locked: ${profileData.lock_reason || 'No reason provided'}`,
             platform,
           });
-
-          // Đăng xuất ngay
           await supabase.auth.signOut();
           setLoading(false);
-
-          // Chuyển đến màn hình locked-account với thông tin lý do
-          router.push({
-            pathname: "/(auth)/locked-account",
-            params: {
-              reason: profileData.lock_reason || "Không có lý do cụ thể",
-              locked_at: profileData.locked_at || "",
-            },
-          });
-          return;
-        }
-
-        // ── Kiểm tra chính sách nền tảng ─────────────────────────────────
-        if (!isRoleAllowedOnPlatform(role, platform)) {
-          // admin / staff cố đăng nhập trên mobile → đăng xuất và báo lỗi
-          authLogger.rolePolicyViolation({ userId, role: role!, email, platform });
-          await supabase.auth.signOut();
-          setLoading(false);
-          Alert.alert(
-            'Không được phép đăng nhập',
+          showAlert(
+            "Không được phép đăng nhập",
             getRolePlatformErrorMessage(role!),
-            [{ text: 'Đã hiểu', style: 'default' }],
+            [{ text: "Đã hiểu", style: "default" }],
           );
           return;
+          }
+
+          authLogger.loginSuccess({ userId, role, platform });
+        } catch (err) {
+          console.error("Error fetching role after login:", err);
+          authLogger.loginSuccess({ userId, role: null, platform });
         }
-
-        // ── Đăng nhập hợp lệ ─────────────────────────────────────────────
-        authLogger.loginSuccess({ userId, role, platform });
-      } catch {
-        // Nếu không fetch được role, vẫn cho qua (tránh block user hợp lệ)
-        authLogger.loginSuccess({ userId, role: null, platform });
       }
+
+      setLoading(false);
+      router.replace("/");
+  } catch (err) {
+      console.error("Login error:", err);
+      setLoading(false);
+      showAlert(
+        "Lỗi",
+        "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.",
+        [{ text: "Đã hiểu", style: "default" }],
+      );
     }
-
-    setLoading(false);
-    router.replace('/');
   }
-
   // --- MỚI THÊM: Xử lý đăng nhập bằng Google/Facebook ---
-  async function handleOAuthLogin(provider: 'google' | 'facebook') {
+  async function handleOAuthLogin(provider: "google" | "facebook") {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           // Quan trọng: Phải khớp với scheme bạn khai báo trong app.json (eshop)
-          redirectTo: 'eshop://', 
+          redirectTo: "eshop://",
         },
       });
 
@@ -165,9 +293,13 @@ const App = () => {
         await Linking.openURL(data.url);
       }
     } catch (error) {
-      Alert.alert('Đăng nhập thất bại', (error as Error).message);
+      showAlert(
+        "Đăng nhập thất bại",
+        (error as Error).message,
+        [{ text: "Đã hiểu", style: "default" }],
+      );
     } finally {
-      // Lưu ý: setLoading(false) ở đây chỉ tắt loading ban đầu. 
+      // Lưu ý: setLoading(false) ở đây chỉ tắt loading ban đầu.
       // Khi quay lại app từ trình duyệt, app sẽ reload lại state auth.
       setLoading(false);
     }
@@ -176,9 +308,9 @@ const App = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
+
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -191,27 +323,26 @@ const App = () => {
               <View style={styles.imageBlurBg} />
               <Image
                 source={{
-                  uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCunnHZlV4LRZKgfNaut1VmCRHTb3xKqHXS75uXE-An1Jg6C6yyIgHcLW7Nd8qwn5JZjg32Hb5DUkol0ybSlCnki0EIkC5OnvhcFlc3idFugb5rL9G-jisY0zbW0WkQJ0Jxh4KgSjeI6CW8gOJgwWLVJhroNzHlHcTjzHZtzeizBWnN0Dnse4H6SZx-Fx8ZChRUp0OQxTtKduIjM8aHevel3SPFMw-lFpSytHXqhrDxnuF4I5DkWKZ5FYq_d8YAnFIgXuGHXBOIU_g',
+                  uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuCunnHZlV4LRZKgfNaut1VmCRHTb3xKqHXS75uXE-An1Jg6C6yyIgHcLW7Nd8qwn5JZjg32Hb5DUkol0ybSlCnki0EIkC5OnvhcFlc3idFugb5rL9G-jisY0zbW0WkQJ0Jxh4KgSjeI6CW8gOJgwWLVJhroNzHlHcTjzHZtzeizBWnN0Dnse4H6SZx-Fx8ZChRUp0OQxTtKduIjM8aHevel3SPFMw-lFpSytHXqhrDxnuF4I5DkWKZ5FYq_d8YAnFIgXuGHXBOIU_g",
                 }}
                 style={styles.heroImage}
                 resizeMode="contain"
               />
             </View>
-            
+
             <Text style={styles.title}>Welcome to E-Shop</Text>
             <Text style={styles.subtitle}>Your personal AI stylist awaits</Text>
           </View>
 
           {/* --- Form Section --- */}
           <View style={styles.formContainer}>
-            
             {/* Email Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email Address</Text>
               <TextInput
                 style={[
                   styles.input,
-                  focusedInput === 'email' && styles.inputFocused
+                  focusedInput === "email" && styles.inputFocused,
                 ]}
                 placeholder="name@example.com"
                 placeholderTextColor={COLORS.textPlaceholder}
@@ -219,7 +350,7 @@ const App = () => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                onFocus={() => setFocusedInput('email')}
+                onFocus={() => setFocusedInput("email")}
                 onBlur={() => setFocusedInput(null)}
               />
             </View>
@@ -227,10 +358,12 @@ const App = () => {
             {/* Password Input */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
-              <View style={[
-                styles.passwordContainer,
-                focusedInput === 'password' && styles.inputFocused
-              ]}>
+              <View
+                style={[
+                  styles.passwordContainer,
+                  focusedInput === "password" && styles.inputFocused,
+                ]}
+              >
                 <TextInput
                   style={styles.passwordInput}
                   placeholder="•••••••••"
@@ -238,7 +371,7 @@ const App = () => {
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!isPasswordVisible}
-                  onFocus={() => setFocusedInput('password')}
+                  onFocus={() => setFocusedInput("password")}
                   onBlur={() => setFocusedInput(null)}
                 />
                 <TouchableOpacity
@@ -246,16 +379,16 @@ const App = () => {
                   style={styles.eyeIcon}
                 >
                   <Icon
-                    name={isPasswordVisible ? 'eye-off' : 'eye-off-outline'}
+                    name={isPasswordVisible ? "eye-off" : "eye-off-outline"}
                     size={20}
                     color={COLORS.textPlaceholder}
                   />
                 </TouchableOpacity>
               </View>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.forgotPasswordContainer}
-                onPress={() => router.push('/forgot-password')}
+                onPress={() => router.push("/forgot-password")}
               >
                 <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
               </TouchableOpacity>
@@ -268,7 +401,11 @@ const App = () => {
               onPress={handleLogin}
               disabled={loading}
             >
-              {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.signInButtonText}>Sign In</Text>}
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.signInButtonText}>Sign In</Text>
+              )}
             </TouchableOpacity>
 
             {/* Divider */}
@@ -280,38 +417,58 @@ const App = () => {
 
             {/* Social Buttons (Đã cập nhật onPress) */}
             <View style={styles.socialRow}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => handleOAuthLogin('google')} // <-- Gọi hàm Google
+                onPress={() => handleOAuthLogin("google")} // <-- Gọi hàm Google
                 disabled={loading}
               >
-                <Image source={{ uri: SOCIAL_LOGOS.google }} style={styles.socialIcon} resizeMode="contain" />
+                <Image
+                  source={{ uri: SOCIAL_LOGOS.google }}
+                  style={styles.socialIcon}
+                  resizeMode="contain"
+                />
                 <Text style={styles.socialButtonText}>Google</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.socialButton}
-                onPress={() => handleOAuthLogin('facebook')} // <-- Gọi hàm Facebook
+                onPress={() => handleOAuthLogin("facebook")} // <-- Gọi hàm Facebook
                 disabled={loading}
               >
-                <Image source={{ uri: SOCIAL_LOGOS.facebook }} style={styles.socialIcon} resizeMode="contain" />
+                <Image
+                  source={{ uri: SOCIAL_LOGOS.facebook }}
+                  style={styles.socialIcon}
+                  resizeMode="contain"
+                />
                 <Text style={styles.socialButtonText}>Facebook</Text>
               </TouchableOpacity>
             </View>
-
           </View>
 
           {/* --- Footer --- */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Dont have an account?{' '}
-              <Text style={styles.signUpLink} onPress={() => router.push('/register')}>
-                Sign Up</Text>
+              Dont have an account?{" "}
+              <Text
+                style={styles.signUpLink}
+                onPress={() => router.push("/register")}
+              >
+                Sign Up
+              </Text>
             </Text>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
+      <AlertDialog
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        onRequestClose={() => {
+          setAlertVisible(false);
+          if (onAlertClose) onAlertClose();
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -326,67 +483,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 40,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  
+
   // Header Styles
   headerContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 32,
-    width: '100%',
+    width: "100%",
   },
   imageContainer: {
     width: 128,
     height: 128,
     marginBottom: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
   },
   imageBlurBg: {
-    position: 'absolute',
+    position: "absolute",
     width: 100,
     height: 100,
-    backgroundColor: 'rgba(100, 103, 242, 0.2)', // Primary color low opacity
+    backgroundColor: "rgba(100, 103, 242, 0.2)", // Primary color low opacity
     borderRadius: 50,
     transform: [{ scale: 1.5 }],
   },
   heroImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     zIndex: 10,
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textMain,
     marginBottom: 8,
-    textAlign: 'center',
-    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif', 
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
   },
   subtitle: {
     fontSize: 14,
     color: COLORS.textSecondary,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontWeight: "500",
+    textAlign: "center",
   },
 
   // Form Styles
   formContainer: {
-    width: '100%',
+    width: "100%",
   },
   inputGroup: {
     marginBottom: 20,
   },
   label: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: COLORS.textMain,
     marginBottom: 8,
     marginLeft: 4,
   },
   input: {
-    width: '100%',
+    width: "100%",
     height: 56,
     backgroundColor: COLORS.inputBg,
     borderWidth: 1,
@@ -397,10 +554,10 @@ const styles = StyleSheet.create({
     color: COLORS.textMain,
   },
   passwordContainer: {
-    width: '100%',
+    width: "100%",
     height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: COLORS.inputBg,
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -413,7 +570,7 @@ const styles = StyleSheet.create({
   },
   passwordInput: {
     flex: 1,
-    height: '100%',
+    height: "100%",
     fontSize: 16,
     color: COLORS.textMain,
   },
@@ -421,40 +578,40 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   forgotPasswordContainer: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     marginTop: 8,
   },
   forgotPasswordText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: COLORS.textSecondary,
   },
 
   // Button Styles
   signInButton: {
-    width: '100%',
+    width: "100%",
     height: 56,
     backgroundColor: COLORS.primary,
     borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
   },
   signInButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   // Divider Styles
   dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 24,
   },
   dividerLine: {
@@ -465,25 +622,25 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#9CA3AF',
-    textTransform: 'uppercase',
+    fontWeight: "600",
+    color: "#9CA3AF",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
   },
 
   // Social Buttons Styles
   socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 16,
   },
   socialButton: {
     flex: 1,
     height: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 24,
@@ -491,7 +648,7 @@ const styles = StyleSheet.create({
   socialButtonText: {
     marginLeft: 12,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: COLORS.textMain,
   },
   socialIcon: {
@@ -501,7 +658,7 @@ const styles = StyleSheet.create({
 
   // Footer Styles
   footer: {
-    marginTop: 'auto',
+    marginTop: "auto",
     paddingTop: 32,
   },
   footerText: {
@@ -509,7 +666,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   signUpLink: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: COLORS.textMain,
   },
 });
