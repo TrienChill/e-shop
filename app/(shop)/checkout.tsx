@@ -145,6 +145,9 @@ export default function CheckoutScreen() {
   // Thêm State để lưu voucher từ database
   const [dbVouchers, setDbVouchers] = useState<any[]>([]);
 
+  // Membership state
+  const [userMembership, setUserMembership] = useState<any>(null);
+
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
   const [allAddresses, setAllAddresses] = useState<any[]>([]);
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -314,9 +317,16 @@ export default function CheckoutScreen() {
     }
   }
 
+  // Tính giảm giá hạng thành viên (HIỂN THỊ DÒNG RIÊNG - phương án A)
+  const membershipDiscount = userMembership && userMembership.benefit_percentage > 0
+    ? Math.round((productsTotal * userMembership.benefit_percentage) / 100)
+    : 0;
+
   // Đảm bảo số tiền giảm không vượt quá tổng đơn
   const finalDiscount = Math.min(discountAmount, productsTotal);
-  const finalTotal = productsTotal + shippingFee - finalDiscount;
+  // Tổng giảm = voucher discount + membership discount
+  const totalDiscount = finalDiscount + membershipDiscount;
+  const finalTotal = productsTotal + shippingFee - totalDiscount;
 
   // Giả lập thanh toán
   useEffect(() => {
@@ -461,6 +471,25 @@ export default function CheckoutScreen() {
             };
           });
           setCartItems(formattedItems);
+        }
+
+        // 4. Lấy thông tin hạng thành viên của user
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select(`
+            id,
+            membership_levels (
+              id,
+              level_name,
+              benefit_percentage,
+              min_spending
+            )
+          `)
+          .eq("id", user.id)
+          .single();
+
+        if (profileData?.membership_levels) {
+          setUserMembership(profileData.membership_levels);
         }
       } catch (err) {
         console.error("Lỗi fetch checkout:", err);
@@ -768,6 +797,16 @@ export default function CheckoutScreen() {
               </Text>
               <Text style={[styles.summaryValue, { color: "#EF4444" }]}>
                 -{finalDiscount.toLocaleString("vi-VN")}₫
+              </Text>
+            </View>
+          )}
+          {userMembership && userMembership.benefit_percentage > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>
+                Giảm thành viên ({userMembership.level_name} - {userMembership.benefit_percentage}%)
+              </Text>
+              <Text style={[styles.summaryValue, { color: "#22C55E" }]}>
+                -{membershipDiscount.toLocaleString("vi-VN")}₫
               </Text>
             </View>
           )}

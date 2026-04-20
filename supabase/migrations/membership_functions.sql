@@ -42,17 +42,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger để tự động chạy khi có thay đổi trong orders
-DROP TRIGGER IF EXISTS trigger_update_membership_on_order_change ON orders;
-
-CREATE TRIGGER trigger_update_membership_on_order_change
-  AFTER INSERT OR UPDATE OF total_amount, status ON orders
-  FOR EACH ROW
-  WHEN (
-    NEW.status = 'completed'
-  )
-  EXECUTE FUNCTION update_membership_level();
-
 -- =====================================================
 -- Function: Recalculate membership for all users
 -- Usage: Gọi khi thay đổi cấu hình membership_levels

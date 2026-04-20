@@ -15,6 +15,8 @@ CREATE OR REPLACE FUNCTION update_user_total_spending()
 RETURNS TRIGGER AS $$
 DECLARE
   affected_user_id UUID;
+  new_total_spending NUMERIC;
+  new_membership_id UUID;
 BEGIN
   -- Xác định user_id bị ảnh hưởng
   IF TG_TABLE_NAME = 'orders' THEN
@@ -38,15 +40,33 @@ BEGIN
   END IF;
 
   -- Tính tổng chi tiêu từ TẤT CẢ completed orders của user
-  -- (chỉ tính orders có status = 'completed')
+  SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
+  INTO new_total_spending
+  FROM order_items oi
+  JOIN orders o ON oi.order_id = o.id
+  WHERE o.user_id = affected_user_id
+    AND o.status = 'completed';
+
+  -- Tìm hạng membership phù hợp dựa trên total_spending
+  SELECT id INTO new_membership_id
+  FROM membership_levels
+  WHERE min_spending <= new_total_spending
+  ORDER BY min_spending DESC
+  LIMIT 1;
+
+  -- Nếu không có hạng nào phù hợp, set về hạng mặc định (min_spending = 0)
+  IF new_membership_id IS NULL THEN
+    SELECT id INTO new_membership_id
+    FROM membership_levels 
+    WHERE min_spending = 0 
+    LIMIT 1;
+  END IF;
+
+  -- Cập nhật cả total_spending VÀ membership_level_id
   UPDATE profiles
-  SET total_spending = (
-    SELECT COALESCE(SUM(oi.quantity * oi.price_at_purchase), 0)
-    FROM order_items oi
-    JOIN orders o ON oi.order_id = o.id
-    WHERE o.user_id = affected_user_id
-      AND o.status = 'completed'
-  )
+  SET total_spending = new_total_spending,
+      membership_level_id = new_membership_id,
+      updated_at = NOW()
   WHERE id = affected_user_id;
 
   RETURN NULL;

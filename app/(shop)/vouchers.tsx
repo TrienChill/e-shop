@@ -1,30 +1,26 @@
-import { supabase } from '@/src/lib/supabase';
-import { router } from 'expo-router';
+import VoucherCollection from "@/src/components/common/VoucherCollection";
+import CommonHeader from "@/src/components/layout/Header";
+import { supabase } from "@/src/lib/supabase";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { router } from "expo-router";
 import {
   ArrowLeft,
-  Settings,
-  LayoutGrid,
   CheckCircle2,
   Cloud,
+  Crown,
   Heart,
+  LayoutGrid,
+  Settings,
   Shirt,
   ShoppingBag,
   Smile,
   Star,
-  Ticket
-} from 'lucide-react-native';
-import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
-import React, { useState } from 'react';
-import CommonHeader from '@/src/components/layout/Header';
-import VoucherCollection from '@/src/components/common/VoucherCollection';
-import {
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, G } from 'react-native-svg';
+  Ticket,
+} from "lucide-react-native";
+import React, { useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Circle, G } from "react-native-svg";
 
 // Types
 interface Voucher {
@@ -34,7 +30,7 @@ interface Voucher {
   validUntil: string;
   daysLeft?: number;
   isCollected: boolean;
-  type: 'normal' | 'expiring';
+  type: "normal" | "expiring";
   icon: React.ReactNode;
 }
 
@@ -47,22 +43,30 @@ interface RewardProgress {
 }
 
 // Custom Ticket Shape for Voucher
-const VoucherTicket = ({ header, content, type }: { header: React.ReactNode; content: React.ReactNode; type: 'normal' | 'expiring' }) => {
-  const isExpiring = type === 'expiring';
-  const borderColor = isExpiring ? '#FCA3A3' : '#3B82F6';
-  const headerBg = isExpiring ? '#FFF1F1' : '#F1F7FF';
+const VoucherTicket = ({
+  header,
+  content,
+  type,
+}: {
+  header: React.ReactNode;
+  content: React.ReactNode;
+  type: "normal" | "expiring";
+}) => {
+  const isExpiring = type === "expiring";
+  const borderColor = isExpiring ? "#FCA3A3" : "#3B82F6";
+  const headerBg = isExpiring ? "#FFF1F1" : "#F1F7FF";
 
   return (
-    <View style={{ marginBottom: 24, position: 'relative' }}>
+    <View style={{ marginBottom: 24, position: "relative" }}>
       <View
         style={{
           borderColor,
           borderWidth: 1.5,
           borderRadius: 24,
-          backgroundColor: '#FFF',
-          overflow: 'hidden',
+          backgroundColor: "#FFF",
+          overflow: "hidden",
           minHeight: 150,
-          shadowColor: isExpiring ? '#FCA3A3' : '#3B82F6',
+          shadowColor: isExpiring ? "#FCA3A3" : "#3B82F6",
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.1,
           shadowRadius: 12,
@@ -70,11 +74,28 @@ const VoucherTicket = ({ header, content, type }: { header: React.ReactNode; con
         }}
       >
         {/* Header Part */}
-        <View style={{ backgroundColor: headerBg, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: borderColor, borderStyle: 'dashed' }}>
+        <View
+          style={{
+            backgroundColor: headerBg,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: 1,
+            borderBottomColor: borderColor,
+            borderStyle: "dashed",
+          }}
+        >
           {header}
         </View>
         {/* Content Part */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 20,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           {content}
         </View>
       </View>
@@ -82,13 +103,13 @@ const VoucherTicket = ({ header, content, type }: { header: React.ReactNode; con
       {/* Semicircle cutouts */}
       <View
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: -10,
           top: 52, // Adjusted to match the dashed line position
           width: 20,
           height: 20,
           borderRadius: 10,
-          backgroundColor: '#FFF', // Match screen background
+          backgroundColor: "#FFF", // Match screen background
           borderRightWidth: 1.5,
           borderRightColor: borderColor,
           zIndex: 10,
@@ -96,13 +117,13 @@ const VoucherTicket = ({ header, content, type }: { header: React.ReactNode; con
       />
       <View
         style={{
-          position: 'absolute',
+          position: "absolute",
           right: -10,
           top: 52,
           width: 20,
           height: 20,
           borderRadius: 10,
-          backgroundColor: '#FFF',
+          backgroundColor: "#FFF",
           borderLeftWidth: 1.5,
           borderLeftColor: borderColor,
           zIndex: 10,
@@ -131,7 +152,14 @@ const CircularProgress = ({
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Svg width={size} height={size}>
         <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
           {/* Background Circle */}
@@ -157,19 +185,19 @@ const CircularProgress = ({
           />
         </G>
       </Svg>
-      <View style={{ position: 'absolute' }}>{children}</View>
+      <View style={{ position: "absolute" }}>{children}</View>
       {completed && (
         <View
           style={{
-            position: 'absolute',
+            position: "absolute",
             top: 2,
             right: 2,
-            backgroundColor: '#10B981',
+            backgroundColor: "#10B981",
             borderRadius: 12,
             padding: 2,
             borderWidth: 2,
-            borderColor: '#FFF',
-            shadowColor: '#000',
+            borderColor: "#FFF",
+            shadowColor: "#000",
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 4,
@@ -183,63 +211,95 @@ const CircularProgress = ({
 };
 
 export default function VouchersScreen() {
-  const [activeTab, setActiveTab] = useState<'rewards' | 'progress'>('rewards');
+  const [activeTab, setActiveTab] = useState<"rewards" | "progress">("rewards");
   const [userVouchers, setUserVouchers] = useState<Voucher[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [userMembership, setUserMembership] = useState<any>(null);
+  const [allMembershipLevels, setAllMembershipLevels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'user_vouchers',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "user_vouchers",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'vouchers',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "vouchers",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   // Mock data as fallback
   const mockVouchers: Voucher[] = [
     {
-      id: '1',
-      title: 'Khách hàng mới',
-      description: 'Đơn hàng đầu tiên\nGiảm 5% cho đơn hàng tiếp theo',
-      validUntil: '21.04.2026',
+      id: "1",
+      title: "Khách hàng mới",
+      description: "Đơn hàng đầu tiên\nGiảm 5% cho đơn hàng tiếp theo",
+      validUntil: "21.04.2026",
       daysLeft: 3,
       isCollected: true,
-      type: 'expiring',
+      type: "expiring",
       icon: <ShoppingBag size={22} color="#2563EB" />,
     },
     {
-      id: '2',
-      title: 'Quà Sinh Nhật',
-      description: 'Cảm ơn bạn đã đồng hành\nGiảm 10% tối đa 50K',
-      validUntil: '20.06.2026',
+      id: "2",
+      title: "Quà Sinh Nhật",
+      description: "Cảm ơn bạn đã đồng hành\nGiảm 10% tối đa 50K",
+      validUntil: "20.06.2026",
       isCollected: true,
-      type: 'normal',
+      type: "normal",
       icon: <Ticket size={24} color="#2563EB" />,
-    }
+    },
   ];
 
   React.useEffect(() => {
     const fetchMyVouchers = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         if (!user) return;
 
         // 1. Fetch Profile for Greeting
         const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, total_orders_completed')
-          .eq('id', user.id)
+          .from("profiles")
+          .select(
+            `
+            full_name,
+            total_orders_completed,
+            total_spending,
+            membership_levels (
+              id,
+              level_name,
+              benefit_percentage,
+              min_spending
+            )
+          `,
+          )
+          .eq("id", user.id)
           .single();
-        if (profile) setUserProfile(profile);
+        if (profile) {
+          setUserProfile(profile);
+          if (profile.membership_levels) {
+            setUserMembership(profile.membership_levels);
+          }
+        }
 
-        // 2. Fetch User Vouchers 
+        // 2. Fetch all membership levels for progress calculation
+        const { data: levelsData } = await supabase
+          .from("membership_levels")
+          .select("*")
+          .order("min_spending", { ascending: true });
+
+        if (levelsData) {
+          setAllMembershipLevels(levelsData);
+        }
+
+        // 2. Fetch User Vouchers
         // Lệnh này yêu cầu file 01_voucher_membership_upgrade.sql đã được chạy
         const { data: vData, error } = await supabase
-          .from('user_vouchers')
-          .select(`
+          .from("user_vouchers")
+          .select(
+            `
             id,
             is_used,
             vouchers (
@@ -250,9 +310,10 @@ export default function VouchersScreen() {
               discount_value,
               voucher_type
             )
-          `)
-          .eq('user_id', user.id)
-          .eq('is_used', false);
+          `,
+          )
+          .eq("user_id", user.id)
+          .eq("is_used", false);
 
         if (error) throw error; // Chuyển sang catch nếu bảng chưa tồn tại
 
@@ -266,23 +327,25 @@ export default function VouchersScreen() {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
             const isExpiring = diffDays > 0 && diffDays <= 3;
-            const validUntilStr = expiryDate.toLocaleDateString('vi-VN');
+            const validUntilStr = expiryDate.toLocaleDateString("vi-VN");
 
             // Gán icon
             let IconComponent = <Ticket size={24} color="#2563EB" />;
-            if (v.voucher_type === 'freeship') IconComponent = <Cloud size={24} color="#2563EB" />;
+            if (v.voucher_type === "freeship")
+              IconComponent = <Cloud size={24} color="#2563EB" />;
 
             return {
               id: item.id,
               title: v.code,
-              description: v.discount_type === 'percentage'
-                ? `Giảm ${v.discount_value}% tổng đơn\nThu thập hôm nay`
-                : `Giảm ${v.discount_value.toLocaleString('vi-VN')}đ\nThu thập hôm nay`,
+              description:
+                v.discount_type === "percentage"
+                  ? `Giảm ${v.discount_value}% tổng đơn\nThu thập hôm nay`
+                  : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ\nThu thập hôm nay`,
               validUntil: validUntilStr,
               daysLeft: isExpiring ? diffDays : undefined,
               isCollected: true,
-              type: isExpiring ? ('expiring' as const) : ('normal' as const),
-              icon: IconComponent
+              type: isExpiring ? ("expiring" as const) : ("normal" as const),
+              icon: IconComponent,
             };
           });
           setUserVouchers(formatted);
@@ -291,7 +354,10 @@ export default function VouchersScreen() {
           setUserVouchers([]);
         }
       } catch (error) {
-        console.log('Lỗi fetch hoặc SQL migration chưa được chạy. Đang dùng mock data.', error);
+        console.log(
+          "Lỗi fetch hoặc SQL migration chưa được chạy. Đang dùng mock data.",
+          error,
+        );
         setUserVouchers(mockVouchers);
       } finally {
         setLoading(false);
@@ -300,68 +366,167 @@ export default function VouchersScreen() {
     fetchMyVouchers();
   }, [refreshTrigger]);
 
+  // Tính progress lên hạng tiếp theo
+  const getNextLevel = () => {
+    if (!userMembership || !allMembershipLevels.length) return null;
+    // Tìm hạng cao hơn hạng hiện tại
+    return allMembershipLevels.find(
+      (level) => level.min_spending > userMembership.min_spending,
+    );
+  };
+
+  const getProgressToNextLevel = () => {
+    if (!userProfile || !allMembershipLevels.length)
+      return { progress: 0, needed: 0, nextLevel: null };
+
+    const nextLevel = getNextLevel();
+    if (!nextLevel) {
+      // Đã ở hạng cao nhất
+      return { progress: 100, needed: 0, nextLevel: null };
+    }
+
+    const currentSpending = Number(userProfile.total_spending) || 0;
+    const currentMinSpending = Number(userMembership.min_spending);
+    const nextMinSpending = Number(nextLevel.min_spending);
+    const range = nextMinSpending - currentMinSpending;
+    const progress = Math.min(
+      ((currentSpending - currentMinSpending) / range) * 100,
+      100,
+    );
+    const needed = Math.max(nextMinSpending - currentSpending, 0);
+
+    return { progress, needed, nextLevel };
+  };
+
+  const {
+    progress: membershipProgress,
+    needed: neededToNextLevel,
+    nextLevel,
+  } = getProgressToNextLevel();
+
   const rewardsProgress: RewardProgress[] = [
     {
-      id: '1',
-      title: 'Đơn thứ 5',
-      description: 'Hoàn thành 5 đơn hàng để thăng hạng và nhận ưu đãi siêu to!',
-      progress: userProfile?.total_orders_completed ? Math.min((userProfile.total_orders_completed / 5) * 100, 100) : 0,
+      id: "membership",
+      title: userMembership
+        ? `Hạng ${userMembership.level_name}`
+        : "Chưa có hạng",
+      description: userMembership
+        ? `Giảm ${userMembership.benefit_percentage}% cho đơn hàng`
+        : "Mua hàng để thăng hạng thành viên",
+      progress:
+        userProfile?.total_spending && userMembership
+          ? Math.min(
+              (Number(userProfile.total_spending) /
+                Number(userMembership.min_spending)) *
+                100,
+              100,
+            )
+          : 0,
+      icon: <Crown size={28} color="#2563EB" />,
+    },
+    {
+      id: "1",
+      title: "Đơn thứ 5",
+      description:
+        "Hoàn thành 5 đơn hàng để thăng hạng và nhận ưu đãi siêu to!",
+      progress: userProfile?.total_orders_completed
+        ? Math.min((userProfile.total_orders_completed / 5) * 100, 100)
+        : 0,
       icon: <ShoppingBag size={28} color="#2563EB" />,
     },
     {
-      id: '2',
-      title: 'Khách thân thiết',
-      description: 'Tiếp tục mua hàng để thăng hạng và nhận thêm nhiều đặc quyền.',
+      id: "2",
+      title: "Khách thân thiết",
+      description:
+        "Tiếp tục mua hàng để thăng hạng và nhận thêm nhiều đặc quyền.",
       progress: 75,
       icon: <Heart size={28} color="#2563EB" />,
     },
     {
-      id: '3',
-      title: 'Người đánh giá',
-      description: 'Chia sẻ cảm nhận về sản phẩm để giúp cộng đồng mua sắm tốt hơn.',
+      id: "3",
+      title: "Người đánh giá",
+      description:
+        "Chia sẻ cảm nhận về sản phẩm để giúp cộng đồng mua sắm tốt hơn.",
       progress: 60,
       icon: <Star size={28} color="#2563EB" />,
     },
     {
-      id: '4',
-      title: 'Tâm hồn lớn',
-      description: 'Tham gia các hoạt động thiện nguyện để lan tỏa yêu thương.',
+      id: "4",
+      title: "Tâm hồn lớn",
+      description: "Tham gia các hoạt động thiện nguyện để lan tỏa yêu thương.",
       progress: 0,
       icon: <Cloud size={28} color="#2563EB" />,
     },
     {
-      id: '5',
-      title: 'Sưu tầm áo thun',
-      description: 'Sở hữu ít nhất 5 mẫu áo thun trong bộ sưu tập mới nhất.',
+      id: "5",
+      title: "Sưu tầm áo thun",
+      description: "Sở hữu ít nhất 5 mẫu áo thun trong bộ sưu tập mới nhất.",
       progress: 0,
       icon: <Shirt size={28} color="#2563EB" />,
     },
     {
-      id: '6',
-      title: '10+ Đơn hàng',
+      id: "6",
+      title: "10+ Đơn hàng",
       description: 'Đạt mốc 10 đơn hàng để nhận huy hiệu "Bậc thầy mua sắm".',
-      progress: userProfile?.total_orders_completed ? Math.min((userProfile.total_orders_completed / 10) * 100, 100) : 0,
+      progress: userProfile?.total_orders_completed
+        ? Math.min((userProfile.total_orders_completed / 10) * 100, 100)
+        : 0,
       icon: <Smile size={28} color="#2563EB" />,
     },
   ];
 
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFF" }}>
       {/* Header Info */}
       <CommonHeader
         renderLeft={() => (
-          <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#0F172A' }}>Kho Voucher</Text>
+          <Text style={{ fontSize: 28, fontWeight: "bold", color: "#0F172A" }}>
+            Kho Voucher
+          </Text>
         )}
         renderRight={() => (
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <TouchableOpacity style={{ width: 44, height: 44, backgroundColor: '#2563EB', borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#BFDBFE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8, elevation: 5 }}>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity
+              style={{
+                width: 44,
+                height: 44,
+                backgroundColor: "#2563EB",
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+                shadowColor: "#BFDBFE",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.5,
+                shadowRadius: 8,
+                elevation: 5,
+              }}
+            >
               <LayoutGrid size={22} color="#FFF" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push("/settings")} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity
+              onPress={() => router.push("/settings")}
+              style={{
+                width: 44,
+                height: 44,
+                backgroundColor: "#EFF6FF",
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <Settings size={22} color="#2563EB" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.back()} style={{ width: 44, height: 44, backgroundColor: '#EFF6FF', borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{
+                width: 44,
+                height: 44,
+                backgroundColor: "#EFF6FF",
+                borderRadius: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
               <ArrowLeft size={22} color="#2563EB" />
             </TouchableOpacity>
           </View>
@@ -369,100 +534,420 @@ export default function VouchersScreen() {
       />
 
       {/* Tabs */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 24, marginVertical: 24 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          paddingHorizontal: 24,
+          marginVertical: 24,
+        }}
+      >
         <TouchableOpacity
-          onPress={() => setActiveTab('rewards')}
-          style={{ flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 16, backgroundColor: activeTab === 'rewards' ? '#EFF6FF' : '#F8FAFC' }}
+          onPress={() => setActiveTab("rewards")}
+          style={{
+            flex: 1,
+            paddingVertical: 14,
+            alignItems: "center",
+            borderRadius: 16,
+            backgroundColor: activeTab === "rewards" ? "#EFF6FF" : "#F8FAFC",
+          }}
         >
-          <Text style={{ fontWeight: 'bold', fontSize: 16, color: activeTab === 'rewards' ? '#2563EB' : '#94A3B8' }}>
+          <Text
+            style={{
+              fontWeight: "bold",
+              fontSize: 16,
+              color: activeTab === "rewards" ? "#2563EB" : "#94A3B8",
+            }}
+          >
             Phần thưởng
           </Text>
         </TouchableOpacity>
         <View style={{ width: 16 }} />
         <TouchableOpacity
-          onPress={() => setActiveTab('progress')}
-          style={{ flex: 1, paddingVertical: 14, alignItems: 'center', borderRadius: 16, backgroundColor: activeTab === 'progress' ? '#EFF6FF' : '#F8FAFC' }}
+          onPress={() => setActiveTab("progress")}
+          style={{
+            flex: 1,
+            paddingVertical: 14,
+            alignItems: "center",
+            borderRadius: 16,
+            backgroundColor: activeTab === "progress" ? "#EFF6FF" : "#F8FAFC",
+          }}
         >
-          <Text style={{ fontWeight: 'bold', fontSize: 16, color: activeTab === 'progress' ? '#2563EB' : '#94A3B8' }}>
+          <Text
+            style={{
+              fontWeight: "bold",
+              fontSize: 16,
+              color: activeTab === "progress" ? "#2563EB" : "#94A3B8",
+            }}
+          >
             Tiến trình
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 40 }}>
-        {activeTab === 'rewards' ? (
+      {/* Membership Level Card - Hiển thị hạng thành viên + Progress */}
+      {userMembership && (
+        <View style={{ paddingHorizontal: 24, marginBottom: 20 }}>
+          <View
+            style={{
+              backgroundColor: "#1E40AF",
+              borderRadius: 20,
+              padding: 20,
+              shadowColor: "#3B82F6",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.3,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+              >
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    backgroundColor: "rgba(255,255,255,0.2)",
+                    borderRadius: 24,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Crown size={24} color="#FFF" />
+                </View>
+                <View>
+                  <Text
+                    style={{
+                      color: "rgba(255,255,255,0.8)",
+                      fontSize: 12,
+                      fontWeight: "500",
+                    }}
+                  >
+                    Hạng thành viên
+                  </Text>
+                  <Text
+                    style={{ color: "#FFF", fontSize: 22, fontWeight: "bold" }}
+                  >
+                    {userMembership.level_name}
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={{
+                  backgroundColor: "#FFF",
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderRadius: 20,
+                }}
+              >
+                <Text
+                  style={{ color: "#1E40AF", fontSize: 16, fontWeight: "bold" }}
+                >
+                  -{userMembership.benefit_percentage}%
+                </Text>
+              </View>
+            </View>
+
+            {nextLevel && (
+              <View style={{ marginTop: 16 }}>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
+                  <Text
+                    style={{ color: "rgba(255,255,255,0.8)", fontSize: 12 }}
+                  >
+                    Tiến tới {nextLevel.level_name}
+                  </Text>
+                  <Text
+                    style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}
+                  >
+                    {neededToNextLevel.toLocaleString("vi-VN")}đ nữa
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    height: 8,
+                    backgroundColor: "rgba(255,255,255,0.2)",
+                    borderRadius: 4,
+                    overflow: "hidden",
+                  }}
+                >
+                  <View
+                    style={{
+                      height: "100%",
+                      width: `${membershipProgress}%`,
+                      backgroundColor: "#FBBF24",
+                      borderRadius: 4,
+                    }}
+                  />
+                </View>
+              </View>
+            )}
+
+            {!nextLevel && (
+              <View style={{ marginTop: 16 }}>
+                <Text
+                  style={{ color: "#FBBF24", fontSize: 14, fontWeight: "600" }}
+                >
+                  Bạn đã đạt hạng cao nhất!
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
+
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 40 }}
+      >
+        {activeTab === "rewards" ? (
           <View>
-            <VoucherCollection onVoucherCollected={() => setRefreshTrigger(prev => prev + 1)} />
-            
+            <VoucherCollection
+              onVoucherCollected={() => setRefreshTrigger((prev) => prev + 1)}
+            />
+
             <View style={{ paddingHorizontal: 24 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 16 }}>Voucher của bạn</Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: "#0F172A",
+                  marginBottom: 16,
+                }}
+              >
+                Voucher của bạn
+              </Text>
               {userVouchers.map((voucher) => (
-              <VoucherTicket
-                key={voucher.id}
-                type={voucher.type}
-                header={
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <Text style={{ fontSize: 19, fontWeight: 'bold', color: voucher.type === 'expiring' ? '#F87171' : '#2563EB' }}>
-                      {voucher.title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                      {voucher.daysLeft && (
-                        <Text style={{ color: '#F87171', fontSize: 12, fontWeight: '600' }}>còn {voucher.daysLeft} ngày</Text>
-                      )}
-                      <View style={{ backgroundColor: voucher.type === 'expiring' ? 'rgba(254, 202, 202, 0.5)' : 'rgba(226, 232, 240, 0.5)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}>
-                        <Text style={{ color: '#0F172A', fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>
-                          Hạn dùng {voucher.validUntil}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                }
-                content={
-                  <>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 8 }}>
-                      <View style={{ width: 48, height: 48, backgroundColor: '#FFF', borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2, marginRight: 16, borderWidth: 1, borderColor: '#F8FAFC' }}>
-                        {voucher.icon}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: '#0F172A', fontWeight: '900', fontSize: 17, lineHeight: 22 }}>
-                          {voucher.description.split('\n')[0]}
-                        </Text>
-                        <Text style={{ color: '#64748B', fontSize: 13, marginTop: 4, fontWeight: '500' }}>
-                          {voucher.description.split('\n')[1]}
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={{ backgroundColor: '#2563EB', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 16, shadowColor: '#BFDBFE', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.8, shadowRadius: 8, elevation: 4 }}
-                      activeOpacity={0.8}
+                <VoucherTicket
+                  key={voucher.id}
+                  type={voucher.type}
+                  header={
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        width: "100%",
+                      }}
                     >
-                      <Text style={{ color: '#FFF', fontWeight: '900', fontSize: 15 }}>Đã thu thập</Text>
-                    </TouchableOpacity>
-                  </>
-                }
-              />
-            ))}
+                      <Text
+                        style={{
+                          fontSize: 19,
+                          fontWeight: "bold",
+                          color:
+                            voucher.type === "expiring" ? "#F87171" : "#2563EB",
+                        }}
+                      >
+                        {voucher.title}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 16,
+                        }}
+                      >
+                        {voucher.daysLeft && (
+                          <Text
+                            style={{
+                              color: "#F87171",
+                              fontSize: 12,
+                              fontWeight: "600",
+                            }}
+                          >
+                            còn {voucher.daysLeft} ngày
+                          </Text>
+                        )}
+                        <View
+                          style={{
+                            backgroundColor:
+                              voucher.type === "expiring"
+                                ? "rgba(254, 202, 202, 0.5)"
+                                : "rgba(226, 232, 240, 0.5)",
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "#0F172A",
+                              fontSize: 11,
+                              fontWeight: "900",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Hạn dùng {voucher.validUntil}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  }
+                  content={
+                    <>
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          flex: 1,
+                          paddingRight: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 48,
+                            height: 48,
+                            backgroundColor: "#FFF",
+                            borderRadius: 24,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            shadowColor: "#000",
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 4,
+                            elevation: 2,
+                            marginRight: 16,
+                            borderWidth: 1,
+                            borderColor: "#F8FAFC",
+                          }}
+                        >
+                          {voucher.icon}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              color: "#0F172A",
+                              fontWeight: "900",
+                              fontSize: 17,
+                              lineHeight: 22,
+                            }}
+                          >
+                            {voucher.description.split("\n")[0]}
+                          </Text>
+                          <Text
+                            style={{
+                              color: "#64748B",
+                              fontSize: 13,
+                              marginTop: 4,
+                              fontWeight: "500",
+                            }}
+                          >
+                            {voucher.description.split("\n")[1]}
+                          </Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: "#2563EB",
+                          paddingHorizontal: 24,
+                          paddingVertical: 12,
+                          borderRadius: 16,
+                          shadowColor: "#BFDBFE",
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.8,
+                          shadowRadius: 8,
+                          elevation: 4,
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text
+                          style={{
+                            color: "#FFF",
+                            fontWeight: "900",
+                            fontSize: 15,
+                          }}
+                        >
+                          Đã thu thập
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  }
+                />
+              ))}
             </View>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 24 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              paddingHorizontal: 24,
+            }}
+          >
             {rewardsProgress.map((item) => (
-              <View key={item.id} style={{ width: '47%', marginBottom: 48, alignItems: 'center', backgroundColor: '#FFF', padding: 20, borderRadius: 40, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F8FAFC' }}>
+              <View
+                key={item.id}
+                style={{
+                  width: "47%",
+                  marginBottom: 48,
+                  alignItems: "center",
+                  backgroundColor: "#FFF",
+                  padding: 20,
+                  borderRadius: 40,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 12,
+                  elevation: 3,
+                  borderWidth: 1,
+                  borderColor: "#F8FAFC",
+                }}
+              >
                 <CircularProgress
                   progress={item.progress}
                   completed={item.progress === 100}
                   size={110}
                   strokeWidth={8}
                 >
-                  <View style={{ width: 80, height: 80, backgroundColor: 'rgba(239, 246, 255, 0.5)', borderRadius: 40, alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      width: 80,
+                      height: 80,
+                      backgroundColor: "rgba(239, 246, 255, 0.5)",
+                      borderRadius: 40,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
                     {item.icon}
                   </View>
                 </CircularProgress>
-                <Text style={{ color: '#0F172A', fontWeight: '900', textAlign: 'center', marginTop: 24, fontSize: 17 }} numberOfLines={1}>
+                <Text
+                  style={{
+                    color: "#0F172A",
+                    fontWeight: "900",
+                    textAlign: "center",
+                    marginTop: 24,
+                    fontSize: 17,
+                  }}
+                  numberOfLines={1}
+                >
                   {item.title}
                 </Text>
-                <View style={{ height: 60, justifyContent: 'center' }}>
-                  <Text style={{ color: '#94A3B8', fontSize: 11, textAlign: 'center', marginTop: 8, lineHeight: 18 }} numberOfLines={3}>
+                <View style={{ height: 60, justifyContent: "center" }}>
+                  <Text
+                    style={{
+                      color: "#94A3B8",
+                      fontSize: 11,
+                      textAlign: "center",
+                      marginTop: 8,
+                      lineHeight: 18,
+                    }}
+                    numberOfLines={3}
+                  >
                     {item.description}
                   </Text>
                 </View>
