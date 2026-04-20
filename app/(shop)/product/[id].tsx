@@ -88,24 +88,24 @@ export default function ProductDetailScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'products',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "products",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'product_variants',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "product_variants",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'product_images',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "product_images",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'reviews',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "reviews",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'wishlist',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "wishlist",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   // Variants từ bảng product_variants
@@ -151,8 +151,8 @@ export default function ProductDetailScreen() {
   const displayImages = useMemo(() => {
     return product?.product_images && product.product_images.length > 0
       ? [...product.product_images]
-        .filter((img: any) => img.image_type !== "description")
-        .sort((a: any, b: any) => a.display_order - b.display_order)
+          .filter((img: any) => img.image_type !== "description")
+          .sort((a: any, b: any) => a.display_order - b.display_order)
       : [];
   }, [product?.product_images]);
 
@@ -163,7 +163,7 @@ export default function ProductDetailScreen() {
     return displayImages.map((img: any) =>
       img.url.startsWith("http")
         ? img.url
-        : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`
+        : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${img.url}`,
     );
   }, [displayImages]);
 
@@ -177,7 +177,7 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     if (selectedColor && displayImages.length > 0) {
       const targetIndex = displayImages.findIndex((img) => {
-        const variantOfImage = variants.find(v => v.id === img.variant_id);
+        const variantOfImage = variants.find((v) => v.id === img.variant_id);
         return variantOfImage && variantOfImage.color === selectedColor;
       });
 
@@ -195,13 +195,16 @@ export default function ProductDetailScreen() {
 
     // 2. Tìm xem bức ảnh này thuộc về biến thể màu nào
     const currentImageUrl = productImages[index];
-    const imageInfo = displayImages.find((img) =>
-      img.url.includes(currentImageUrl) || currentImageUrl.includes(img.url)
+    const imageInfo = displayImages.find(
+      (img) =>
+        img.url.includes(currentImageUrl) || currentImageUrl.includes(img.url),
     );
 
     if (imageInfo && imageInfo.variant_id) {
       // Tìm màu sắc tương ứng với variant_id đó
-      const matchedVariant = variants.find(v => v.id === imageInfo.variant_id);
+      const matchedVariant = variants.find(
+        (v) => v.id === imageInfo.variant_id,
+      );
 
       if (matchedVariant) {
         // Tự động chọn màu đó trên UI
@@ -216,19 +219,26 @@ export default function ProductDetailScreen() {
   };
 
   // --- Derived từ bảng product_variants ---
-  const uniqueColors = [...new Set(variants.map((v) => v.color).filter(Boolean))];
+  const uniqueColors = [
+    ...new Set(variants.map((v) => v.color).filter(Boolean)),
+  ];
   const sizesForColor = selectedColor
-    ? variants.filter((v) => v.color === selectedColor).map((v) => v.size).filter(Boolean)
+    ? variants
+        .filter((v) => v.color === selectedColor)
+        .map((v) => v.size)
+        .filter(Boolean)
     : [...new Set(variants.map((v) => v.size).filter(Boolean))];
 
   const hasSizes = sizesForColor.length > 0;
   const hasColors = uniqueColors.length > 0;
 
   // Stock của variant đang chọn
-  const selectedVariant = variants.find(
-    (v) => v.color === selectedColor && v.size === selectedSize
-  ) || variants.find((v) => v.color === selectedColor && !v.size)
-    || variants.find((v) => !v.color && v.size === selectedSize);
+  const selectedVariant =
+    variants.find(
+      (v) => v.color === selectedColor && v.size === selectedSize,
+    ) ||
+    variants.find((v) => v.color === selectedColor && !v.size) ||
+    variants.find((v) => !v.color && v.size === selectedSize);
 
   const availableStock = selectedVariant?.stock ?? 0;
 
@@ -237,11 +247,16 @@ export default function ProductDetailScreen() {
 
   // Stock theo màu
   const getColorStock = (color: string) =>
-    variants.filter((v) => v.color === color).reduce((sum, v) => sum + (v.stock || 0), 0);
+    variants
+      .filter((v) => v.color === color)
+      .reduce((sum, v) => sum + (v.stock || 0), 0);
 
   // Stock theo size (trong màu đang chọn)
   const getSizeStock = (size: string) => {
-    const v = variants.find((v) => v.size === size && (selectedColor ? v.color === selectedColor : true));
+    const v = variants.find(
+      (v) =>
+        v.size === size && (selectedColor ? v.color === selectedColor : true),
+    );
     return v?.stock ?? 0;
   };
 
@@ -255,7 +270,7 @@ export default function ProductDetailScreen() {
       return;
     }
     if (availableStock === 0) {
-      alert('Sản phẩm này đã hết hàng!');
+      alert("Sản phẩm này đã hết hàng!");
       return;
     }
     // Đã chọn đủ ở ngoài -> Thêm vào với số lượng là 1
@@ -408,7 +423,9 @@ export default function ProductDetailScreen() {
 
   const checkWishlistStatus = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
       const { data, error } = await supabase
         .from("wishlist")
@@ -425,7 +442,9 @@ export default function ProductDetailScreen() {
 
   const handleToggleFavorite = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         alert("Vui lòng đăng nhập để lưu sản phẩm yêu thích");
         return;
@@ -463,16 +482,14 @@ export default function ProductDetailScreen() {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { error } = await supabase
-        .from("product_view_history")
-        .upsert(
-          {
-            user_id: user.id,
-            product_id: productData.id,
-            viewed_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id, product_id" } // Upsert: thêm mới hoặc update dòng cũ
-        );
+      const { error } = await supabase.from("product_view_history").upsert(
+        {
+          user_id: user.id,
+          product_id: productData.id,
+          viewed_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id, product_id" }, // Upsert: thêm mới hoặc update dòng cũ
+      );
 
       if (error) throw error;
     } catch (error) {
@@ -500,7 +517,11 @@ export default function ProductDetailScreen() {
 
         if (data && data.length > 0) {
           // Sắp xếp các bình luận mới nhất lên đầu
-          const sortedData = data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          const sortedData = data.sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime(),
+          );
           setReviews(sortedData);
 
           const total = sortedData.reduce((acc, curr) => acc + curr.rating, 0);
@@ -553,7 +574,7 @@ export default function ProductDetailScreen() {
       setQuantity(1);
 
       // Tìm variant đầu tiên của màu này để lấy id (phòng trường hợp ảnh gắn theo variant_id cụ thể)
-      const firstVariantOfColor = variants.find(v => v.color === color);
+      const firstVariantOfColor = variants.find((v) => v.color === color);
       if (firstVariantOfColor) {
         // Logic bổ sung nếu cần thiết
       }
@@ -601,9 +622,27 @@ export default function ProductDetailScreen() {
           </ScrollView>
         )}
         {review.admin_reply && (
-          <View style={{ backgroundColor: '#F3F4F6', padding: 12, borderRadius: 8, marginTop: 12 }}>
-            <Text style={{ fontWeight: 'bold', fontSize: 13, marginBottom: 4, color: '#111' }}>Phản hồi từ cửa hàng</Text>
-            <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 20 }}>{review.admin_reply}</Text>
+          <View
+            style={{
+              backgroundColor: "#F3F4F6",
+              padding: 12,
+              borderRadius: 8,
+              marginTop: 12,
+            }}
+          >
+            <Text
+              style={{
+                fontWeight: "bold",
+                fontSize: 13,
+                marginBottom: 4,
+                color: "#111",
+              }}
+            >
+              Phản hồi từ cửa hàng
+            </Text>
+            <Text style={{ fontSize: 13, color: "#4B5563", lineHeight: 20 }}>
+              {review.admin_reply}
+            </Text>
           </View>
         )}
       </View>
@@ -634,15 +673,27 @@ export default function ProductDetailScreen() {
           <Image
             // Mẹo cực hay: Dùng thuộc tính key để ép React Native vẽ lại ảnh mới 100%, chống kẹt hình
             key={productImages[activeIndex]}
-            source={{ uri: productImages[activeIndex] || "https://via.placeholder.com/600" }}
-            style={[styles.heroImage, { width: SCREEN_WIDTH, height: IMAGE_HEIGHT, backgroundColor: '#F3F4F6' }]}
+            source={{
+              uri:
+                productImages[activeIndex] || "https://via.placeholder.com/600",
+            }}
+            style={[
+              styles.heroImage,
+              {
+                width: SCREEN_WIDTH,
+                height: IMAGE_HEIGHT,
+                backgroundColor: "#F3F4F6",
+              },
+            ]}
             resizeMode="contain"
           />
         </View>
 
         {/* Dải ảnh thu nhỏ (Thumbnails) bên dưới */}
         {productImages && productImages.length > 1 && (
-          <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 8 }}>
+          <View
+            style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 8 }}
+          >
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {productImages.map((imgUrl: string, index: number) => (
                 <TouchableOpacity
@@ -653,14 +704,19 @@ export default function ProductDetailScreen() {
                   style={{
                     marginRight: 12,
                     borderWidth: 2,
-                    borderColor: activeIndex === index ? '#2563EB' : 'transparent', // Viền xanh cho ảnh đang chọn
+                    borderColor:
+                      activeIndex === index ? "#2563EB" : "transparent", // Viền xanh cho ảnh đang chọn
                     borderRadius: 8,
-                    overflow: 'hidden',
+                    overflow: "hidden",
                   }}
                 >
                   <Image
                     source={{ uri: imgUrl }}
-                    style={{ width: 60, height: 60, backgroundColor: '#E5E7EB' }}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      backgroundColor: "#E5E7EB",
+                    }}
                     resizeMode="cover"
                   />
                 </TouchableOpacity>
@@ -668,8 +724,6 @@ export default function ProductDetailScreen() {
             </ScrollView>
           </View>
         )}
-
-
 
         {/* ══════════════ 2. Thông tin sản phẩm ══════════════ */}
         <View style={styles.section}>
@@ -688,7 +742,9 @@ export default function ProductDetailScreen() {
           <Text style={styles.productName}>{product.name}</Text>
           {/* Lấy mô tả NGẮN từ state product */}
           {product.short_description ? (
-            <Text style={styles.productDescription}>{product.short_description}</Text>
+            <Text style={styles.productDescription}>
+              {product.short_description}
+            </Text>
           ) : null}
         </View>
 
@@ -704,16 +760,30 @@ export default function ProductDetailScreen() {
             </View>
           ) : totalStock > 0 ? (
             <View style={styles.stockRow}>
-              <View style={[styles.stockBadge, totalStock < 10 && styles.stockBadgeLow]}>
-                <Text style={[styles.stockBadgeText, totalStock < 10 && styles.stockBadgeTextLow]}>
-                  {totalStock < 10 ? `⚠ Còn ${totalStock} sản phẩm` : `✓ Còn hàng (${totalStock})`}
+              <View
+                style={[
+                  styles.stockBadge,
+                  totalStock < 10 && styles.stockBadgeLow,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.stockBadgeText,
+                    totalStock < 10 && styles.stockBadgeTextLow,
+                  ]}
+                >
+                  {totalStock < 10
+                    ? `⚠ Còn ${totalStock} sản phẩm`
+                    : `✓ Còn hàng (${totalStock})`}
                 </Text>
               </View>
             </View>
           ) : (
             <View style={styles.stockRow}>
               <View style={[styles.stockBadge, styles.stockBadgeOut]}>
-                <Text style={[styles.stockBadgeText, styles.stockBadgeTextOut]}>Hết hàng</Text>
+                <Text style={[styles.stockBadgeText, styles.stockBadgeTextOut]}>
+                  Hết hàng
+                </Text>
               </View>
             </View>
           )}
@@ -723,7 +793,9 @@ export default function ProductDetailScreen() {
             <View style={{ marginBottom: 20 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Màu sắc</Text>
-                <Text style={styles.variantInfoText}>{selectedColor || ''}</Text>
+                <Text style={styles.variantInfoText}>
+                  {selectedColor || ""}
+                </Text>
               </View>
               <ScrollView
                 horizontal
@@ -746,13 +818,17 @@ export default function ProductDetailScreen() {
                         isOutOfStock && styles.chipDisabled,
                       ]}
                     >
-                      <Text style={[
-                        styles.colorChipText,
-                        isSelected && styles.colorChipTextSelected,
-                        isOutOfStock && styles.chipTextDisabled,
-                      ]}>{color}</Text>
+                      <Text
+                        style={[
+                          styles.colorChipText,
+                          isSelected && styles.colorChipTextSelected,
+                          isOutOfStock && styles.chipTextDisabled,
+                        ]}
+                      >
+                        {color}
+                      </Text>
                       <Text style={styles.stockLabel}>
-                        {isOutOfStock ? 'Hết' : `${colorStock}`}
+                        {isOutOfStock ? "Hết" : `${colorStock}`}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -766,7 +842,7 @@ export default function ProductDetailScreen() {
             <View style={{ marginBottom: 20 }}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Kích cỡ</Text>
-                <Text style={styles.variantInfoText}>{selectedSize || ''}</Text>
+                <Text style={styles.variantInfoText}>{selectedSize || ""}</Text>
               </View>
               <ScrollView
                 horizontal
@@ -781,32 +857,47 @@ export default function ProductDetailScreen() {
                     <TouchableOpacity
                       key={index}
                       activeOpacity={0.8}
-                      onPress={() => !isOutOfStock && setSelectedSize((prev) => prev === size ? null : size)}
+                      onPress={() =>
+                        !isOutOfStock &&
+                        setSelectedSize((prev) => (prev === size ? null : size))
+                      }
                       style={[
                         styles.chip,
                         {
                           borderWidth: 1,
                           borderColor: isSelected ? "#3B82F6" : "#E5E7EB",
-                          backgroundColor: isSelected ? "#EFF6FF" : isOutOfStock ? "#F3F4F6" : "#F9FAFB",
+                          backgroundColor: isSelected
+                            ? "#EFF6FF"
+                            : isOutOfStock
+                              ? "#F3F4F6"
+                              : "#F9FAFB",
                         },
                         isOutOfStock && styles.chipDisabled,
                       ]}
                     >
-                      <Text style={[
-                        styles.chipText,
-                        {
-                          color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151",
-                          fontWeight: isSelected ? "700" : "500"
-                        },
-                      ]}>
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: isSelected
+                              ? "#3B82F6"
+                              : isOutOfStock
+                                ? "#D1D5DB"
+                                : "#374151",
+                            fontWeight: isSelected ? "700" : "500",
+                          },
+                        ]}
+                      >
                         {size}
                       </Text>
                       {/* Nhãn stock nhỏ dưới size */}
-                      <Text style={[
-                        styles.chipStockLabel,
-                        isOutOfStock && { color: '#EF4444' }
-                      ]}>
-                        {isOutOfStock ? 'Hết' : sizeStock}
+                      <Text
+                        style={[
+                          styles.chipStockLabel,
+                          isOutOfStock && { color: "#EF4444" },
+                        ]}
+                      >
+                        {isOutOfStock ? "Hết" : sizeStock}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -827,25 +918,43 @@ export default function ProductDetailScreen() {
           {product.specifications && product.specifications.length > 0 && (
             <View style={{ marginBottom: 16 }}>
               {product.specifications.map((spec: any, index: number) => (
-                <View key={index} style={{ flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' }}>
-                  <Text style={{ width: Dimensions.get('window').width * 0.35, color: '#6B7280', fontSize: 14 }}>{spec.name || spec.label}</Text>
-                  <Text style={{ flex: 1, color: '#111827', fontSize: 14 }}>{spec.value}</Text>
+                <View
+                  key={index}
+                  style={{
+                    flexDirection: "row",
+                    marginBottom: 8,
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <Text
+                    style={{
+                      width: Dimensions.get("window").width * 0.35,
+                      color: "#6B7280",
+                      fontSize: 14,
+                    }}
+                  >
+                    {spec.name || spec.label}
+                  </Text>
+                  <Text style={{ flex: 1, color: "#111827", fontSize: 14 }}>
+                    {spec.value}
+                  </Text>
                 </View>
               ))}
             </View>
           )}
 
           {/* Mô tả chi tiết */}
-          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Mô tả sản phẩm</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
+            Mô tả sản phẩm
+          </Text>
 
-          <Text style={{ color: '#374151', fontSize: 14, lineHeight: 22 }}>
+          <Text style={{ color: "#374151", fontSize: 14, lineHeight: 22 }}>
             {product.description || "Đang cập nhật mô tả..."}
           </Text>
         </View>
 
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
-
 
         {/* ══════════════ 6. Đánh giá & Nhận xét ══════════════ */}
         <View style={styles.section}>
@@ -1027,20 +1136,34 @@ export default function ProductDetailScreen() {
                         <TouchableOpacity
                           key={index}
                           activeOpacity={0.8}
-                          onPress={() => !isOutOfStock && handleSelectColor(color)}
+                          onPress={() =>
+                            !isOutOfStock && handleSelectColor(color)
+                          }
                           style={[
                             styles.modalColorChip,
                             isSelected && styles.modalColorChipSelected,
                             isOutOfStock && styles.chipDisabled,
                           ]}
                         >
-                          <Text style={[
-                            styles.modalColorChipText,
-                            isSelected && { color: '#3B82F6', fontWeight: '700' },
-                            isOutOfStock && styles.chipTextDisabled,
-                          ]}>{color}</Text>
-                          <Text style={[styles.modalStockText, isOutOfStock && { color: '#EF4444' }]}>
-                            {isOutOfStock ? 'Hết hàng' : `Còn ${colorStock}`}
+                          <Text
+                            style={[
+                              styles.modalColorChipText,
+                              isSelected && {
+                                color: "#3B82F6",
+                                fontWeight: "700",
+                              },
+                              isOutOfStock && styles.chipTextDisabled,
+                            ]}
+                          >
+                            {color}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.modalStockText,
+                              isOutOfStock && { color: "#EF4444" },
+                            ]}
+                          >
+                            {isOutOfStock ? "Hết hàng" : `Còn ${colorStock}`}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -1062,20 +1185,34 @@ export default function ProductDetailScreen() {
                         <TouchableOpacity
                           key={index}
                           activeOpacity={0.8}
-                          onPress={() => !isOutOfStock && setSelectedSize((prev) => prev === size ? null : size)}
+                          onPress={() =>
+                            !isOutOfStock &&
+                            setSelectedSize((prev) =>
+                              prev === size ? null : size,
+                            )
+                          }
                           style={[
                             styles.modalSizeChip,
                             isSelected && styles.modalSizeChipSelected,
                             isOutOfStock && styles.chipDisabled,
                           ]}
                         >
-                          <Text style={[
-                            styles.modalSizeText,
-                            isSelected && styles.modalSizeTextSelected,
-                            isOutOfStock && styles.chipTextDisabled,
-                          ]}>{size}</Text>
-                          <Text style={[styles.modalStockText, isOutOfStock && { color: '#EF4444' }]}>
-                            {isOutOfStock ? 'Hết' : sizeStock}
+                          <Text
+                            style={[
+                              styles.modalSizeText,
+                              isSelected && styles.modalSizeTextSelected,
+                              isOutOfStock && styles.chipTextDisabled,
+                            ]}
+                          >
+                            {size}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.modalStockText,
+                              isOutOfStock && { color: "#EF4444" },
+                            ]}
+                          >
+                            {isOutOfStock ? "Hết" : sizeStock}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -1089,8 +1226,18 @@ export default function ProductDetailScreen() {
                 <View>
                   <Text style={styles.modalSectionTitle}>Số lượng</Text>
                   {selectedVariant && (
-                    <Text style={[styles.modalStockText, { marginTop: 2, color: availableStock < 5 ? '#F59E0B' : '#10B981' }]}>
-                      {availableStock === 0 ? 'Hết hàng' : `Còn lại: ${availableStock} cái`}
+                    <Text
+                      style={[
+                        styles.modalStockText,
+                        {
+                          marginTop: 2,
+                          color: availableStock < 5 ? "#F59E0B" : "#10B981",
+                        },
+                      ]}
+                    >
+                      {availableStock === 0
+                        ? "Hết hàng"
+                        : `Còn lại: ${availableStock} cái`}
                     </Text>
                   )}
                 </View>
@@ -1106,7 +1253,11 @@ export default function ProductDetailScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.quantityBtn}
-                    onPress={() => setQuantity((q) => (availableStock > 0 && q < availableStock ? q + 1 : q))}
+                    onPress={() =>
+                      setQuantity((q) =>
+                        availableStock > 0 && q < availableStock ? q + 1 : q,
+                      )
+                    }
                   >
                     <Text style={styles.quantityBtnText}>+</Text>
                   </TouchableOpacity>
@@ -1127,7 +1278,7 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView >
+    </SafeAreaView>
   );
 }
 
@@ -1724,72 +1875,72 @@ const styles = StyleSheet.create({
   },
   // --- Stock & Variant Styles (mới) ---
   stockRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: 16,
   },
   stockBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: "#ECFDF5",
   },
   stockBadgeLow: {
-    backgroundColor: '#FFFBEB',
+    backgroundColor: "#FFFBEB",
   },
   stockBadgeOut: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: "#FEF2F2",
   },
   stockBadgeText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#10B981',
+    fontWeight: "600",
+    color: "#10B981",
   },
   stockBadgeTextLow: {
-    color: '#F59E0B',
+    color: "#F59E0B",
   },
   stockBadgeTextOut: {
-    color: '#EF4444',
+    color: "#EF4444",
   },
   colorChip: {
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
     marginRight: 10,
-    alignItems: 'center',
+    alignItems: "center",
     minWidth: 64,
   },
   colorChipSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
+    borderColor: "#3B82F6",
+    backgroundColor: "#EFF6FF",
   },
   colorChipText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: "500",
+    color: "#374151",
   },
   colorChipTextSelected: {
-    color: '#3B82F6',
-    fontWeight: '700',
+    color: "#3B82F6",
+    fontWeight: "700",
   },
   stockLabel: {
     fontSize: 11,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 3,
   },
   chipDisabled: {
     opacity: 0.4,
   },
   chipTextDisabled: {
-    color: '#9CA3AF',
+    color: "#9CA3AF",
   },
   chipStockLabel: {
     fontSize: 10,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 2,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // Modal color chip (dạng text thay vì hình tròn)
   modalColorChip: {
@@ -1797,25 +1948,25 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
+    borderColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
     marginRight: 10,
-    alignItems: 'center',
+    alignItems: "center",
     minWidth: 70,
   },
   modalColorChipSelected: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
+    borderColor: "#3B82F6",
+    backgroundColor: "#EFF6FF",
   },
   modalColorChipText: {
     fontSize: 13,
-    fontWeight: '500',
-    color: '#374151',
+    fontWeight: "500",
+    color: "#374151",
   },
   modalStockText: {
     fontSize: 12,
-    color: '#10B981',
+    color: "#10B981",
     marginTop: 3,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
