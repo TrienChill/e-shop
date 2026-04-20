@@ -10,6 +10,7 @@ import {
   Search as SearchIcon,
   Trash2,
   X,
+  ChevronRight,
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
@@ -290,20 +291,61 @@ export default function SearchScreen() {
       <FlatList
         data={searchResults}
         keyExtractor={(item) => item.id.toString()}
-        numColumns={isDesktop ? 3 : 2}
-        key={isDesktop ? "desktop" : "mobile"}
+        numColumns={isDesktop ? 4 : 1}
+        key={isDesktop ? "desktop_grid" : "mobile_list"}
         contentContainerStyle={styles.gridContainer}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.resultCard}
-            activeOpacity={0.8}
-            onPress={() => router.push({ pathname: `/(shop)/product/[id]`, params: { id: item.id } } as any)}
-          >
-            <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.resultImg} />
-            <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-            <Text style={styles.productPrice}>{(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ</Text>
-          </TouchableOpacity>
-        )}
+        columnWrapperStyle={isDesktop ? { justifyContent: 'flex-start' } : null}
+        renderItem={({ item }) => {
+          if (isDesktop) {
+            return (
+              <TouchableOpacity 
+                style={styles.resultCardWeb}
+                activeOpacity={0.8}
+                onPress={() => router.push({ pathname: `/(shop)/product/[id]`, params: { id: item.id } } as any)}
+              >
+                <View style={styles.imageWrapperWeb}>
+                  <Image 
+                    source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} 
+                    style={styles.resultImgWeb} 
+                    resizeMode="cover"
+                  />
+                </View>
+                <View style={styles.infoWrapperWeb}>
+                  <Text style={styles.productNameWeb} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.productPriceWeb}>{(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          // Compact List Layout for Mobile
+          return (
+            <TouchableOpacity 
+              style={styles.compactCard}
+              activeOpacity={0.7}
+              onPress={() => router.push({ pathname: `/(shop)/product/[id]`, params: { id: item.id } } as any)}
+            >
+              <Image 
+                source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} 
+                style={styles.compactImg} 
+              />
+              <View style={styles.compactInfo}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.compactName} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.compactDesc} numberOfLines={1}>
+                    {item.description || "Mô tả sản phẩm đang được cập nhật..."}
+                  </Text>
+                  <Text style={styles.compactPrice}>
+                    {(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ
+                  </Text>
+                </View>
+                <View style={styles.compactAction}>
+                  <ChevronRight size={18} color="#9CA3AF" />
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
     );
   };
@@ -486,5 +528,91 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 10,
     backgroundColor: "#F5F5F5",
+  },
+
+  // Web Grid Styles (Fixed Stretching)
+  resultCardWeb: {
+    width: '23%', // Khoảng 1/4 chiều rộng (trừ margin)
+    margin: '1%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    // Hiệu ứng hover cho Web (sẽ được handle bằng CSS hoặc Pressable state)
+  },
+  imageWrapperWeb: {
+    width: '100%',
+    aspectRatio: 1.2, // Chỉnh tỉ lệ ảnh nằm ngang hơn một chút để tiết kiệm chiều cao
+    backgroundColor: '#F9FAFB',
+  },
+  resultImgWeb: {
+    width: '100%',
+    height: '100%',
+  },
+  infoWrapperWeb: {
+    padding: 12,
+  },
+  productNameWeb: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+    height: 40, // Cố định chiều cao text để các card đều nhau
+  },
+  productPriceWeb: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#3B82F6',
+  },
+  
+  // Compact Styles (Mobile)
+  compactCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    padding: 10,
+    marginBottom: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    // Thêm shadow nhẹ cho iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    // Elevation cho Android
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  compactImg: {
+    width: 85,
+    height: 85,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+  },
+  compactInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    marginLeft: 12,
+    alignItems: 'center',
+  },
+  compactName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  compactDesc: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  compactPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#3B82F6',
+  },
+  compactAction: {
+    paddingLeft: 10,
   },
 });
