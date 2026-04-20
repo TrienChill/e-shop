@@ -198,6 +198,7 @@ export default function AdminMembershipScreen() {
         level_name: formData.level_name.trim(),
         min_spending: parseVND(formData.min_spending),
         benefit_percentage: parseInt(formData.benefit_percentage, 10),
+        description: formData.description.trim() || null,
       };
 
       console.log("payload:", payload);
