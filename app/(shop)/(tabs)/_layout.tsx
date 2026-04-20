@@ -11,6 +11,8 @@ import {
 } from "react-native";
 import { supabase } from "@/src/lib/supabase";
 import WebHeader from "@/src/components/web/WebHeader";
+import WebFooter from "@/src/components/web/WebFooter";
+import { ScrollView } from "react-native";
 
 const { width: STATIC_WIDTH } = Dimensions.get("window");
 
@@ -136,38 +138,47 @@ export default function TabsLayout() {
     fetchCartCount();
   }, []);
 
+  const Container = isWebDesktop ? ScrollView : View;
+
   return (
-    <View style={styles.container}>
+    <Container 
+      style={styles.container} 
+      contentContainerStyle={isWebDesktop ? { flexGrow: 1 } : undefined}
+    >
       {isWeb && <WebHeader cartCount={cartCount} />}
 
-      <Tabs
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarShowLabel: false,
-          tabBarStyle: {
-            display: isWeb ? "none" : "flex",
-            position: "absolute",
-            backgroundColor: "transparent",
-            borderTopWidth: 0,
-            elevation: 0,
-          },
-        }}
-      >
-        <Tabs.Screen name="index" />
-        <Tabs.Screen name="categories" />
-        <Tabs.Screen name="wishlist" />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            href: isWebDesktop ? "/(shop)/(account)/profile" : "/(shop)/(tabs)/profile",
+      <View style={isWebDesktop ? { flex: 1, minHeight: Dimensions.get('window').height } : { flex: 1 }}>
+        <Tabs
+          tabBar={(props) => <CustomTabBar {...props} />}
+          screenOptions={{
+            headerShown: false,
+            tabBarShowLabel: false,
+            tabBarStyle: {
+              display: isWeb ? "none" : "flex",
+              position: "absolute",
+              backgroundColor: "transparent",
+              borderTopWidth: 0,
+              elevation: 0,
+            },
           }}
-        />
-        <Tabs.Screen name="search" options={{ href: null }} />
-        <Tabs.Screen name="ai-chat" options={{ href: null }} />
-        <Tabs.Screen name="cart" options={{ href: null }} />
-      </Tabs>
-    </View>
+        >
+          <Tabs.Screen name="index" />
+          <Tabs.Screen name="categories" />
+          <Tabs.Screen name="wishlist" />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              href: isWebDesktop ? "/(shop)/(account)/profile" : "/(shop)/(tabs)/profile",
+            }}
+          />
+          <Tabs.Screen name="search" options={{ href: null }} />
+          <Tabs.Screen name="ai-chat" options={{ href: null }} />
+          <Tabs.Screen name="cart" options={{ href: null }} />
+        </Tabs>
+      </View>
+      
+      <WebFooter />
+    </Container>
   );
 }
 

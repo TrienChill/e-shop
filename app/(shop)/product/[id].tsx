@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import Head from "expo-router/head";
 import {
   ArrowLeft,
   ChevronRight,
@@ -685,10 +686,22 @@ export default function ProductDetailScreen() {
     );
   }
 
+  const seoTags = (
+    <Head>
+      <title>{product.name} | E-Shop</title>
+      <meta name="description" content={product.short_description || "Sản phẩm chính hãng tại E-Shop"} />
+      <meta property="og:title" content={product.name} />
+      <meta property="og:description" content={product.short_description || "Sản phẩm chính hãng tại E-Shop"} />
+      {productImages[0] && <meta property="og:image" content={productImages[0]} />}
+      <meta property="og:type" content="product" />
+    </Head>
+  );
+
   // ── Web Desktop 2-column layout ──
   if (IS_WEB_DESKTOP) {
     return (
       <SafeAreaView style={webStyles.safeArea}>
+        {seoTags}
         <StatusBar barStyle="dark-content" backgroundColor="#fff" />
         <WebHeader />
         <ScrollView style={webStyles.scroll} showsVerticalScrollIndicator={false}>
@@ -965,6 +978,7 @@ export default function ProductDetailScreen() {
   // ── Mobile layout (default) ──
   return (
     <SafeAreaView style={styles.safeArea}>
+      {seoTags}
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* ── Nút quay lại ── */}
