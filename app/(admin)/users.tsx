@@ -95,6 +95,8 @@ export default function AdminUserManagementScreen() {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [isLockModalVisible, setIsLockModalVisible] = useState(false);
+  const [isUnlockModalVisible, setIsUnlockModalVisible] = useState(false);
+  const [unlockTargetUserId, setUnlockTargetUserId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form data
@@ -235,32 +237,25 @@ export default function AdminUserManagementScreen() {
   };
 
   const handleUnlockUser = async () => {
-    if (!editFormData.id) return;
+    if (!unlockTargetUserId) return;
 
-    Alert.alert("Xác nhận mở khóa", "Bạn có chắc muốn mở khóa tài khoản này?", [
-      { text: "Hủy", style: "cancel" },
-      {
-        text: "Mở khóa",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            setIsSubmitting(true);
-            const { error } = await supabase.rpc("unlock_user_account", {
-              p_user_id: editFormData.id,
-            });
+    try {
+      setIsSubmitting(true);
+      const { error } = await supabase.rpc("unlock_user_account", {
+        p_user_id: unlockTargetUserId,
+      });
 
-            if (error) throw error;
+      if (error) throw error;
 
-            showToast("Đã mở khóa tài khoản!");
-            fetchUsers();
-          } catch (e: any) {
-            Alert.alert("Lỗi", e.message);
-          } finally {
-            setIsSubmitting(false);
-          }
-        },
-      },
-    ]);
+      showToast("Đã mở khóa tài khoản!");
+      setIsUnlockModalVisible(false);
+      setUnlockTargetUserId(null);
+      fetchUsers();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openEditModal = (user: UserProfile) => {
@@ -271,8 +266,8 @@ export default function AdminUserManagementScreen() {
   const openLockModal = (user: UserProfile) => {
     setEditFormData(user);
     if (user.is_locked) {
-      // If already locked, show confirmation directly
-      handleUnlockUser();
+      setUnlockTargetUserId(user.id);
+      setIsUnlockModalVisible(true);
     } else {
       setIsLockModalVisible(true);
     }
@@ -709,6 +704,51 @@ export default function AdminUserManagementScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── UNLOCK CONFIRMATION MODAL ─────────────────────────────────────────── */}
+      <Modal visible={isUnlockModalVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center p-4">
+          <View className="bg-white w-full max-w-md rounded-2xl p-6">
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                <Unlock size={24} color="#059669" />
+                <Text className="text-xl font-bold text-gray-900 ml-2">
+                  Mở khóa tài khoản
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsUnlockModalVisible(false)}>
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-gray-600 mb-6">
+              Bạn có chắc muốn mở khóa tài khoản này? Người dùng sẽ có thể đăng nhập lại.
+            </Text>
+
+            <View className="flex-row gap-3">
+              <TouchableOpacity
+                onPress={() => setIsUnlockModalVisible(false)}
+                className="flex-1 py-3 rounded-xl items-center bg-gray-100"
+              >
+                <Text className="text-gray-700 font-semibold">Hủy</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleUnlockUser}
+                disabled={isSubmitting}
+                className={`flex-1 py-3 rounded-xl items-center ${
+                  isSubmitting ? "bg-gray-300" : "bg-emerald-600"
+                }`}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text className="text-white font-bold">Mở khóa</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
