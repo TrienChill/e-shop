@@ -10,17 +10,20 @@ import {
   Award,
   Edit2,
   Plus,
-  RefreshCcw,
   Search,
   Trash2,
   Users,
   TrendingUp,
+  ChevronRight,
+  X,
+  Phone,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   Text,
@@ -28,6 +31,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
+
+interface LevelMember {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  avatar_url: string | null;
+  total_spending: number;
+}
 
 interface LevelStats {
   level_id: string;
@@ -48,6 +60,7 @@ const parseVND = (value: string): number => {
 };
 
 export default function AdminMembershipScreen() {
+  const router = useRouter();
   const [levels, setLevels] = useState<MembershipLevelWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -56,6 +69,13 @@ export default function AdminMembershipScreen() {
   // Modal states
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingLevel, setEditingLevel] = useState<MembershipLevel | null>(null);
+
+  // Members modal state
+  const [isMembersModalVisible, setIsMembersModalVisible] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState<MembershipLevelWithStats | null>(null);
+  const [members, setMembers] = useState<LevelMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [membersSearchQuery, setMembersSearchQuery] = useState("");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -120,6 +140,42 @@ export default function AdminMembershipScreen() {
   useEffect(() => {
     fetchLevels();
   }, [fetchLevels]);
+
+  // Fetch members for a specific level
+  const fetchMembers = useCallback(async (levelId: string) => {
+    try {
+      setLoadingMembers(true);
+
+      // Query profiles for this level (email is in auth.users, not profiles)
+      const { data, error: fetchError } = await supabase
+        .from("profiles")
+        .select("id, full_name, phone, avatar_url, total_spending, membership_level_id")
+        .eq("membership_level_id", levelId)
+        .order("total_spending", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setMembers(data || []);
+    } catch (e: any) {
+      Alert.alert("Lỗi", e.message);
+      setMembers([]);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, []);
+
+  // Open members modal
+  const openMembersModal = (level: MembershipLevelWithStats) => {
+    setSelectedLevel(level);
+    setMembersSearchQuery("");
+    setIsMembersModalVisible(true);
+    fetchMembers(level.id);
+  };
+
+  // Navigate to user detail
+  const navigateToUser = (userId: string) => {
+    setIsMembersModalVisible(false);
+    router.push(`/(admin)/users?highlight=${userId}`);
+  };
 
   // Open modal for create/edit
   const openModal = (level?: MembershipLevel) => {
@@ -352,15 +408,19 @@ export default function AdminMembershipScreen() {
             </Text>
           </View>
 
-          <View className="flex-1 bg-gray-50 rounded-xl p-3">
+          <TouchableOpacity
+            onPress={() => openMembersModal(item)}
+            className="flex-1 bg-gray-50 rounded-xl p-3"
+          >
             <View className="flex-row items-center mb-1">
               <Users size={14} color="#6b7280" />
               <Text className="text-gray-500 text-xs ml-1">Thành viên</Text>
+              <ChevronRight size={12} color="#6b7280" className="ml-auto" />
             </View>
             <Text className="text-xl font-bold text-gray-900">
               {item.member_count.toLocaleString("vi-VN")}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Description */}
@@ -386,6 +446,15 @@ export default function AdminMembershipScreen() {
   const filteredLevels = levels.filter((level) =>
     level.level_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Filtered members
+  const filteredMembers = members.filter((member) => {
+    const query = membersSearchQuery.toLowerCase();
+    return (
+      member.full_name?.toLowerCase().includes(query) ||
+      member.phone?.includes(query)
+    );
+  });
 
   // Total stats
   const totalMembers = levels.reduce((sum, l) => sum + l.member_count, 0);
@@ -578,6 +647,126 @@ export default function AdminMembershipScreen() {
                 </Text>
               </TouchableOpacity>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MEMBERS LIST MODAL */}
+      <Modal
+        visible={isMembersModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsMembersModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-6 max-h-[85%]">
+            {/* Header */}
+            <View className="flex-row justify-between items-center mb-4">
+              <View className="flex-row items-center">
+                {selectedLevel && (
+                  <View
+                    className={`w-10 h-10 rounded-full ${TIER_COLORS[selectedLevel.level_name]?.bg || "bg-gray-100"} items-center justify-center mr-3`}
+                  >
+                    <Text className="text-xl">
+                      {TIER_COLORS[selectedLevel.level_name]?.icon || "👤"}
+                    </Text>
+                  </View>
+                )}
+                <View>
+                  <Text className="text-xl font-bold text-gray-900">
+                    Thành viên hạng {selectedLevel?.level_name}
+                  </Text>
+                  <Text className="text-gray-500 text-sm">
+                    {members.length} thành viên
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsMembersModalVisible(false)}
+                className="p-2"
+              >
+                <X size={24} color="#6b7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search */}
+            <View className="flex-row items-center bg-gray-100 rounded-xl px-3 mb-4">
+              <Search size={20} color="#9ca3af" />
+              <TextInput
+                value={membersSearchQuery}
+                onChangeText={setMembersSearchQuery}
+                placeholder="Tìm kiếm thành viên..."
+                className="flex-1 py-3 px-2 text-gray-900"
+                placeholderTextColor="#9ca3af"
+              />
+            </View>
+
+            {/* Members List */}
+            {loadingMembers ? (
+              <View className="items-center justify-center py-10">
+                <ActivityIndicator size="large" color="#4f46e5" />
+                <Text className="text-gray-500 mt-2">Đang tải...</Text>
+              </View>
+            ) : filteredMembers.length === 0 ? (
+              <View className="items-center py-10">
+                <Users size={48} color="#d1d5db" />
+                <Text className="text-gray-400 mt-2">
+                  {membersSearchQuery
+                    ? "Không tìm thấy thành viên"
+                    : "Chưa có thành viên nào"}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredMembers}
+                keyExtractor={(item) => item.id}
+                showsVerticalScrollIndicator={false}
+                style={{ maxHeight: 400 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    onPress={() => navigateToUser(item.id)}
+                    className="flex-row items-center p-3 bg-gray-50 rounded-xl mb-2"
+                  >
+                    {/* Avatar */}
+                    {item.avatar_url ? (
+                      <Image
+                        source={{ uri: item.avatar_url }}
+                        className="w-12 h-12 rounded-full"
+                      />
+                    ) : (
+                      <View className="w-12 h-12 rounded-full bg-indigo-100 items-center justify-center">
+                        <Text className="text-indigo-600 font-bold text-lg">
+                          {item.full_name?.charAt(0)?.toUpperCase() || "?"}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Info */}
+                    <View className="flex-1 ml-3">
+                      <Text className="text-gray-900 font-semibold">
+                        {item.full_name || "Chưa có tên"}
+                      </Text>
+                      {item.phone && (
+                        <View className="flex-row items-center mt-1">
+                          <Phone size={12} color="#9ca3af" />
+                          <Text className="text-gray-400 text-xs ml-1">
+                            {item.phone}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Spending */}
+                    <View className="items-end">
+                      <Text className="text-emerald-600 font-semibold">
+                        {formatVND(item.total_spending || 0)}
+                      </Text>
+                      <Text className="text-gray-400 text-xs">Tổng chi tiêu</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
           </View>
         </View>
       </Modal>
