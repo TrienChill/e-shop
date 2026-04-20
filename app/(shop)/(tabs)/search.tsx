@@ -30,6 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Platform, useWindowDimensions } from "react-native";
 import { FilterSidebarWeb } from "@/src/components/search/FilterSidebarWeb";
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 const { width } = Dimensions.get("window");
 
 // --- Dữ liệu mặc định nếu lịch sử rỗng ---
@@ -312,7 +313,12 @@ export default function SearchScreen() {
                 </View>
                 <View style={styles.infoWrapperWeb}>
                   <Text style={styles.productNameWeb} numberOfLines={2}>{item.name}</Text>
-                  <Text style={styles.productPriceWeb}>{(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ</Text>
+                  <PriceDisplay 
+                    originalPrice={item.price}
+                    finalPrice={item.finalPrice}
+                    hasDiscount={item.finalPrice < item.price}
+                    size="sm"
+                  />
                 </View>
               </TouchableOpacity>
             );
@@ -335,9 +341,12 @@ export default function SearchScreen() {
                   <Text style={styles.compactDesc} numberOfLines={1}>
                     {item.description || "Mô tả sản phẩm đang được cập nhật..."}
                   </Text>
-                  <Text style={styles.compactPrice}>
-                    {(item.finalPrice || item.price || 0).toLocaleString('vi-VN')} đ
-                  </Text>
+                  <PriceDisplay 
+                    originalPrice={item.price}
+                    finalPrice={item.finalPrice}
+                    hasDiscount={item.finalPrice < item.price}
+                    size="sm"
+                  />
                 </View>
                 <View style={styles.compactAction}>
                   <ChevronRight size={18} color="#9CA3AF" />
