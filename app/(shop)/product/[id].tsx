@@ -124,6 +124,7 @@ export default function ProductDetailScreen() {
   // Thêm State cho Pop-up và Số lượng
   const [isModalVisible, setModalVisible] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [errorMsg, setErrorMsg] = useState("");
 
   // 1. Tạo ref cho ScrollView ảnh
   const imageScrollRef = useRef<FlatList>(null);
@@ -261,6 +262,32 @@ export default function ProductDetailScreen() {
         v.size === size && (selectedColor ? v.color === selectedColor : true),
     );
     return v?.stock ?? 0;
+  };
+
+  const handleAddToCartWeb = () => {
+    const isSizeSelected = !hasSizes || !!selectedSize;
+    const isColorSelected = !hasColors || !!selectedColor;
+
+    if (!isSizeSelected && !isColorSelected) {
+      setErrorMsg("⚠️ Vui lòng chọn Màu sắc và Kích cỡ.");
+      return;
+    }
+    if (!isColorSelected) {
+      setErrorMsg("⚠️ Vui lòng chọn Màu sắc.");
+      return;
+    }
+    if (!isSizeSelected) {
+      setErrorMsg("⚠️ Vui lòng chọn Kích cỡ.");
+      return;
+    }
+    
+    if (availableStock === 0) {
+      setErrorMsg("⚠️ Sản phẩm này đã hết hàng!");
+      return;
+    }
+
+    setErrorMsg("");
+    addToCartService(quantity);
   };
 
   // Hàm xử lý Thêm vào giỏ từ màn hình chính
@@ -573,6 +600,7 @@ export default function ProductDetailScreen() {
 
   // 3. Hàm xử lý chọn màu
   const handleSelectColor = (color: string) => {
+    setErrorMsg("");
     if (selectedColor === color) {
       setSelectedColor(null);
       setSelectedSize(null);
@@ -777,8 +805,18 @@ export default function ProductDetailScreen() {
                             <TouchableOpacity
                               key={index}
                               activeOpacity={0.8}
-                              onPress={() => !isOutOfStock && handleSelectColor(color)}
-                              style={[styles.colorChip, isSelected && styles.colorChipSelected, isOutOfStock && styles.chipDisabled]}
+                              onPress={() => {
+                                if (!isOutOfStock) {
+                                  handleSelectColor(color);
+                                  setErrorMsg("");
+                                }
+                              }}
+                              style={[
+                                styles.colorChip, 
+                                isSelected && styles.colorChipSelected, 
+                                isOutOfStock && styles.chipDisabled,
+                                (errorMsg.includes("Màu sắc") && !selectedColor) && { borderColor: 'red', backgroundColor: '#FEF2F2' }
+                              ]}
                             >
                               <Text style={[styles.colorChipText, isSelected && styles.colorChipTextSelected, isOutOfStock && styles.chipTextDisabled]}>
                                 {color}
@@ -804,8 +842,18 @@ export default function ProductDetailScreen() {
                             <TouchableOpacity
                               key={index}
                               activeOpacity={0.8}
-                              onPress={() => !isOutOfStock && setSelectedSize((prev) => (prev === size ? null : size))}
-                              style={[styles.chip, { borderWidth: 1, borderColor: isSelected ? "#3B82F6" : "#E5E7EB", backgroundColor: isSelected ? "#EFF6FF" : isOutOfStock ? "#F3F4F6" : "#F9FAFB" }, isOutOfStock && styles.chipDisabled]}
+                              onPress={() => {
+                                if (!isOutOfStock) {
+                                  setSelectedSize((prev) => (prev === size ? null : size));
+                                  setErrorMsg("");
+                                }
+                              }}
+                              style={[
+                                styles.chip, 
+                                { borderWidth: 1, borderColor: isSelected ? "#3B82F6" : "#E5E7EB", backgroundColor: isSelected ? "#EFF6FF" : isOutOfStock ? "#F3F4F6" : "#F9FAFB" }, 
+                                isOutOfStock && styles.chipDisabled,
+                                (errorMsg.includes("Kích cỡ") && !selectedSize) && { borderColor: 'red', backgroundColor: '#FEF2F2' }
+                              ]}
                             >
                               <Text style={[{ color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151", fontWeight: isSelected ? "700" : "500" }]}>
                                 {size}
@@ -822,13 +870,24 @@ export default function ProductDetailScreen() {
 
                   <View style={styles.divider} />
 
-                  {/* Action bar */}
-                  <View style={styles.actionBar}>
-                    <TouchableOpacity style={styles.actionIcon} activeOpacity={0.7} onPress={handleToggleFavorite}>
-                      <Heart size={22} color={wishlist ? "#EF4444" : "#fff"} fill={wishlist ? "#EF4444" : "transparent"} />
+                  {/* TEXT BÁO LỖI */}
+                  {errorMsg ? <Text style={webStyles.errorText}>{errorMsg}</Text> : null}
+
+                  {/* KHU VỰC NÚT BẤM DÀNH CHO WEB (Thay thế thanh đen) */}
+                  <View style={webStyles.webActionRow}>
+                    <TouchableOpacity 
+                      style={[webStyles.btnWishlist, wishlist && webStyles.btnWishlistActive]} 
+                      activeOpacity={0.8} 
+                      onPress={handleToggleFavorite}
+                    >
+                      <Heart size={24} color={wishlist ? "#EF4444" : "#6B7280"} fill={wishlist ? "#EF4444" : "transparent"} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.addBagBtn} activeOpacity={0.85} onPress={handleAddToBag}>
-                      <Text style={styles.addBagText}>Thêm vào giỏ</Text>
+                    <TouchableOpacity 
+                      style={webStyles.btnAddToCart} 
+                      activeOpacity={0.85} 
+                      onPress={handleAddToCartWeb}
+                    >
+                      <Text style={webStyles.btnAddToCartText}>Thêm vào giỏ</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2327,5 +2386,50 @@ const webStyles = StyleSheet.create({
     paddingTop: 32,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 14,
+    marginBottom: 12,
+    fontWeight: '500'
+  },
+  webActionRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 8,
+    alignItems: 'center'
+  },
+  btnWishlist: {
+    width: 54,
+    height: 54,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnWishlistActive: {
+    borderColor: '#FEF2F2',
+    backgroundColor: '#FEF2F2',
+  },
+  btnAddToCart: {
+    flex: 1,
+    height: 54,
+    borderRadius: 12,
+    backgroundColor: '#0055FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#0055FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  btnAddToCartText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });
