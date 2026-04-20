@@ -1,13 +1,15 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React from "react";
-import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { supabase } from "@/src/lib/supabase";
+import WebHeader from "@/src/components/web/WebHeader";
 
 const { width } = Dimensions.get("window");
 
-// Custom Tab Bar Component
 function CustomTabBar({ state, descriptors, navigation }: any) {
-  // Hide tab bar on cart screen
+  if (Platform.OS === "web") return null;
+
   if (state.routes[state.index].name === "cart") return null;
 
   const onTabPress = (routeName: string, isFocused: boolean) => {
@@ -28,7 +30,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   return (
     <View style={styles.bottomNavContainer}>
       <View style={styles.bottomNav}>
-        {/* Nút 1: HOME */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onTabPress(routes[0], state.routeNames[activeIndex] === routes[0])}
@@ -43,7 +44,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           </View>
         </TouchableOpacity>
 
-        {/* Nút 2: CATEGORIES */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onTabPress(routes[1], state.routeNames[activeIndex] === routes[1])}
@@ -58,7 +58,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           </View>
         </TouchableOpacity>
 
-        {/* Nút 3: WISHLIST */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onTabPress(routes[2], state.routeNames[activeIndex] === routes[2])}
@@ -73,7 +72,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           </View>
         </TouchableOpacity>
 
-        {/* Nút 4: PROFILE */}
         <TouchableOpacity
           style={styles.navItem}
           onPress={() => onTabPress(routes[3], state.routeNames[activeIndex] === routes[3])}
@@ -93,33 +91,71 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  const isWeb = Platform.OS === "web";
+  const [cartCount, setCartCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCartCount = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          setCartCount(0);
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from("cart_items")
+          .select("quantity")
+          .eq("user_id", user.id);
+
+        if (error) throw error;
+
+        const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+        setCartCount(total);
+      } catch (error) {
+        console.error("Lỗi lấy số lượng giỏ hàng:", error);
+      }
+    };
+
+    fetchCartCount();
+  }, []);
+
   return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: "transparent",
-          borderTopWidth: 0,
-          elevation: 0,
-        },
-      }}
-    >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="categories" />
-      <Tabs.Screen name="wishlist" />
-      <Tabs.Screen name="profile" />
-      {/* Các màn hình thuộc /tabs nhưng không hiển thị trên Bottom Bar */}
-      <Tabs.Screen name="search" options={{ href: null }} />
-      <Tabs.Screen name="ai-chat" options={{ href: null }} />
-      <Tabs.Screen name="cart" options={{ href: null }} />
-    </Tabs>
+    <View style={styles.container}>
+      {isWeb && <WebHeader cartCount={cartCount} />}
+
+      <Tabs
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarStyle: {
+            display: isWeb ? "none" : "flex",
+            position: "absolute",
+            backgroundColor: "transparent",
+            borderTopWidth: 0,
+            elevation: 0,
+          },
+        }}
+      >
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="categories" />
+        <Tabs.Screen name="wishlist" />
+        <Tabs.Screen name="profile" />
+        <Tabs.Screen name="search" options={{ href: null }} />
+        <Tabs.Screen name="ai-chat" options={{ href: null }} />
+        <Tabs.Screen name="cart" options={{ href: null }} />
+      </Tabs>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   bottomNavContainer: {
     position: "absolute",
     bottom: 24,

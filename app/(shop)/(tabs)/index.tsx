@@ -1,14 +1,18 @@
 import {
   ActivityIndicator,
   Dimensions,
+  FlatList,
   Image,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -38,6 +42,17 @@ const { width } = Dimensions.get("window");
 // ==================== COMPONENTS ====================
 
 const HomeScreen = () => {
+  const { width: windowWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web';
+
+  // Responsive calculations
+  const responsivePadding = windowWidth > 1200 ? 100 : windowWidth > 900 ? 60 : windowWidth > 600 ? 24 : 16;
+  const popularColumns = windowWidth > 1200 ? 4 : windowWidth > 900 ? 3 : windowWidth > 600 ? 2 : 2;
+  const justForYouColumns = windowWidth > 1200 ? 5 : windowWidth > 900 ? 4 : windowWidth > 600 ? 3 : 2;
+
+  // Hide mobile header on web - WebHeader is in _layout
+  const showMobileHeader = !isWeb;
+
   {
     /* ========== TOP PRODUCTS SECTION ========== */
   }
@@ -346,42 +361,44 @@ const HomeScreen = () => {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>E-Shop</Text>
+      {showMobileHeader && (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>E-Shop</Text>
 
-        <TouchableOpacity
-          style={styles.searchBar}
-          activeOpacity={0.8}
-          onPress={() => router.push("/(shop)/(tabs)/search")}
-        >
-          <Text style={styles.searchText}>Tìm kiếm...</Text>
-          <MaterialIcons name="photo-camera" size={24} color="#0055FF" />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchBar}
+            activeOpacity={0.8}
+            onPress={() => router.push("/(shop)/(tabs)/search")}
+          >
+            <Text style={styles.searchText}>Tìm kiếm...</Text>
+            <MaterialIcons name="photo-camera" size={24} color="#0055FF" />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.cartButton}
-          activeOpacity={0.7}
-          onPress={() => router.push("/(shop)/(tabs)/cart")}
-        >
-          <MaterialIcons name="shopping-bag" size={28} color="#1a1a1a" />
+          <TouchableOpacity
+            style={styles.cartButton}
+            activeOpacity={0.7}
+            onPress={() => router.push("/(shop)/(tabs)/cart")}
+          >
+            <MaterialIcons name="shopping-bag" size={28} color="#1a1a1a" />
 
-          {/* Hiển thị Badge nếu số lượng > 0 */}
-          {cartCount > 0 && (
-            <View style={styles.cartBadge}>
-              <Text style={styles.cartBadgeText}>
-                {cartCount > 99 ? "99+" : cartCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+            {/* Hiển thị Badge nếu số lượng > 0 */}
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>
+                  {cartCount > 99 ? "99+" : cartCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={400}
+        contentContainerStyle={isWeb ? { paddingHorizontal: responsivePadding } : undefined}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          // Tải thêm nếu cách đáy 300px
           if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 300) {
             loadMoreJustForYou();
           }
@@ -389,7 +406,7 @@ const HomeScreen = () => {
       >
         {/* ========== BANNER SECTION ========== */}
         {banners.length > 0 && (
-          <View style={styles.bannerContainer}>
+          <View style={[styles.bannerContainer, isWeb && { paddingHorizontal: 0 }]}>
             <ScrollView
               ref={bannerScrollRef}
               horizontal
@@ -401,7 +418,7 @@ const HomeScreen = () => {
               {displayBanners.map((banner, index) => (
                 <TouchableOpacity
                   key={`${banner.id}-${banner.updated_at}-${index}`}
-                  style={[styles.bannerContent, { width: width - 32 }]}
+                  style={[styles.bannerContent, { width: isWeb ? Math.min(windowWidth - responsivePadding * 2, 1200) : width - 32 }]}
                   activeOpacity={0.9}
                   onPress={() => {
                     if (banner.action_type === "product" && banner.action_value) {
@@ -592,8 +609,8 @@ const HomeScreen = () => {
         </TouchableOpacity>
 
         {/* ========== MOST POPULAR SECTION ========== */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+        <View style={[styles.section, isWeb && { paddingHorizontal: 0 }]}>
+          <View style={[styles.sectionHeader, isWeb && { paddingHorizontal: responsivePadding }]}>
             <Text style={styles.sectionTitle}>Nổi tiếng nhất</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
@@ -604,86 +621,133 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.popularGrid}>
-            {/* Thêm .slice(0, 4) để chỉ lấy 4 phần tử đầu tiên */}
-            {popularItems.slice(0, 4).map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.popularCard}
-                onPress={() => router.push(`/(shop)/product/${item.id}`)}
-              >
-                <Image
-                  source={{ uri: item.images?.[0] || item.image }}
-                  style={styles.popularImage}
-                  resizeMode="cover"
-                />
-
-                {/* Hiển thị Rating & Lượt xem nhỏ bên dưới ảnh */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    paddingHorizontal: 4,
-                    marginTop: 4,
-                  }}
+          <View style={[
+            styles.popularGrid,
+            isWeb && {
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              paddingHorizontal: responsivePadding,
+              gap: 16,
+            }
+          ]}>
+            {popularItems.slice(0, isWeb ? popularColumns * 2 : 4).map((item) => {
+              const cardWidth = isWeb
+                ? (windowWidth - responsivePadding * 2 - 16 * (popularColumns - 1)) / popularColumns
+                : (width - 44) / 2;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.popularCard,
+                    isWeb && {
+                      width: cardWidth,
+                      marginBottom: 16,
+                    }
+                  ]}
+                  onPress={() => router.push(`/(shop)/product/${item.id}`)}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <MaterialIcons name="star" size={12} color="#f59e0b" />
-                    <Text style={{ fontSize: 11, color: "#666" }}>
-                      {" "}
-                      {item.average_rating || 0}
+                  <Image
+                    source={{ uri: item.images?.[0] || item.image }}
+                    style={[
+                      styles.popularImage,
+                      isWeb && { height: cardWidth * 0.75 }
+                    ]}
+                    resizeMode="cover"
+                  />
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 4,
+                      marginTop: 4,
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <MaterialIcons name="star" size={12} color="#f59e0b" />
+                      <Text style={{ fontSize: 11, color: "#666" }}>
+                        {item.average_rating || 0}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: "#999" }}>
+                      {item.view_count || 0} lượt xem
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 11, color: "#999" }}>
-                    {item.view_count || 0} lượt xem
-                  </Text>
-                </View>
 
-                <Text style={styles.popularName} numberOfLines={2}>
-                  {item.name}
-                </Text>
-                <PriceDisplay
-                  hasDiscount={item.hasDiscount}
-                  finalPrice={item.finalPrice}
-                  originalPrice={item.originalPrice}
-                  size="md"
-                />
-              </TouchableOpacity>
-            ))}
+                  <Text style={styles.popularName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <PriceDisplay
+                    hasDiscount={item.hasDiscount}
+                    finalPrice={item.finalPrice}
+                    originalPrice={item.originalPrice}
+                    size="md"
+                  />
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
         {/* ========== JUST FOR YOU SECTION ========== */}
-        <View style={[styles.section, { marginBottom: 100 }]}>
-          <View style={styles.justForYouHeader}>
+        <View style={[styles.section, { marginBottom: isWeb ? 40 : 100 }]}>
+          <View style={[styles.justForYouHeader, isWeb && { paddingHorizontal: responsivePadding }]}>
             <MaterialIcons name="star" size={20} color="#2563eb" />
             <Text style={styles.sectionTitle}>Dành cho bạn</Text>
           </View>
 
-          <View style={styles.justForYouGrid}>
-            {justForYouItems.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.justForYouCard}
-                onPress={() => router.push(`/(shop)/product/${item.id}`)}
-              >
-                <Image
-                  source={{ uri: item.images?.[0] || item.image || "https://via.placeholder.com/400" }}
-                  style={styles.justForYouImage}
-                  resizeMode="cover"
-                />
-                <Text style={styles.justForYouName} numberOfLines={2}>
-                  {item.name}
-                </Text>
-                <PriceDisplay
-                  hasDiscount={item.hasDiscount}
-                  finalPrice={item.finalPrice}
-                  originalPrice={item.originalPrice}
-                  size="md"
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
+          <FlatList
+            key={justForYouColumns}
+            data={justForYouItems}
+            numColumns={justForYouColumns}
+            keyExtractor={(item) => String(item.id)}
+            scrollEnabled={false}
+            columnWrapperStyle={isWeb ? {
+              paddingHorizontal: responsivePadding,
+              gap: 16,
+            } : undefined}
+            renderItem={({ item }) => {
+              const cardWidth = isWeb
+                ? (windowWidth - responsivePadding * 2 - 16 * (justForYouColumns - 1)) / justForYouColumns
+                : (width - 44) / 2;
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.justForYouCard,
+                    isWeb && {
+                      flex: 1,
+                      maxWidth: cardWidth,
+                      marginBottom: 16,
+                    }
+                  ]}
+                  onPress={() => router.push(`/(shop)/product/${item.id}`)}
+                >
+                  <Image
+                    source={{ uri: item.images?.[0] || item.image || "https://via.placeholder.com/400" }}
+                    style={[
+                      styles.justForYouImage,
+                      isWeb && { height: cardWidth * 0.8 }
+                    ]}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.justForYouName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <PriceDisplay
+                    hasDiscount={item.hasDiscount}
+                    finalPrice={item.finalPrice}
+                    originalPrice={item.originalPrice}
+                    size="md"
+                  />
+                </TouchableOpacity>
+              );
+            }}
+            contentContainerStyle={!isWeb ? {
+              paddingHorizontal: 16,
+              gap: 12,
+            } : undefined}
+            style={isWeb ? { flex: 1 } : undefined}
+          />
 
           {/* Vòng quay tải thêm nằm dưới lưới Just for you */}
           {isLoadingMore.current && (
