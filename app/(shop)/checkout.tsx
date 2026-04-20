@@ -952,7 +952,10 @@ export default function CheckoutScreen() {
                 </View>
                 <Text style={styles.statusTitle}>Thành công!</Text>
                 <Text style={styles.statusDesc}>Thanh toán của bạn đã được ghi nhận</Text>
-                <TouchableOpacity style={styles.trackOrderBtn} onPress={() => router.push("/to-receive")}>
+                <TouchableOpacity style={styles.trackOrderBtn} onPress={() => {
+                  setPaymentStatus("idle");
+                  router.push("/to-receive");
+                }}>
                   <Text style={styles.trackOrderText}>Theo dõi đơn hàng</Text>
                 </TouchableOpacity>
               </>
