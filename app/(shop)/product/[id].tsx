@@ -13,11 +13,13 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -27,6 +29,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
+import WebHeader from "@/src/components/web/WebHeader";
 import {
   calculateDiscountedPrice,
   getPopularProducts,
@@ -36,7 +39,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
+const MOBILE_IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 const CARD_WIDTH = (SCREEN_WIDTH - 46) / 2; // Adjusted for gap
 
 // ─────────────────────────── Dữ liệu giả ───────────────────────────
@@ -545,6 +548,11 @@ export default function ProductDetailScreen() {
     fetchPopular();
   }, [id, refreshTrigger]);
 
+  // ── Responsive guard (must be called before any conditional return) ──
+  const { width: WINDOW_WIDTH } = useWindowDimensions();
+  const IS_WEB_DESKTOP = Platform.OS === "web" && WINDOW_WIDTH >= 1024;
+  const IMAGE_HEIGHT = IS_WEB_DESKTOP ? 500 : SCREEN_HEIGHT * 0.42;
+
   // 3. Hiển thị loading trong lúc đợi dữ liệu
   if (loading) {
     return (
@@ -649,6 +657,253 @@ export default function ProductDetailScreen() {
     );
   }
 
+  // ── Web Desktop 2-column layout ──
+  if (IS_WEB_DESKTOP) {
+    return (
+      <SafeAreaView style={webStyles.safeArea}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <WebHeader />
+        <ScrollView style={webStyles.scroll} showsVerticalScrollIndicator={false}>
+          {/* Container centered with maxWidth 1200 */}
+          <View style={webStyles.container}>
+            {/* ── Row: Left (Gallery 60%) + Right (Info 40% sticky) ── */}
+            <View style={webStyles.twoColRow}>
+              {/* Left: Image Gallery */}
+              <View style={webStyles.leftCol}>
+                {/* Main image */}
+                <Image
+                  key={productImages[activeIndex]}
+                  source={{ uri: productImages[activeIndex] || "https://via.placeholder.com/800" }}
+                  style={[webStyles.mainImage, { height: IMAGE_HEIGHT }]}
+                  resizeMode="contain"
+                />
+                {/* Thumbnail strip */}
+                {productImages.length > 1 && (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={webStyles.thumbScroll}
+                    contentContainerStyle={webStyles.thumbContainer}
+                  >
+                    {productImages.map((imgUrl: string, index: number) => (
+                      <TouchableOpacity
+                        key={index}
+                        activeOpacity={0.8}
+                        onPress={() => handleSelectImage(index)}
+                        style={[
+                          webStyles.thumb,
+                          activeIndex === index && webStyles.thumbActive,
+                        ]}
+                      >
+                        <Image
+                          source={{ uri: imgUrl }}
+                          style={webStyles.thumbImg}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+
+              {/* Right: Product Info — sticky panel */}
+              <View style={webStyles.rightCol}>
+                <View style={webStyles.stickyPanel}>
+                  {/* Back button */}
+                  <TouchableOpacity
+                    style={webStyles.backBtn}
+                    activeOpacity={0.8}
+                    onPress={() => router.back()}
+                  >
+                    <ArrowLeft size={20} color="#111" />
+                  </TouchableOpacity>
+
+                  {/* Price */}
+                  <View style={styles.priceRow}>
+                    <PriceDisplay
+                      hasDiscount={product.hasDiscount}
+                      finalPrice={product.finalPrice}
+                      originalPrice={product.originalPrice ?? product.price ?? 0}
+                      size="lg"
+                    />
+                    <TouchableOpacity style={styles.shareBtn} activeOpacity={0.7}>
+                      <Share2 size={16} color="#3B82F6" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Name */}
+                  <Text style={webStyles.productName}>{product.name}</Text>
+                  {product.short_description && (
+                    <Text style={webStyles.shortDesc}>{product.short_description}</Text>
+                  )}
+
+                  {/* Rating row */}
+                  <View style={webStyles.ratingRow}>
+                    <StarRow rating={Math.round(averageRating)} size={16} />
+                    <Text style={webStyles.ratingText}>
+                      {averageRating}/5 ({reviews.length} đánh giá)
+                    </Text>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  {/* Stock badge */}
+                  {!variantsLoaded ? (
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                  ) : (
+                    <View style={styles.stockRow}>
+                      <View style={[styles.stockBadge, totalStock < 10 && styles.stockBadgeLow]}>
+                        <Text style={[styles.stockBadgeText, totalStock < 10 && styles.stockBadgeTextLow]}>
+                          {totalStock < 10 ? `Còn ${totalStock}` : `Còn hàng (${totalStock})`}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Color selector */}
+                  {hasColors && (
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={styles.sectionTitle}>Màu sắc</Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.variantList}
+                      >
+                        {uniqueColors.map((color: string, index: number) => {
+                          const isSelected = selectedColor === color;
+                          const colorStock = getColorStock(color);
+                          const isOutOfStock = colorStock === 0;
+                          return (
+                            <TouchableOpacity
+                              key={index}
+                              activeOpacity={0.8}
+                              onPress={() => !isOutOfStock && handleSelectColor(color)}
+                              style={[styles.colorChip, isSelected && styles.colorChipSelected, isOutOfStock && styles.chipDisabled]}
+                            >
+                              <Text style={[styles.colorChipText, isSelected && styles.colorChipTextSelected, isOutOfStock && styles.chipTextDisabled]}>
+                                {color}
+                              </Text>
+                              <Text style={styles.stockLabel}>{isOutOfStock ? "Hết" : `${colorStock}`}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  {/* Size selector */}
+                  {hasSizes && (
+                    <View style={{ marginBottom: 16 }}>
+                      <Text style={styles.sectionTitle}>Kích cỡ</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.variantList}>
+                        {sizesForColor.map((size: string, index: number) => {
+                          const isSelected = selectedSize === size;
+                          const sizeStock = getSizeStock(size);
+                          const isOutOfStock = sizeStock === 0;
+                          return (
+                            <TouchableOpacity
+                              key={index}
+                              activeOpacity={0.8}
+                              onPress={() => !isOutOfStock && setSelectedSize((prev) => (prev === size ? null : size))}
+                              style={[styles.chip, { borderWidth: 1, borderColor: isSelected ? "#3B82F6" : "#E5E7EB", backgroundColor: isSelected ? "#EFF6FF" : isOutOfStock ? "#F3F4F6" : "#F9FAFB" }, isOutOfStock && styles.chipDisabled]}
+                            >
+                              <Text style={[{ color: isSelected ? "#3B82F6" : isOutOfStock ? "#D1D5DB" : "#374151", fontWeight: isSelected ? "700" : "500" }]}>
+                                {size}
+                              </Text>
+                              <Text style={[styles.chipStockLabel, isOutOfStock && { color: "#EF4444" }]}>
+                                {isOutOfStock ? "Hết" : sizeStock}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
+
+                  <View style={styles.divider} />
+
+                  {/* Action bar */}
+                  <View style={styles.actionBar}>
+                    <TouchableOpacity style={styles.actionIcon} activeOpacity={0.7} onPress={handleToggleFavorite}>
+                      <Heart size={22} color={wishlist ? "#EF4444" : "#fff"} fill={wishlist ? "#EF4444" : "transparent"} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.addBagBtn} activeOpacity={0.85} onPress={handleAddToBag}>
+                      <Text style={styles.addBagText}>Thêm vào giỏ</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ── Below the fold: Description + Reviews ── */}
+            <View style={webStyles.belowFold}>
+              {/* Product description */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Chi tiết sản phẩm</Text>
+                {product.specifications && product.specifications.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    {product.specifications.map((spec: any, index: number) => (
+                      <View key={index} style={{ flexDirection: "row", marginBottom: 8 }}>
+                        <Text style={{ width: 160, color: "#6B7280", fontSize: 14 }}>{spec.name || spec.label}</Text>
+                        <Text style={{ flex: 1, color: "#111827", fontSize: 14 }}>{spec.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Text style={[styles.sectionTitle, { marginTop: 8 }]}>Mô tả sản phẩm</Text>
+                <Text style={{ color: "#374151", fontSize: 14, lineHeight: 22 }}>{product.description || "Đang cập nhật mô tả..."}</Text>
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Reviews */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Đánh giá & Nhận xét ({reviews.length})</Text>
+                <View style={styles.overallRating}>
+                  <StarRow rating={Math.round(averageRating)} size={20} />
+                  <Text style={styles.overallScore}>{averageRating}/5</Text>
+                </View>
+                {reviews.length > 0 ? (
+                  reviews.slice(0, 2).map((r) => <ReviewCard key={r.id} review={r} />)
+                ) : (
+                  <Text style={{ color: "#9CA3AF", marginVertical: 10 }}>Chưa có đánh giá nào.</Text>
+                )}
+                {reviews.length > 2 && (
+                  <TouchableOpacity
+                    style={styles.viewAllBtn}
+                    activeOpacity={0.8}
+                    onPress={() => router.push({ pathname: "/product/reviews" as any, params: { productId: id, productName: product.name } })}
+                  >
+                    <Text style={styles.viewAllText}>Xem tất cả {reviews.length} nhận xét</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <View style={styles.divider} />
+
+              {/* Popular products */}
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Sản phẩm phổ biến</Text>
+                </View>
+                <View style={[styles.popularGrid, { flexDirection: "row", flexWrap: "wrap", gap: 16 }]}>
+                  {popularProducts.slice(0, 4).map((item) => (
+                    <PopularCard
+                      key={item.id}
+                      style={{ width: 240 }}
+                      item={{ ...item, image: item.images?.[0] || "https://via.placeholder.com/300", badge: item.stock < 5 ? "Sắp hết" : "Hot", badgeColor: item.stock < 5 ? "#FBBF24" : "#EF4444" }}
+                    />
+                  ))}
+                </View>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Mobile layout (default) ──
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -1341,7 +1596,7 @@ const styles = StyleSheet.create({
   // ── Hero ──
   heroContainer: {
     width: SCREEN_WIDTH,
-    height: IMAGE_HEIGHT,
+    height: MOBILE_IMAGE_HEIGHT,
     backgroundColor: "#F3F4F6",
   },
   heroImage: {
@@ -1968,5 +2223,109 @@ const styles = StyleSheet.create({
     color: "#10B981",
     marginTop: 3,
     fontWeight: "500",
+  },
+});
+
+// ── Web Desktop styles ──
+const webStyles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  scroll: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  container: {
+    maxWidth: 1200,
+    alignSelf: "center",
+    width: "100%",
+    paddingHorizontal: 32,
+    paddingVertical: 32,
+  },
+  twoColRow: {
+    flexDirection: "row",
+    gap: 32,
+    alignItems: "flex-start",
+  },
+  leftCol: {
+    flex: 6,
+  },
+  rightCol: {
+    flex: 4,
+    position: "relative",
+  },
+  stickyPanel: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 16,
+    padding: 24,
+    position: "sticky",
+    top: 24,
+  },
+  mainImage: {
+    width: "100%",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 16,
+  },
+  thumbScroll: {
+    marginTop: 16,
+  },
+  thumbContainer: {
+    flexDirection: "row",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  thumb: {
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  thumbActive: {
+    borderColor: "#2563EB",
+  },
+  thumbImg: {
+    width: 72,
+    height: 72,
+    backgroundColor: "#E5E7EB",
+  },
+  backBtn: {
+    alignSelf: "flex-start",
+    marginBottom: 16,
+    padding: 8,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+  },
+  productName: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#111827",
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  shortDesc: {
+    fontSize: 14,
+    color: "#6B7280",
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  ratingText: {
+    fontSize: 14,
+    color: "#6B7280",
+    fontWeight: "500",
+  },
+  belowFold: {
+    marginTop: 48,
+    paddingTop: 32,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
 });

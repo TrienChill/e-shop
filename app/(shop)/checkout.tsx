@@ -2,6 +2,7 @@ import AddressEditModal from "@/src/components/checkout/AddressEditModal";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 import PriceDisplay from "@/src/components/common/PriceDisplay";
 import VoucherCollection from "@/src/components/common/VoucherCollection";
+import WebHeader from "@/src/components/web/WebHeader";
 import { supabase } from "@/src/lib/supabase";
 import {
   calculateDiscountedPrice,
@@ -27,12 +28,14 @@ import {
   Dimensions,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -676,6 +679,177 @@ export default function CheckoutScreen() {
     }
   };
 
+  // ── Responsive guard ──
+  const { width: WINDOW_WIDTH } = useWindowDimensions();
+  const IS_WEB_DESKTOP = Platform.OS === "web" && WINDOW_WIDTH >= 1024;
+
+  // ── Web Desktop 2-column layout ──
+  if (IS_WEB_DESKTOP) {
+    return (
+      <SafeAreaView style={webStyles.safeArea}>
+        <StatusBar barStyle="dark-content" />
+        <WebHeader />
+        <View style={webStyles.layout}>
+          {/* Left column (70%): Form */}
+          <ScrollView
+            style={webStyles.leftCol}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={webStyles.leftScrollContent}
+          >
+            {/* Header */}
+            <View style={webStyles.headerRow}>
+              <TouchableOpacity onPress={() => router.back()} style={webStyles.backBtnHeader}>
+                <ChevronLeft size={28} color={C.text} />
+              </TouchableOpacity>
+              <Text style={webStyles.headerTitle}>Thanh toán</Text>
+            </View>
+
+            {/* Address section */}
+            <View style={webStyles.addressCard}>
+              <View style={webStyles.addressCardHeader}>
+                <Text style={webStyles.addressCardTitle}>Địa chỉ giao hàng</Text>
+                <TouchableOpacity onPress={() => setShowAddressModal(true)}>
+                  <Text style={webStyles.changeAddressBtn}>Thay đổi</Text>
+                </TouchableOpacity>
+              </View>
+              {loading ? (
+                <ActivityIndicator size="small" color="#2563EB" />
+              ) : userAddress ? (
+                <View>
+                  <Text style={webStyles.receiverName}>{userAddress.receiver_name} | {userAddress.phone_number}</Text>
+                  <Text style={webStyles.addressText}>
+                    {userAddress.street_address}, {userAddress.ward_commune ? userAddress.ward_commune + ", " : ""}{userAddress.district}, {userAddress.province_city}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={webStyles.noAddress}>Chưa có địa chỉ giao hàng.</Text>
+              )}
+            </View>
+
+            {/* Shipping options */}
+            <View style={webStyles.sectionBlock}>
+              <Text style={webStyles.sectionTitle}>Phương thức vận chuyển</Text>
+              <ShippingOptions
+                customerDistrictId={customerDistrictId}
+                customerWardCode={customerWardCode}
+                totalCartWeight={1500}
+                onSelectMethod={(serviceId, fee) => {
+                  setSelectedShippingId(String(serviceId));
+                  setDynamicShippingFee(fee);
+                }}
+              />
+            </View>
+
+            {/* Payment method */}
+            <View style={webStyles.sectionBlock}>
+              <Text style={webStyles.sectionTitle}>Phương thức thanh toán</Text>
+              <View style={webStyles.codCard}>
+                <View style={webStyles.codIconWrapper}>
+                  <Banknote size={24} color={C.blue} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={webStyles.codTitle}>Thanh toán khi nhận hàng (COD)</Text>
+                  <Text style={webStyles.codSubtitle}>Thanh toán bằng tiền mặt khi giao hàng tận nơi</Text>
+                </View>
+                <CheckCircle2 size={22} color={C.blue} />
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Right column (30%): Order Summary — sticky */}
+          <View style={webStyles.rightCol}>
+            <View style={webStyles.stickySummary}>
+              <Text style={webStyles.summaryTitle}>Tóm tắt đơn hàng</Text>
+
+              {/* Cart items */}
+              {loading ? (
+                <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "center", marginVertical: 20 }} />
+              ) : cartItems.length > 0 ? (
+                cartItems.map((item) => (
+                  <View key={item.id} style={webStyles.summaryItem}>
+                    <View style={webStyles.summaryItemImgWrap}>
+                      <Image source={{ uri: item.image }} style={webStyles.summaryItemImg} />
+                      <View style={webStyles.summaryItemQtyBadge}>
+                        <Text style={webStyles.summaryItemQty}>{item.quantity}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={webStyles.summaryItemName} numberOfLines={2}>{item.name}</Text>
+                      <Text style={webStyles.summaryItemMeta}>{item.color}, {item.size}</Text>
+                    </View>
+                    <PriceDisplay
+                      originalPrice={item.originalPrice * item.quantity}
+                      finalPrice={item.price * item.quantity}
+                      hasDiscount={item.hasDiscount}
+                      size="sm"
+                      justify="flex-end"
+                    />
+                  </View>
+                ))
+              ) : (
+                <Text style={{ color: C.sub, textAlign: "center", padding: 20 }}>Không có sản phẩm</Text>
+              )}
+
+              {/* Summary totals */}
+              <View style={webStyles.summaryDivider} />
+              <View style={webStyles.summaryRow}>
+                <Text style={webStyles.summaryLabel}>Tạm tính</Text>
+                <Text style={webStyles.summaryValue}>{productsTotal.toLocaleString("vi-VN")}₫</Text>
+              </View>
+              <View style={webStyles.summaryRow}>
+                <Text style={webStyles.summaryLabel}>Phí vận chuyển</Text>
+                <Text style={webStyles.summaryValue}>{shippingFee.toLocaleString("vi-VN")}₫</Text>
+              </View>
+              {selectedVoucher && (
+                <View style={webStyles.summaryRow}>
+                  <Text style={webStyles.summaryLabel}>Giảm giá</Text>
+                  <Text style={[webStyles.summaryValue, { color: "#EF4444" }]}>-{finalDiscount.toLocaleString("vi-VN")}₫</Text>
+                </View>
+              )}
+              {userMembership && userMembership.benefit_percentage > 0 && (
+                <View style={webStyles.summaryRow}>
+                  <Text style={webStyles.summaryLabel}>Giảm thành viên ({userMembership.level_name})</Text>
+                  <Text style={[webStyles.summaryValue, { color: "#22C55E" }]}>-{membershipDiscount.toLocaleString("vi-VN")}₫</Text>
+                </View>
+              )}
+              <View style={webStyles.summaryDivider} />
+              <View style={webStyles.summaryRow}>
+                <Text style={webStyles.totalLabel}>Tổng cộng</Text>
+                <Text style={webStyles.totalValue}>{finalTotal.toLocaleString("vi-VN")}₫</Text>
+              </View>
+
+              {/* Voucher */}
+              <TouchableOpacity
+                style={webStyles.voucherRow}
+                onPress={() => setShowVouchers(true)}
+                activeOpacity={0.8}
+              >
+                <Gift size={20} color={COLORS.primary} />
+                <Text style={webStyles.voucherText}>
+                  {selectedVoucher ? "Đã áp dụng mã giảm giá" : "Chọn mã giảm giá"}
+                </Text>
+                <ChevronRight size={18} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+
+              {/* Pay button */}
+              <TouchableOpacity
+                style={[webStyles.payButton, (loading || cartItems.length === 0) && { backgroundColor: C.sub }]}
+                activeOpacity={0.9}
+                onPress={handlePlaceOrder}
+                disabled={loading || cartItems.length === 0 || paymentStatus === "processing"}
+              >
+                <Text style={webStyles.payButtonText}>
+                  {paymentStatus === "processing" ? "Đang xử lý..." : "Thanh toán"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Mobile layout (default) ──
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
@@ -905,8 +1079,13 @@ export default function CheckoutScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+    </SafeAreaView>
+  );
 
-      {/* Modal Trạng thái Thanh toán */}
+  // ── All modals (shared by both mobile and web desktop) ──
+  return (
+    <>
+      {/* Payment status modal */}
       <Modal
         visible={paymentStatus !== "idle"}
         transparent={true}
@@ -1239,7 +1418,7 @@ export default function CheckoutScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </>
   );
 }
 
@@ -1829,6 +2008,235 @@ const styles = StyleSheet.create({
   },
   changeMethodText: {
     color: COLORS.secondary,
+    fontWeight: "700",
+  },
+});
+
+// ── Web Desktop styles ──
+const webStyles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  layout: {
+    flex: 1,
+    flexDirection: "row",
+    maxWidth: 1200,
+    alignSelf: "center",
+    width: "100%",
+  },
+  leftCol: {
+    flex: 7,
+  },
+  leftScrollContent: {
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    paddingBottom: 120,
+  },
+  rightCol: {
+    flex: 3,
+    borderLeftWidth: 1,
+    borderLeftColor: "#E5E7EB",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 24,
+  },
+  backBtnHeader: { paddingRight: 4 },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: COLORS.secondary,
+    flex: 1,
+  },
+  addressCard: {
+    backgroundColor: "#FAFBFB",
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  addressCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  addressCardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.secondary,
+  },
+  changeAddressBtn: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  receiverName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#111",
+    marginBottom: 4,
+  },
+  addressText: {
+    fontSize: 14,
+    color: "#555",
+    lineHeight: 20,
+  },
+  noAddress: {
+    fontSize: 14,
+    color: "#EF4444",
+  },
+  sectionBlock: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.secondary,
+    marginBottom: 12,
+  },
+  codCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FAFBFB",
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+  },
+  codIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E6EFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  codTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.secondary,
+    marginBottom: 4,
+  },
+  codSubtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  stickySummary: {
+    padding: 24,
+    backgroundColor: "#fff",
+    position: "sticky",
+    top: 0,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLORS.secondary,
+    marginBottom: 16,
+  },
+  summaryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 12,
+  },
+  summaryItemImgWrap: {
+    position: "relative",
+    flexShrink: 0,
+  },
+  summaryItemImg: {
+    width: 52,
+    height: 52,
+    borderRadius: 8,
+    backgroundColor: "#F0F0F0",
+  },
+  summaryItemQtyBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: COLORS.grayBadge,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
+  summaryItemQty: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#000",
+  },
+  summaryItemName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.secondary,
+    marginBottom: 2,
+  },
+  summaryItemMeta: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: 12,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.secondary,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: COLORS.secondary,
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#EF4444",
+  },
+  voucherRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  voucherText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+  payButton: {
+    backgroundColor: COLORS.secondary,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  payButtonText: {
+    color: "#FFF",
+    fontSize: 16,
     fontWeight: "700",
   },
 });

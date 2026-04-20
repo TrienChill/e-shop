@@ -1,11 +1,18 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, usePathname } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Dimensions, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import {
+  Dimensions,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { supabase } from "@/src/lib/supabase";
 import WebHeader from "@/src/components/web/WebHeader";
 
-const { width } = Dimensions.get("window");
+const { width: STATIC_WIDTH } = Dimensions.get("window");
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   if (Platform.OS === "web") return null;
@@ -91,8 +98,15 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  const { width } = useWindowDimensions();
+  const pathname = usePathname();
   const isWeb = Platform.OS === "web";
+  const isWebDesktop = isWeb && width >= 1024;
   const [cartCount, setCartCount] = useState(0);
+
+  // On web desktop, hide bottom tabs when on account pages
+  const isAccountRoute = pathname === "/(shop)/(tabs)/profile" ||
+    pathname === "/(shop)/(tabs)/wishlist";
 
   useEffect(() => {
     const fetchCartCount = async () => {
@@ -143,7 +157,12 @@ export default function TabsLayout() {
         <Tabs.Screen name="index" />
         <Tabs.Screen name="categories" />
         <Tabs.Screen name="wishlist" />
-        <Tabs.Screen name="profile" />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            href: isWebDesktop ? "/(shop)/(account)/profile" : "/(shop)/(tabs)/profile",
+          }}
+        />
         <Tabs.Screen name="search" options={{ href: null }} />
         <Tabs.Screen name="ai-chat" options={{ href: null }} />
         <Tabs.Screen name="cart" options={{ href: null }} />
