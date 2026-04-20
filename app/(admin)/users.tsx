@@ -188,14 +188,46 @@ export default function AdminUserManagementScreen() {
       return;
     }
 
+    if (createFormData.password.length < 6) {
+      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      // TODO: Create auth user first via Supabase Admin API or use RPC
-      // For now, we'll just show a message
-      Alert.alert(
-        "Thông báo",
-        "Tính năng tạo tài khoản cần kết nối với Supabase Auth API. Sẽ được implement sau.",
-      );
+
+      // Bước 1: Tạo user trong Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: createFormData.email.trim(),
+        password: createFormData.password,
+        options: {
+          data: {
+            full_name: createFormData.full_name,
+            role: createFormData.role,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.user) {
+        throw new Error("Không thể tạo người dùng. Vui lòng thử lại.");
+      }
+
+      // Bước 2: Cập nhật profile với role và full_name
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: createFormData.full_name,
+          role: createFormData.role,
+        })
+        .eq("id", authData.user.id);
+
+      if (profileError) {
+        console.error("Profile update error:", profileError);
+      }
+
+      showToast("Đã tạo tài khoản thành công!");
       setIsCreateModalVisible(false);
       setCreateFormData({
         email: "",
@@ -203,6 +235,7 @@ export default function AdminUserManagementScreen() {
         full_name: "",
         role: "staff",
       });
+      fetchUsers();
     } catch (e: any) {
       Alert.alert("Lỗi", e.message);
     } finally {
