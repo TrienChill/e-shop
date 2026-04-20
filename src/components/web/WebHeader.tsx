@@ -1,6 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter, usePathname } from "expo-router";
-import React, { useState } from "react";
+import { useRouter, usePathname, useLocalSearchParams } from "expo-router";
+import React, { useState, useEffect } from "react";
 import {
   Dimensions,
   Pressable,
@@ -19,7 +19,14 @@ interface WebHeaderProps {
 export default function WebHeader({ cartCount = 0 }: WebHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { q } = useLocalSearchParams<{ q?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (q) {
+      setSearchQuery(q);
+    }
+  }, [q]);
 
   const isActive = (path: string) => {
     if (path === "/" && pathname === "/") return true;
@@ -61,6 +68,9 @@ export default function WebHeader({ cartCount = 0 }: WebHeaderProps) {
             onSubmitEditing={handleSearch}
             returnKeyType="search"
           />
+          <Pressable style={styles.cameraButton}>
+            <MaterialIcons name="camera-alt" size={20} color="#6B7280" />
+          </Pressable>
           <Pressable style={styles.searchButton} onPress={handleSearch}>
             <MaterialIcons name="search" size={22} color="#fff" />
           </Pressable>
@@ -158,11 +168,19 @@ const styles = StyleSheet.create({
     height: 44,
     backgroundColor: "#F3F4F6",
     borderRadius: 22,
-    paddingHorizontal: 20,
+    paddingLeft: 20,
+    paddingRight: 40, // Space for the camera icon
     fontSize: 15,
     color: "#1F2937",
     borderTopRightRadius: 0,
     borderBottomRightRadius: 0,
+  },
+  cameraButton: {
+    position: 'absolute',
+    right: 54, // Positioned inside the input, before the search button
+    height: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
   },
   searchButton: {
     width: 44,

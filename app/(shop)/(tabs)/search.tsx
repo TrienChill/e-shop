@@ -1,7 +1,7 @@
 import { getPopularProducts, calculateDiscountedPrice } from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { FilterModal } from "@/src/components/search/FilterModal";
 import {
   Camera,
@@ -51,18 +51,17 @@ export default function SearchScreen() {
   const [discoverProducts, setDiscoverProducts] = useState<any[]>([]);
   const [history, setHistory] = useState<string[]>([]);
   
-  // Trạng thái cho Search thực tế
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
+  const { q } = useLocalSearchParams<{ q?: string }>();
 
+  // Khởi tạo ban đầu
   useEffect(() => {
     const initData = async () => {
-      // Load sản phẩm phổ biến
       const popularData = await getPopularProducts();
       setDiscoverProducts(popularData);
 
-      // Load lịch sử từ storage
       try {
         const storedHistory = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedHistory) {
@@ -74,6 +73,16 @@ export default function SearchScreen() {
     };
     initData();
   }, []);
+
+  // Lắng nghe thay đổi từ URL params (đặc biệt cho Web khi search từ Header)
+  useEffect(() => {
+    if (q && q.trim()) {
+      setSearchPhrase(q);
+      performSearch(q);
+    } else if (q === "") {
+      clearSearch();
+    }
+  }, [q]);
 
   // --- REALTIME: khi admin xóa sản phẩm, lọc ngay khỏi UI ---
   useSupabaseRealtime({
@@ -180,37 +189,39 @@ export default function SearchScreen() {
   // --- Header ---
   const renderHeader = () => (
     <View style={styles.header}>
-      <Text style={styles.headerTitle}>{showResults ? "Cửa hàng" : "Tìm kiếm"}</Text>
-      <View style={styles.searchBarWrapper}>
-        <View style={styles.searchBar}>
-          {!showResults && <SearchIcon size={20} color="#9CA3AF" style={{ marginRight: 10 }} />}
+      <Text style={styles.headerTitle}>{showResults ? "Kết quả tìm kiếm" : "Khám phá"}</Text>
+      {!isDesktop && (
+        <View style={styles.searchBarWrapper}>
+          <View style={styles.searchBar}>
+            {!showResults && <SearchIcon size={20} color="#9CA3AF" style={{ marginRight: 10 }} />}
+            {showResults && (
+              <View style={styles.searchChip}>
+                <Text style={styles.searchChipText}>{searchPhrase}</Text>
+                <TouchableOpacity onPress={clearSearch}>
+                  <X size={14} color="#3B82F6" strokeWidth={3} />
+                </TouchableOpacity>
+              </View>
+            )}
+            <TextInput
+              style={[styles.input, showResults && { width: 0, opacity: 0 }]}
+              placeholder="Tìm kiếm sản phẩm..."
+              placeholderTextColor="#9CA3AF"
+              value={searchPhrase}
+              onChangeText={setSearchPhrase}
+              onSubmitEditing={() => performSearch(searchPhrase)}
+              returnKeyType="search"
+            />
+            <TouchableOpacity>
+              <Camera size={20} color="#3B82F6" />
+            </TouchableOpacity>
+          </View>
           {showResults && (
-            <View style={styles.searchChip}>
-              <Text style={styles.searchChipText}>{searchPhrase}</Text>
-              <TouchableOpacity onPress={clearSearch}>
-                <X size={14} color="#3B82F6" strokeWidth={3} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)}>
+              <Filter size={20} color="#000" />
+            </TouchableOpacity>
           )}
-          <TextInput
-            style={[styles.input, showResults && { width: 0, opacity: 0 }]}
-            placeholder="Tìm kiếm sản phẩm..."
-            placeholderTextColor="#9CA3AF"
-            value={searchPhrase}
-            onChangeText={setSearchPhrase}
-            onSubmitEditing={() => performSearch(searchPhrase)}
-            returnKeyType="search"
-          />
-          <TouchableOpacity>
-            <Camera size={20} color="#3B82F6" />
-          </TouchableOpacity>
         </View>
-        {showResults && !isDesktop && (
-          <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)}>
-            <Filter size={20} color="#000" />
-          </TouchableOpacity>
-        )}
-      </View>
+      )}
     </View>
   );
 
