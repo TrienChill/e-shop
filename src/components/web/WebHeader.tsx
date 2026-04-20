@@ -1,6 +1,7 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, usePathname, useLocalSearchParams } from "expo-router";
 import React, { useState, useEffect } from "react";
+import { useWebUI } from "@/src/context/WebUIContext";
 import {
   Dimensions,
   Pressable,
@@ -8,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
 } from "react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -21,6 +23,7 @@ export default function WebHeader({ cartCount = 0 }: WebHeaderProps) {
   const pathname = usePathname();
   const { q } = useLocalSearchParams<{ q?: string }>();
   const [searchQuery, setSearchQuery] = useState("");
+  const { toggleCartDrawer } = useWebUI();
 
   useEffect(() => {
     if (q) {
@@ -85,7 +88,13 @@ export default function WebHeader({ cartCount = 0 }: WebHeaderProps) {
                 styles.navItem,
                 isActive(item.path) && styles.navItemActive,
               ]}
-              onPress={() => router.push(item.path as any)}
+              onPress={() => {
+                if (item.path === "/(shop)/(tabs)/cart" && Platform.OS === "web") {
+                  toggleCartDrawer();
+                } else {
+                  router.push(item.path as any);
+                }
+              }}
             >
               <View style={styles.navIconWrapper}>
                 <MaterialIcons
