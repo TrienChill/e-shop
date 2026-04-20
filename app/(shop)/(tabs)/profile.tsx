@@ -2,20 +2,20 @@
 import CommonHeader from "@/src/components/layout/Header";
 import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import { supabase } from "@/src/lib/supabase";
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import {
   ArrowRight,
   Bell,
   Lock,
   Package,
+  RotateCcw,
   Settings,
   Star,
   Ticket,
   Truck,
   Wallet,
-  RotateCcw
 } from "lucide-react-native";
 import React, { useCallback, useState } from "react";
 import {
@@ -49,8 +49,6 @@ const COLOR = {
 // Dữ liệu mẫu cho "Đã xem gần đây" (Xóa vì dùng data thật từ profile.recent_views)
 // const RECENTLY_VIEWED = [...];
 
-
-
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [recentViews, setRecentViews] = useState<any[]>([]);
@@ -59,12 +57,12 @@ export default function ProfileScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'profiles',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "profiles",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'product_view_history',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "product_view_history",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   // Fetch profile data
@@ -94,26 +92,33 @@ export default function ProfileScreen() {
 
   const fetchRecentViews = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
         .from("product_view_history")
-        .select(`
+        .select(
+          `
           product:products (
             id,
             images
           )
-        `)
+        `,
+        )
         .eq("user_id", user.id)
         .order("viewed_at", { ascending: false })
         .limit(5); // Chỉ lấy 5 cái mới nhất
 
       if (!error && data && data.length > 0) {
-        const sortedViews = data.map((item: any) => ({
-          id: item.product?.id,
-          image: item.product?.images?.[0] || "https://via.placeholder.com/150",
-        })).filter((i: any) => i.id);
+        const sortedViews = data
+          .map((item: any) => ({
+            id: item.product?.id,
+            image:
+              item.product?.images?.[0] || "https://via.placeholder.com/150",
+          }))
+          .filter((i: any) => i.id);
 
         setRecentViews(sortedViews);
       }
@@ -164,13 +169,12 @@ export default function ProfileScreen() {
 
   const getAvatarUrl = (path: string | null) => {
     if (!path)
-      return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop";
+      return "https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg";
     if (path.startsWith("http")) return path;
     // Assuming 'avatars' is the bucket name as seen in reviews.tsx
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
   };
-
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -196,14 +200,20 @@ export default function ProfileScreen() {
         )}
         renderRight={() => (
           <>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/vouchers")} >
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push("/vouchers")}
+            >
               <Ticket size={22} color={COLOR.dark} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconButton}>
               <Bell size={22} color={COLOR.dark} />
               <View style={styles.filterBadge} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={() => router.push("/settings")}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={() => router.push("/settings")}
+            >
               <Settings size={22} color={COLOR.dark} />
             </TouchableOpacity>
           </>
@@ -217,14 +227,12 @@ export default function ProfileScreen() {
         {/* Lời chào mừng */}
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeText}>
-            Chào, {profile?.full_name || "Triển Chill"}!
+            Chào, {profile?.full_name || "Khách hàng"}!
           </Text>
           {profile?.is_locked && (
             <View style={styles.lockWarningBanner}>
               <Lock size={16} color="#fff" />
-              <Text style={styles.lockWarningText}>
-                Tài khoản đang bị khóa
-              </Text>
+              <Text style={styles.lockWarningText}>Tài khoản đang bị khóa</Text>
             </View>
           )}
         </View>
@@ -322,7 +330,6 @@ export default function ProfileScreen() {
             />
           </View>
         </View>
-
 
         {/* Khoảng cách lề dưới cho ScrollView */}
         <View style={{ height: 100 }} />
