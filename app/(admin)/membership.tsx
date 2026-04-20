@@ -163,18 +163,18 @@ export default function AdminMembershipScreen() {
       return false;
     }
 
-    // Check min_spending order
-    const existingLevels = editingLevel
-      ? levels.filter((l) => l.id !== editingLevel.id)
-      : levels;
-
-    for (const level of existingLevels) {
-      if (level.min_spending >= minSpending && minSpending > 0) {
-        Alert.alert(
-          "Lỗi",
-          `Số tiền tối thiểu phải lớn hơn hạng "${level.level_name}" (${formatVND(level.min_spending)}).`
-        );
-        return false;
+    // Check min_spending order - CHỈ kiểm tra khi TẠO MỚI
+    // Hạng mới phải có min_spending LỚN HƠN tất cả các hạng hiện có
+    if (!editingLevel) {
+      const existingLevels = levels;
+      for (const level of existingLevels) {
+        if (level.min_spending >= minSpending) {
+          Alert.alert(
+            "Lỗi",
+            `Số tiền tối thiểu phải lớn hơn hạng "${level.level_name}" (${formatVND(level.min_spending)}).`
+          );
+          return false;
+        }
       }
     }
 
@@ -183,39 +183,73 @@ export default function AdminMembershipScreen() {
 
   // Save level
   const handleSave = async () => {
-    if (!validateForm()) return;
+    console.log("=== handleSave START ===");
+    console.log("editingLevel:", editingLevel);
+    console.log("formData:", formData);
+
+    if (!validateForm()) {
+      console.log("validateForm failed");
+      return;
+    }
+    console.log("validateForm passed");
 
     try {
-      const payload = {
+      const payload: any = {
         level_name: formData.level_name.trim(),
         min_spending: parseVND(formData.min_spending),
         benefit_percentage: parseInt(formData.benefit_percentage, 10),
-        description: formData.description.trim() || null,
       };
 
+      console.log("payload:", payload);
+
       if (editingLevel) {
-        const { error } = await supabase
+        console.log("=== UPDATE MODE ===");
+        const { error, data } = await supabase
           .from("membership_levels")
           .update(payload)
-          .eq("id", editingLevel.id);
+          .eq("id", editingLevel.id)
+          .select()
+          .single();
 
-        if (error) throw error;
+        console.log("Update result:", { error, data });
 
-        // Recalculate all memberships
-        await supabase.rpc("recalculate_all_membership_levels");
+        if (error) {
+          console.log("Update error:", error);
+          throw error;
+        }
+
+        // Recalculate all memberships (bắt lỗi riêng vì function có thể chưa được tạo)
+        try {
+          await supabase.rpc("recalculate_all_membership_levels");
+        } catch (rpcError) {
+          console.log("RPC recalculate_all_membership_levels chưa được tạo:", rpcError);
+        }
         showToast("Đã cập nhật hạng thành viên!");
       } else {
-        const { error } = await supabase
+        console.log("=== INSERT MODE ===");
+        const { error, data } = await supabase
           .from("membership_levels")
-          .insert(payload);
+          .insert(payload)
+          .select()
+          .single();
 
-        if (error) throw error;
+        console.log("Insert result:", { error, data });
+
+        if (error) {
+          console.log("Insert error:", error);
+          throw error;
+        }
         showToast("Đã tạo hạng thành viên mới!");
       }
 
+      console.log("Closing modal...");
       setIsModalVisible(false);
       fetchLevels();
+      console.log("=== handleSave END ===");
     } catch (e: any) {
+      console.log("=== CATCH ERROR ===");
+      console.log("Error object:", e);
+      console.log("Error message:", e.message);
       Alert.alert("Lỗi", e.message);
     }
   };
