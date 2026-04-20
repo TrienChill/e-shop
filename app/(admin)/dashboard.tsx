@@ -1,34 +1,41 @@
-import React, { useState, useMemo, useEffect } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
+  AdminStats,
+  ChartData,
+  getAdminDashboardStats,
+  getRecentOrders,
+  getRevenueChartData,
+  getTopViewedProducts,
+  TopViewedProduct,
+} from "@/src/services/admin/stats";
+import {
+  AlertCircle,
+  Bell,
+  Eye,
+  Package,
+  ShoppingBag,
+  TrendingDown,
+  TrendingUp,
+  Users
+} from "lucide-react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Alert,
   Dimensions,
   Image,
   Platform,
-  Alert,
+  ScrollView,
   StyleSheet,
-  ActivityIndicator,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  ShoppingBag, 
-  Users, 
-  Package, 
-  Bell, 
-  ArrowUpRight,
-  AlertCircle
-} from "lucide-react-native";
-import Svg, { Path, Defs, LinearGradient, Stop, Circle } from "react-native-svg";
-import { 
-  getAdminDashboardStats, 
-  getRevenueChartData, 
-  getRecentOrders,
-  AdminStats,
-  ChartData
-} from "@/src/services/admin/stats";
+import Svg, {
+  Circle,
+  Defs,
+  LinearGradient,
+  Path,
+  Stop,
+} from "react-native-svg";
 
 // --- Components ---
 
@@ -37,31 +44,76 @@ const StatusBadge = ({ status }: { status: string }) => {
   let textColor = "#2563EB";
   let label = status;
 
-  if (status === "completed" || status === "Đã giao") { 
-    bgColor = "#DCFCE7"; textColor = "#15803D"; label = "Đã giao";
-  } else if (status === "cancelled" || status === "Đã hủy") { 
-    bgColor = "#FEE2E2"; textColor = "#B91C1C"; label = "Đã hủy";
+  if (status === "completed" || status === "Đã giao") {
+    bgColor = "#DCFCE7";
+    textColor = "#15803D";
+    label = "Đã giao";
+  } else if (status === "cancelled" || status === "Đã hủy") {
+    bgColor = "#FEE2E2";
+    textColor = "#B91C1C";
+    label = "Đã hủy";
   } else if (status === "pending" || status === "Đang xử lý") {
-    bgColor = "#FEF3C7"; textColor = "#B45309"; label = "Đang xử lý";
+    bgColor = "#FEF3C7";
+    textColor = "#B45309";
+    label = "Đang xử lý";
   }
 
   return (
-    <View style={StyleSheet.flatten([styles.statusBadge, { backgroundColor: bgColor }])}>
-      <Text style={StyleSheet.flatten([styles.statusBadgeText, { color: textColor }])}>{label}</Text>
+    <View
+      style={StyleSheet.flatten([
+        styles.statusBadge,
+        { backgroundColor: bgColor },
+      ])}
+    >
+      <Text
+        style={StyleSheet.flatten([
+          styles.statusBadgeText,
+          { color: textColor },
+        ])}
+      >
+        {label}
+      </Text>
     </View>
   );
 };
 
-const KPICard = ({ title, value, change, isPositive, icon: Icon, color, iconBg }: any) => (
+const KPICard = ({
+  title,
+  value,
+  change,
+  isPositive,
+  icon: Icon,
+  color,
+  iconBg,
+}: any) => (
   <View style={styles.kpiCardWrapper}>
     <View style={styles.kpiCard}>
       <View style={styles.kpiHeader}>
-        <View style={StyleSheet.flatten([styles.iconContainer, { backgroundColor: iconBg }])}>
+        <View
+          style={StyleSheet.flatten([
+            styles.iconContainer,
+            { backgroundColor: iconBg },
+          ])}
+        >
           <Icon size={22} color={color} strokeWidth={2.5} />
         </View>
-        <View style={StyleSheet.flatten([styles.changeBadge, { backgroundColor: isPositive ? '#F0FDF4' : '#FEF2F2' }])}>
-          {isPositive ? <TrendingUp size={12} color="#10b981" /> : <TrendingDown size={12} color="#ef4444" />}
-          <Text style={StyleSheet.flatten([styles.changeText, { color: isPositive ? '#10b981' : '#ef4444' }])}>
+        <View
+          style={StyleSheet.flatten([
+            styles.changeBadge,
+            { backgroundColor: isPositive ? "#F0FDF4" : "#FEF2F2" },
+          ])}
+        >
+          {isPositive ? (
+            <TrendingUp size={12} color="#10b981" />
+          ) : (
+            <TrendingDown size={12} color="#ef4444" />
+          )}
+          <Text
+            style={StyleSheet.flatten([
+              styles.changeText,
+              { color: isPositive ? "#10b981" : "#ef4444" },
+            ])}
+          >
             {change}
           </Text>
         </View>
@@ -89,6 +141,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [chartData, setChartData] = useState<ChartData[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [topViewedProducts, setTopViewedProducts] = useState<TopViewedProduct[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,23 +152,25 @@ export default function AdminDashboard() {
     try {
       setIsLoading(true);
       setError(null);
-      
-      const [s, c, o] = await Promise.all([
+
+      const [s, c, o, v] = await Promise.all([
         getAdminDashboardStats(),
         getRevenueChartData(),
-        getRecentOrders(5)
+        getRecentOrders(5),
+        getTopViewedProducts(5),
       ]);
 
       setStats(s);
       setChartData(c);
       setRecentOrders(o);
+      setTopViewedProducts(v);
     } catch (err: any) {
       console.log("DASHBOARD_ERROR_OBJECT:", err);
       const msg = err?.message || "Lỗi mạng hoặc phân quyền Supabase";
       const code = err?.code || "NoCode";
       setError(`Lỗi: ${msg} (Mã: ${code})`);
-      
-      if (Platform.OS !== 'web') {
+
+      if (Platform.OS !== "web") {
         Alert.alert("Lỗi kết nối", msg);
       }
     } finally {
@@ -125,19 +180,21 @@ export default function AdminDashboard() {
 
   const chartHeight = 220;
   const screenWidth = Dimensions.get("window").width;
-  const contentWidth = Platform.OS === 'web' ? Math.max(screenWidth - 340, 600) : screenWidth - 48;
+  const contentWidth =
+    Platform.OS === "web" ? Math.max(screenWidth - 340, 600) : screenWidth - 48;
   const chartWidth = contentWidth;
-  
+
   const maxRevenue = useMemo(() => {
     if (chartData.length === 0) return 1;
-    return Math.max(...chartData.map(d => d.revenue), 1000000);
+    return Math.max(...chartData.map((d) => d.revenue), 1000000);
   }, [chartData]);
-  
+
   const points = useMemo(() => {
     if (chartData.length === 0) return [];
     return chartData.map((d, i) => {
       const x = (i / (chartData.length - 1)) * chartWidth;
-      const y = chartHeight - (d.revenue / maxRevenue) * (chartHeight - 60) - 30;
+      const y =
+        chartHeight - (d.revenue / maxRevenue) * (chartHeight - 60) - 30;
       return { x, y };
     });
   }, [chartData, chartWidth, maxRevenue]);
@@ -145,7 +202,9 @@ export default function AdminDashboard() {
   const linePath = useMemo(() => {
     if (points.length === 0) return "";
     return points.reduce((acc, point, i) => {
-      return i === 0 ? `M ${point.x} ${point.y}` : `${acc} L ${point.x} ${point.y}`;
+      return i === 0
+        ? `M ${point.x} ${point.y}`
+        : `${acc} L ${point.x} ${point.y}`;
     }, "");
   }, [points]);
 
@@ -162,13 +221,19 @@ export default function AdminDashboard() {
     }).format(amount);
   };
 
+  const formatChange = (change: number): string => {
+    if (change === 0) return "0%";
+    const sign = change > 0 ? "+" : "";
+    return `${sign}${change}%`;
+  };
+
   if (error && !isLoading) {
     return (
       <View style={styles.errorFull}>
         <AlertCircle size={48} color="#ef4444" />
         <Text style={styles.errorTitle}>Rất tiếc, đã xảy ra lỗi</Text>
         <Text style={styles.errorMsg}>{error}</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.retryButton}
           onPress={loadDashboardData}
         >
@@ -179,7 +244,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.root}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.rootContent}
@@ -191,7 +256,7 @@ export default function AdminDashboard() {
           <Text style={styles.topBarTitle}>Tổng quan</Text>
         </View>
         <View style={styles.topBarActions}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.iconButton}
             onPress={loadDashboardData}
           >
@@ -199,8 +264,8 @@ export default function AdminDashboard() {
             <View style={styles.notificationBadge} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.profileButton}>
-            <Image 
-              source={{ uri: "https://i.pravatar.cc/150?u=admin" }} 
+            <Image
+              source={{ uri: "https://i.pravatar.cc/150?u=admin" }}
               style={styles.profileImage}
             />
             <View style={styles.profileInfo}>
@@ -214,37 +279,37 @@ export default function AdminDashboard() {
       {/* KPI Grid */}
       <View style={styles.kpiGrid}>
         {isLoading || !stats ? (
-          [1, 2, 3, 4].map(i => <SkeletonCard key={i} />)
+          [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
         ) : (
           <>
-            <KPICard 
+            <KPICard
               title="Doanh thu"
               value={formatCurrency(stats.totalRevenue)}
-              change="+12.5%"
-              isPositive={true}
+              change={formatChange(stats.revenueChange)}
+              isPositive={stats.revenueChange >= 0}
               icon={TrendingUp}
               color="#6366f1"
               iconBg="#EEF2FF"
             />
-            <KPICard 
+            <KPICard
               title="Đơn hàng"
               value={stats.newOrdersToday}
-              change="+0%"
-              isPositive={true}
+              change={formatChange(stats.ordersChange)}
+              isPositive={stats.ordersChange >= 0}
               icon={ShoppingBag}
               color="#f59e0b"
               iconBg="#FFFBEB"
             />
-            <KPICard 
+            <KPICard
               title="Khách hàng"
               value={stats.totalCustomers.toLocaleString()}
-              change="+0%"
-              isPositive={true}
+              change={formatChange(stats.customersChange)}
+              isPositive={stats.customersChange >= 0}
               icon={Users}
               color="#10b981"
               iconBg="#ECFDF5"
             />
-            <KPICard 
+            <KPICard
               title="Tồn kho thấp"
               value={stats.lowStockCount}
               change="Cần chú ý"
@@ -265,7 +330,9 @@ export default function AdminDashboard() {
             <View style={styles.cardHeader}>
               <View>
                 <Text style={styles.cardTitle}>Doanh thu 7 ngày qua</Text>
-                <Text style={styles.cardSubtitle}>Dữ liệu thực tế từ Supabase</Text>
+                <Text style={styles.cardSubtitle}>
+                  Dữ liệu thực tế từ Supabase
+                </Text>
               </View>
               <View style={styles.realtimeBadge}>
                 <Text style={styles.realtimeText}>Real-time</Text>
@@ -274,19 +341,23 @@ export default function AdminDashboard() {
 
             <View style={styles.chartWrapper}>
               {isLoading ? (
-                 <View style={styles.chartSkeleton}>
-                    <Text style={styles.skeletonText}>Đang tải...</Text>
-                 </View>
+                <View style={styles.chartSkeleton}>
+                  <Text style={styles.skeletonText}>Đang tải...</Text>
+                </View>
               ) : (
                 <>
                   <Svg width={chartWidth} height={chartHeight}>
                     <Defs>
                       <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor="#6366f1" stopOpacity={0.15} />
+                        <Stop
+                          offset="0"
+                          stopColor="#6366f1"
+                          stopOpacity={0.15}
+                        />
                         <Stop offset="1" stopColor="#6366f1" stopOpacity={0} />
                       </LinearGradient>
                     </Defs>
-                    
+
                     <Path d={areaPath} fill="url(#grad)" />
                     <Path
                       d={linePath}
@@ -309,7 +380,7 @@ export default function AdminDashboard() {
                       />
                     ))}
                   </Svg>
-                  
+
                   <View style={styles.chartLabels}>
                     {chartData.map((d, i) => (
                       <Text key={i} style={styles.chartLabel}>
@@ -334,7 +405,7 @@ export default function AdminDashboard() {
             </View>
 
             {isLoading ? (
-              [1, 2, 3, 4, 5].map(i => (
+              [1, 2, 3, 4, 5].map((i) => (
                 <View key={i} style={styles.orderItemSkeleton}>
                   <View style={styles.orderIconSkeleton} />
                   <View style={styles.orderTextSkeleton}>
@@ -343,38 +414,112 @@ export default function AdminDashboard() {
                   </View>
                 </View>
               ))
-            ) : (
-              recentOrders.length > 0 ? (
-                recentOrders.map((order, index) => (
-                  <View 
-                    key={order.id} 
-                    style={styles.orderItem}
-                  >
-                    <View style={styles.orderIcon}>
-                      <Text style={styles.orderIndexText}>#{index+1}</Text>
-                    </View>
-                    
-                    <View style={styles.orderInfo}>
-                      <Text style={styles.orderCustomerName} numberOfLines={1}>
-                        {order.profiles?.full_name || "Guest"}
-                      </Text>
-                      <Text style={styles.orderAmount}>
-                        {formatCurrency(order.total_amount)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.orderStatus}>
-                       <StatusBadge status={order.status} />
-                    </View>
+            ) : recentOrders.length > 0 ? (
+              recentOrders.map((order, index) => (
+                <View key={order.id} style={styles.orderItem}>
+                  <View style={styles.orderIcon}>
+                    <Text style={styles.orderIndexText}>#{index + 1}</Text>
                   </View>
-                ))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>Trống</Text>
+
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderCustomerName} numberOfLines={1}>
+                      {order.profiles?.full_name || "Guest"}
+                    </Text>
+                    <Text style={styles.orderAmount}>
+                      {formatCurrency(order.total_amount)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.orderStatus}>
+                    <StatusBadge status={order.status} />
+                  </View>
                 </View>
-              )
+              ))
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Trống</Text>
+              </View>
             )}
           </View>
+        </View>
+      </View>
+
+      {/* Top Viewed Products Section */}
+      <View style={styles.viewedSection}>
+        <View style={styles.whiteCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.viewedHeaderLeft}>
+              <View
+                style={StyleSheet.flatten([
+                  styles.iconContainer,
+                  { backgroundColor: "#FEF3C7", marginRight: 12 },
+                ])}
+              >
+                <Eye size={20} color="#D97706" strokeWidth={2.5} />
+              </View>
+              <View>
+                <Text style={styles.cardTitle}>Sản phẩm xem nhiều</Text>
+                <Text style={styles.cardSubtitle}>
+                  30 ngày gần nhất
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity>
+              <Text style={styles.seeAllText}>Tất cả</Text>
+            </TouchableOpacity>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.viewedListContainer}>
+              {[1, 2, 3, 4, 5].map((i) => (
+                <View key={i} style={styles.viewedItemSkeleton}>
+                  <View style={styles.viewedRankSkeleton} />
+                  <View style={styles.viewedImageSkeleton} />
+                  <View style={styles.viewedTextSkeleton}>
+                    <View style={styles.skeletonLineShort} />
+                    <View style={styles.skeletonLineMini} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : topViewedProducts.length > 0 ? (
+            <View style={styles.viewedListContainer}>
+              {topViewedProducts.map((product, index) => (
+                <View key={product.id} style={styles.viewedItem}>
+                  <View style={styles.viewedRank}>
+                    <Text style={styles.viewedRankText}>#{index + 1}</Text>
+                  </View>
+                  <Image
+                    source={{
+                      uri: product.image_url || "https://via.placeholder.com/60",
+                    }}
+                    style={styles.viewedImage}
+                  />
+                  <View style={styles.viewedInfo}>
+                    <Text style={styles.viewedName} numberOfLines={1}>
+                      {product.name}
+                    </Text>
+                    <View style={styles.viewedStats}>
+                      <Eye size={12} color="#9CA3AF" />
+                      <Text style={styles.viewedCount}>
+                        {product.view_count.toLocaleString()} lượt xem
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.viewedBadge}>
+                    <Text style={styles.viewedBadgeText}>
+                      {index === 0 ? "HOT" : `Top ${index + 1}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Eye size={32} color="#D1D5DB" />
+              <Text style={styles.emptyText}>Chưa có sản phẩm nào được xem</Text>
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -391,7 +536,12 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   topBarLabel: { color: "#9ca3af", fontSize: 14, fontWeight: "500" },
-  topBarTitle: { color: "#111827", fontSize: 30, fontWeight: "900", letterSpacing: -0.5 },
+  topBarTitle: {
+    color: "#111827",
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: -0.5,
+  },
   topBarActions: { flexDirection: "row", alignItems: "center", gap: 12 },
   iconButton: {
     backgroundColor: "white",
@@ -432,11 +582,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   profileImage: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
-  profileInfo: { display: Platform.OS === 'web' ? 'flex' : 'none' },
+  profileInfo: { display: Platform.OS === "web" ? "flex" : "none" },
   profileName: { color: "#111827", fontWeight: "700", fontSize: 12 },
   profileRole: { color: "#9ca3af", fontSize: 10 },
-  kpiGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -8, marginBottom: 24 },
-  kpiCardWrapper: { width: Platform.OS === 'web' ? "25%" : "100%", padding: 8 },
+  kpiGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -8,
+    marginBottom: 24,
+  },
+  kpiCardWrapper: { width: Platform.OS === "web" ? "25%" : "100%", padding: 8 },
   kpiCard: {
     backgroundColor: "white",
     padding: 24,
@@ -451,15 +606,41 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  kpiHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 },
+  kpiHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 24,
+  },
   iconContainer: { padding: 12, borderRadius: 16 },
-  changeBadge: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  changeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
   changeText: { marginLeft: 4, fontSize: 10, fontWeight: "700" },
-  kpiTitle: { color: "#9ca3af", fontSize: 12, fontWeight: "500", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
+  kpiTitle: {
+    color: "#9ca3af",
+    fontSize: 12,
+    fontWeight: "500",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
   kpiValue: { color: "#111827", fontSize: 24, fontWeight: "900" },
   mainGrid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -12 },
-  chartCol: { width: Platform.OS === 'web' ? "66.666%" : "100%", paddingHorizontal: 12, marginBottom: 24 },
-  ordersCol: { width: Platform.OS === 'web' ? "33.333%" : "100%", paddingHorizontal: 12, marginBottom: 24 },
+  chartCol: {
+    width: Platform.OS === "web" ? "66.666%" : "100%",
+    paddingHorizontal: 12,
+    marginBottom: 24,
+  },
+  ordersCol: {
+    width: Platform.OS === "web" ? "33.333%" : "100%",
+    paddingHorizontal: 12,
+    marginBottom: 24,
+  },
   whiteCard: {
     backgroundColor: "white",
     padding: 32,
@@ -472,41 +653,261 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 32 },
-  cardTitle: { color: "#111827", fontWeight: "900", fontSize: 20, letterSpacing: -0.5 },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  cardTitle: {
+    color: "#111827",
+    fontWeight: "900",
+    fontSize: 20,
+    letterSpacing: -0.5,
+  },
   cardSubtitle: { color: "#9ca3af", fontSize: 12, marginTop: 4 },
-  realtimeBadge: { backgroundColor: "#EEF2FF", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
+  realtimeBadge: {
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
   realtimeText: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
   chartWrapper: { alignItems: "center" },
-  chartSkeleton: { height: 220, width: "100%", backgroundColor: "#f9fafb", borderRadius: 24, alignItems: "center", justifyContent: "center" },
+  chartSkeleton: {
+    height: 220,
+    width: "100%",
+    backgroundColor: "#f9fafb",
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   skeletonText: { color: "#d1d5db", fontWeight: "700" },
-  chartLabels: { flexDirection: "row", justifyContent: "space-between", width: "100%", marginTop: 24, paddingHorizontal: 8 },
-  chartLabel: { color: "#9ca3af", fontSize: 11, fontWeight: "900", textTransform: "uppercase", textAlign: "center", flex: 1 },
+  chartLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: 24,
+    paddingHorizontal: 8,
+  },
+  chartLabel: {
+    color: "#9ca3af",
+    fontSize: 11,
+    fontWeight: "900",
+    textTransform: "uppercase",
+    textAlign: "center",
+    flex: 1,
+  },
   seeAllText: { color: "#6366f1", fontWeight: "700", fontSize: 12 },
-  orderItem: { flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#f9fafb", paddingBottom: 20, marginBottom: 20 },
-  orderIcon: { width: 48, height: 48, backgroundColor: "#EEF2FF", borderRadius: 16, alignItems: "center", justifyContent: "center", marginRight: 16 },
+  orderItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9fafb",
+    paddingBottom: 20,
+    marginBottom: 20,
+  },
+  orderIcon: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#EEF2FF",
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 16,
+  },
   orderIndexText: { color: "#6366f1", fontWeight: "900", fontSize: 12 },
   orderInfo: { flex: 1 },
   orderCustomerName: { color: "#111827", fontWeight: "700", fontSize: 14 },
-  orderAmount: { color: "#9ca3af", fontSize: 11, fontWeight: "500", marginTop: 2 },
+  orderAmount: {
+    color: "#9ca3af",
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 2,
+  },
   orderStatus: { alignItems: "flex-end" },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 9999 },
-  statusBadgeText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
   emptyContainer: { paddingVertical: 40, alignItems: "center" },
   emptyText: { color: "#9ca3af", fontStyle: "italic" },
-  errorFull: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#f9fafb", padding: 24 },
-  errorTitle: { color: "#111827", fontWeight: "700", fontSize: 18, marginTop: 16 },
-  errorMsg: { color: "#ef4444", fontSize: 14, marginTop: 8, textAlign: "center", backgroundColor: "#fef2f2", padding: 16, borderRadius: 20, borderWidth: 1, borderColor: "#fee2e2" },
-  retryButton: { marginTop: 24, backgroundColor: "#6366f1", paddingHorizontal: 32, paddingVertical: 12, borderRadius: 16 },
+  errorFull: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f9fafb",
+    padding: 24,
+  },
+  errorTitle: {
+    color: "#111827",
+    fontWeight: "700",
+    fontSize: 18,
+    marginTop: 16,
+  },
+  errorMsg: {
+    color: "#ef4444",
+    fontSize: 14,
+    marginTop: 8,
+    textAlign: "center",
+    backgroundColor: "#fef2f2",
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#fee2e2",
+  },
+  retryButton: {
+    marginTop: 24,
+    backgroundColor: "#6366f1",
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 16,
+  },
   retryText: { color: "white", fontWeight: "700" },
   skeleton: { opacity: 0.5 },
-  skeletonIcon: { height: 40, width: 40, backgroundColor: "#f3f4f6", borderRadius: 16, marginBottom: 24 },
-  skeletonTitle: { height: 16, width: 80, backgroundColor: "#f3f4f6", borderRadius: 4, marginBottom: 8 },
-  skeletonValue: { height: 32, width: 120, backgroundColor: "#f3f4f6", borderRadius: 4 },
-  orderItemSkeleton: { marginBottom: 24, flexDirection: "row", alignItems: "center" },
-  orderIconSkeleton: { width: 48, height: 48, backgroundColor: "#f3f4f6", borderRadius: 16, marginRight: 16 },
+  skeletonIcon: {
+    height: 40,
+    width: 40,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 16,
+    marginBottom: 24,
+  },
+  skeletonTitle: {
+    height: 16,
+    width: 80,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonValue: {
+    height: 32,
+    width: 120,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 4,
+  },
+  orderItemSkeleton: {
+    marginBottom: 24,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  orderIconSkeleton: {
+    width: 48,
+    height: 48,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 16,
+    marginRight: 16,
+  },
   orderTextSkeleton: { flex: 1 },
-  skeletonLineShort: { height: 16, width: 96, backgroundColor: "#f3f4f6", borderRadius: 4, marginBottom: 8 },
-  skeletonLineMini: { height: 12, width: 64, backgroundColor: "#f3f4f6", borderRadius: 4 },
+  skeletonLineShort: {
+    height: 16,
+    width: 96,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonLineMini: {
+    height: 12,
+    width: 64,
+    backgroundColor: "#f3f4f6",
+    borderRadius: 4,
+  },
+  viewedSection: {
+    width: "100%",
+    marginBottom: 24,
+  },
+  viewedHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  viewedListContainer: {
+    gap: 12,
+  },
+  viewedItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    borderRadius: 16,
+    padding: 12,
+  },
+  viewedRank: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#EEF2FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  viewedRankText: {
+    color: "#6366f1",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  viewedImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#e5e7eb",
+    marginRight: 12,
+  },
+  viewedInfo: {
+    flex: 1,
+  },
+  viewedName: {
+    color: "#111827",
+    fontWeight: "700",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  viewedStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  viewedCount: {
+    color: "#9CA3AF",
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  viewedBadge: {
+    backgroundColor: "#FEE2E2",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  viewedBadgeText: {
+    color: "#DC2626",
+    fontWeight: "700",
+    fontSize: 10,
+  },
+  viewedItemSkeleton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    borderRadius: 16,
+    padding: 12,
+  },
+  viewedRankSkeleton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
+    marginRight: 12,
+  },
+  viewedImageSkeleton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+    marginRight: 12,
+  },
+  viewedTextSkeleton: {
+    flex: 1,
+  },
 });
-
