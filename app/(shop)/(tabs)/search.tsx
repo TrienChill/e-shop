@@ -27,7 +27,8 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-
+import { Platform, useWindowDimensions } from "react-native";
+import { FilterSidebarWeb } from "@/src/components/search/FilterSidebarWeb";
 const { width } = Dimensions.get("window");
 
 // --- Dữ liệu mặc định nếu lịch sử rỗng ---
@@ -40,6 +41,9 @@ const STORAGE_KEY = "search_history";
 
 export default function SearchScreen() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === 'web' && width > 1024;
+
   const [searchPhrase, setSearchPhrase] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [discoverProducts, setDiscoverProducts] = useState<any[]>([]);
@@ -116,13 +120,13 @@ export default function SearchScreen() {
     }
   };
 
-  const performSearch = async (query: string) => {
-    if (!query.trim()) return;
+  const performSearch = async (query: string, customFilters?: any) => {
+    if (!query.trim() && !customFilters) return;
     Keyboard.dismiss();
     setShowResults(true);
     setLoadingSearch(true);
     try {
-      const { data, error } = await supabase
+      let queryBuilder = supabase
         .from('products')
         .select(`
           *,
@@ -130,15 +134,33 @@ export default function SearchScreen() {
             id, discount_type, discount_value, is_active, start_date, end_date
           )
         `)
-        .eq('is_active', true)
-        // Sử dụng cột fts (Full-Text Search) với cấu hình 'simple' và loại 'websearch'
-        // 'websearch' giúp xử lý an toàn các ký tự đặc biệt do người dùng nhập vào
-        .textSearch('fts', query.trim(), { config: 'simple', type: 'websearch' });
+        .eq('is_active', true);
+
+      if (query.trim()) {
+        queryBuilder = queryBuilder.textSearch('fts', query.trim(), { config: 'simple', type: 'websearch' });
+      }
+
+      // Add filter conditions if customFilters is provided
+      if (customFilters) {
+        if (customFilters.categories && customFilters.categories.length > 0) {
+          queryBuilder = queryBuilder.in('category_id', customFilters.categories);
+        }
+        // Assuming size and color fields exist in DB or JSONB for simplicity
+      }
+
+      const { data, error } = await queryBuilder;
       if (error) throw error;
       
-      const processed = (data || []).map(calculateDiscountedPrice);
+      let processed = (data || []).map(calculateDiscountedPrice);
+
+      // Sort results
+      if (customFilters?.sortBy) {
+        if (customFilters.sortBy === 'price_high_low') processed.sort((a, b) => (b.finalPrice || b.price) - (a.finalPrice || a.price));
+        else if (customFilters.sortBy === 'price_low_high') processed.sort((a, b) => (a.finalPrice || a.price) - (b.finalPrice || b.price));
+      }
+
       setSearchResults(processed);
-      addToHistory(query);
+      if (query.trim()) addToHistory(query);
     } catch (err) {
       console.error("Lỗi khi tìm kiếm:", err);
     } finally {
@@ -181,7 +203,7 @@ export default function SearchScreen() {
             <Camera size={20} color="#3B82F6" />
           </TouchableOpacity>
         </View>
-        {showResults && (
+        {showResults && !isDesktop && (
           <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)}>
             <Filter size={20} color="#000" />
           </TouchableOpacity>
@@ -268,7 +290,8 @@ export default function SearchScreen() {
       <FlatList
         data={searchResults}
         keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
+        numColumns={isDesktop ? 3 : 2}
+        key={isDesktop ? "desktop" : "mobile"}
         contentContainerStyle={styles.gridContainer}
         renderItem={({ item }) => (
           <TouchableOpacity 
@@ -287,17 +310,35 @@ export default function SearchScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {renderHeader()}
-      {showResults ? renderResultsView() : renderInitialView()}
-      
-      <FilterModal 
-        isVisible={isFilterVisible} 
-        onClose={() => setIsFilterVisible(false)}
-        onApply={(filters) => {
-          console.log("Áp dụng bộ lọc:", filters);
-          // TODO: Thực hiện lại performSearch với các điều kiện filters
-        }}
-      />
+      <View style={[styles.webWrapper, isDesktop && { maxWidth: 1200, alignSelf: 'center', width: '100%', flex: 1 }]}>
+        {renderHeader()}
+        
+        <View style={{ flex: 1, flexDirection: isDesktop ? 'row' : 'column' }}>
+          {isDesktop && showResults && (
+            <View style={styles.sidebarWebContainer}>
+              <FilterSidebarWeb 
+                onFilterChange={(filters) => {
+                  performSearch(searchPhrase, filters);
+                }} 
+              />
+            </View>
+          )}
+
+          <View style={{ flex: 1 }}>
+            {showResults ? renderResultsView() : renderInitialView()}
+          </View>
+        </View>
+
+        {!isDesktop && (
+          <FilterModal 
+            isVisible={isFilterVisible} 
+            onClose={() => setIsFilterVisible(false)}
+            onApply={(filters) => {
+              performSearch(searchPhrase, filters);
+            }}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -306,6 +347,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+  },
+  webWrapper: {
+    flex: 1,
+  },
+  sidebarWebContainer: {
+    width: 250,
+    marginRight: 20,
+    position: Platform.OS === 'web' ? ('sticky' as any) : 'relative',
+    top: 0,
+    height: '100%',
   },
   header: {
     paddingHorizontal: 20,
