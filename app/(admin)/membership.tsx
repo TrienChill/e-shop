@@ -1,0 +1,569 @@
+import { supabase } from "@/src/lib/supabase";
+import {
+  MembershipLevel,
+  MembershipLevelWithStats,
+  formatVND,
+  formatPercentage,
+  TIER_COLORS,
+} from "@/src/types/membership";
+import {
+  Award,
+  Edit2,
+  Plus,
+  RefreshCcw,
+  Search,
+  Trash2,
+  Users,
+  TrendingUp,
+} from "lucide-react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+interface LevelStats {
+  level_id: string;
+  level_name: string;
+  member_count: number;
+  total_spending_sum: number;
+}
+
+// Helper format tiền
+const formatInputVND = (value: string): string => {
+  const num = value.replace(/[^\d]/g, "");
+  return num ? parseInt(num, 10).toLocaleString("vi-VN") : "";
+};
+
+// Helper parse VND input về number
+const parseVND = (value: string): number => {
+  return parseInt(value.replace(/[^\d]/g, ""), 10) || 0;
+};
+
+export default function AdminMembershipScreen() {
+  const [levels, setLevels] = useState<MembershipLevelWithStats[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  // Modal states
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingLevel, setEditingLevel] = useState<MembershipLevel | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    level_name: "",
+    min_spending: "",
+    benefit_percentage: "",
+    description: "",
+  });
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<"success" | "error">("success");
+
+  const showToast = (message: string, type: "success" | "error" = "success") => {
+    setToastMessage(message);
+    setToastType(type);
+    setTimeout(() => setToastMessage(""), 3000);
+  };
+
+  // Fetch membership levels with stats
+  const fetchLevels = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch all levels
+      const { data: levelsData, error: levelsError } = await supabase
+        .from("membership_levels")
+        .select("*")
+        .order("min_spending", { ascending: true });
+
+      if (levelsError) throw levelsError;
+
+      // Fetch stats for each level
+      const { data: statsData, error: statsError } = await supabase.rpc(
+        "get_membership_stats"
+      );
+
+      const statsMap = new Map<string, LevelStats>();
+      if (!statsError && statsData) {
+        (statsData as LevelStats[]).forEach((stat) => {
+          statsMap.set(stat.level_id, stat);
+        });
+      }
+
+      // Combine levels with stats
+      const levelsWithStats: MembershipLevelWithStats[] = (levelsData || []).map(
+        (level) => ({
+          ...level,
+          member_count: statsMap.get(level.id)?.member_count || 0,
+        })
+      );
+
+      setLevels(levelsWithStats);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLevels();
+  }, [fetchLevels]);
+
+  // Open modal for create/edit
+  const openModal = (level?: MembershipLevel) => {
+    if (level) {
+      setEditingLevel(level);
+      setFormData({
+        level_name: level.level_name,
+        min_spending: level.min_spending.toLocaleString("vi-VN"),
+        benefit_percentage: level.benefit_percentage.toString(),
+        description: level.description || "",
+      });
+    } else {
+      setEditingLevel(null);
+      setFormData({
+        level_name: "",
+        min_spending: "",
+        benefit_percentage: "",
+        description: "",
+      });
+    }
+    setIsModalVisible(true);
+  };
+
+  // Validate form
+  const validateForm = (): boolean => {
+    if (!formData.level_name.trim()) {
+      Alert.alert("Lỗi", "Vui lòng nhập tên hạng thành viên.");
+      return false;
+    }
+
+    const minSpending = parseVND(formData.min_spending);
+    const benefit = parseInt(formData.benefit_percentage, 10);
+
+    if (minSpending < 0) {
+      Alert.alert("Lỗi", "Số tiền tối thiểu không được âm.");
+      return false;
+    }
+
+    if (isNaN(benefit) || benefit < 0 || benefit > 100) {
+      Alert.alert("Lỗi", "Phần trăm giảm giá phải từ 0 đến 100.");
+      return false;
+    }
+
+    // Check min_spending order
+    const existingLevels = editingLevel
+      ? levels.filter((l) => l.id !== editingLevel.id)
+      : levels;
+
+    for (const level of existingLevels) {
+      if (level.min_spending >= minSpending && minSpending > 0) {
+        Alert.alert(
+          "Lỗi",
+          `Số tiền tối thiểu phải lớn hơn hạng "${level.level_name}" (${formatVND(level.min_spending)}).`
+        );
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  // Save level
+  const handleSave = async () => {
+    if (!validateForm()) return;
+
+    try {
+      const payload = {
+        level_name: formData.level_name.trim(),
+        min_spending: parseVND(formData.min_spending),
+        benefit_percentage: parseInt(formData.benefit_percentage, 10),
+        description: formData.description.trim() || null,
+      };
+
+      if (editingLevel) {
+        const { error } = await supabase
+          .from("membership_levels")
+          .update(payload)
+          .eq("id", editingLevel.id);
+
+        if (error) throw error;
+
+        // Recalculate all memberships
+        await supabase.rpc("recalculate_all_membership_levels");
+        showToast("Đã cập nhật hạng thành viên!");
+      } else {
+        const { error } = await supabase
+          .from("membership_levels")
+          .insert(payload);
+
+        if (error) throw error;
+        showToast("Đã tạo hạng thành viên mới!");
+      }
+
+      setIsModalVisible(false);
+      fetchLevels();
+    } catch (e: any) {
+      Alert.alert("Lỗi", e.message);
+    }
+  };
+
+  // Delete level
+  const handleDelete = (level: MembershipLevelWithStats) => {
+    if (level.member_count > 0) {
+      Alert.alert(
+        "Không thể xóa",
+        `Hạng "${level.level_name}" đang có ${level.member_count} thành viên. Vui lòng chuyển họ sang hạng khác trước.`
+      );
+      return;
+    }
+
+    Alert.alert(
+      "Xác nhận xóa",
+      `Bạn có chắc muốn xóa hạng "${level.level_name}"?`,
+      [
+        { text: "Hủy", style: "cancel" },
+        {
+          text: "Xóa",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const { error } = await supabase
+                .from("membership_levels")
+                .delete()
+                .eq("id", level.id);
+
+              if (error) throw error;
+              showToast("Đã xóa hạng thành viên!");
+              fetchLevels();
+            } catch (e: any) {
+              Alert.alert("Lỗi", e.message);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Render level card
+  const renderLevelCard = ({ item }: { item: MembershipLevelWithStats }) => {
+    const tierStyle = TIER_COLORS[item.level_name] || TIER_COLORS["Đồng"];
+    const isHighest = item.id === levels[levels.length - 1]?.id;
+
+    return (
+      <View
+        className={`bg-white rounded-2xl p-5 mb-4 border-2 ${tierStyle.border} shadow-sm`}
+      >
+        {/* Header */}
+        <View className="flex-row justify-between items-start mb-4">
+          <View className="flex-row items-center">
+            <View
+              className={`w-12 h-12 rounded-full ${tierStyle.bg} items-center justify-center mr-3`}
+            >
+              <Text className="text-2xl">{tierStyle.icon}</Text>
+            </View>
+            <View>
+              <Text className={`text-lg font-bold ${tierStyle.text}`}>
+                {item.level_name}
+              </Text>
+              <Text className="text-gray-500 text-sm">
+                {item.min_spending === 0
+                  ? "Hạng mặc định"
+                  : `Từ ${formatVND(item.min_spending)}`}
+              </Text>
+            </View>
+          </View>
+
+          {/* Actions */}
+          <View className="flex-row gap-2">
+            <TouchableOpacity
+              onPress={() => openModal(item)}
+              className="p-2 bg-blue-50 rounded-lg"
+            >
+              <Edit2 size={18} color="#3b82f6" />
+            </TouchableOpacity>
+            {!isHighest && (
+              <TouchableOpacity
+                onPress={() => handleDelete(item)}
+                className="p-2 bg-red-50 rounded-lg"
+              >
+                <Trash2 size={18} color="#ef4444" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View className="flex-row gap-4 mb-4">
+          <View className="flex-1 bg-gray-50 rounded-xl p-3">
+            <View className="flex-row items-center mb-1">
+              <TrendingUp size={14} color="#6b7280" />
+              <Text className="text-gray-500 text-xs ml-1">Ưu đãi</Text>
+            </View>
+            <Text className="text-xl font-bold text-emerald-600">
+              {formatPercentage(item.benefit_percentage)}
+            </Text>
+          </View>
+
+          <View className="flex-1 bg-gray-50 rounded-xl p-3">
+            <View className="flex-row items-center mb-1">
+              <Users size={14} color="#6b7280" />
+              <Text className="text-gray-500 text-xs ml-1">Thành viên</Text>
+            </View>
+            <Text className="text-xl font-bold text-gray-900">
+              {item.member_count.toLocaleString("vi-VN")}
+            </Text>
+          </View>
+        </View>
+
+        {/* Description */}
+        {item.description && (
+          <Text className="text-gray-600 text-sm">{item.description}</Text>
+        )}
+
+        {/* Badge */}
+        {isHighest && (
+          <View className="absolute top-4 right-4">
+            <View className="bg-amber-100 px-2 py-1 rounded-full">
+              <Text className="text-amber-700 text-xs font-semibold">
+                Cao nhất
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // Filtered levels
+  const filteredLevels = levels.filter((level) =>
+    level.level_name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Total stats
+  const totalMembers = levels.reduce((sum, l) => sum + l.member_count, 0);
+
+  return (
+    <View className="flex-1 bg-gray-100">
+      {/* Header */}
+      <View className="bg-white px-4 pt-4 pb-2">
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="text-2xl font-bold text-gray-900">
+            Hạng thành viên
+          </Text>
+          <TouchableOpacity
+            onPress={() => openModal()}
+            className="bg-indigo-600 px-4 py-2 rounded-xl flex-row items-center"
+          >
+            <Plus size={18} color="white" />
+            <Text className="text-white font-semibold ml-1">Thêm hạng</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Search */}
+        <View className="flex-row items-center bg-gray-100 rounded-xl px-3 mb-4">
+          <Search size={20} color="#9ca3af" />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Tìm kiếm hạng..."
+            className="flex-1 py-3 px-2 text-gray-900"
+            placeholderTextColor="#9ca3af"
+          />
+        </View>
+      </View>
+
+      {/* Summary Stats */}
+      <View className="px-4 py-3">
+        <View className="bg-indigo-600 rounded-2xl p-4 flex-row items-center">
+          <View className="w-12 h-12 bg-white/20 rounded-full items-center justify-center">
+            <Award size={24} color="white" />
+          </View>
+          <View className="ml-3">
+            <Text className="text-white/80 text-sm">Tổng thành viên</Text>
+            <Text className="text-white text-2xl font-bold">
+              {totalMembers.toLocaleString("vi-VN")}
+            </Text>
+          </View>
+          <View className="ml-auto">
+            <Text className="text-white/80 text-sm">{levels.length} hạng</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Content */}
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#4f46e5" />
+          <Text className="text-gray-500 mt-2">Đang tải...</Text>
+        </View>
+      ) : error ? (
+        <View className="flex-1 items-center justify-center p-4">
+          <Text className="text-red-500 text-center">{error}</Text>
+          <TouchableOpacity
+            onPress={fetchLevels}
+            className="mt-4 bg-indigo-600 px-4 py-2 rounded-xl"
+          >
+            <Text className="text-white font-semibold">Thử lại</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredLevels}
+          renderItem={renderLevelCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View className="items-center py-10">
+              <Award size={48} color="#d1d5db" />
+              <Text className="text-gray-400 mt-2">Chưa có hạng thành viên</Text>
+            </View>
+          }
+        />
+      )}
+
+      {/* CREATE/EDIT MODAL */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-end">
+          <View className="bg-white rounded-t-3xl p-6 max-h-[90%]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-xl font-bold text-gray-900">
+                {editingLevel ? "Sửa hạng" : "Thêm hạng mới"}
+              </Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <Text className="text-gray-500 text-lg">Đóng</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Level Name */}
+              <View className="mb-4">
+                <Text className="text-gray-700 font-semibold mb-2">
+                  Tên hạng <Text className="text-red-500">*</Text>
+                </Text>
+                <TextInput
+                  value={formData.level_name}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, level_name: text })
+                  }
+                  placeholder="Ví dụ: Đồng, Bạc, Vàng"
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+                />
+              </View>
+
+              {/* Min Spending */}
+              <View className="mb-4">
+                <Text className="text-gray-700 font-semibold mb-2">
+                  Chi tiêu tối thiểu (VNĐ) <Text className="text-red-500">*</Text>
+                </Text>
+                <TextInput
+                  value={formData.min_spending}
+                  onChangeText={(text) =>
+                    setFormData({
+                      ...formData,
+                      min_spending: formatInputVND(text),
+                    })
+                  }
+                  placeholder="0"
+                  keyboardType="numeric"
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+                />
+                <Text className="text-gray-400 text-xs mt-1">
+                  Số tiền tối thiểu khách phải chi để đạt hạng này
+                </Text>
+              </View>
+
+              {/* Benefit Percentage */}
+              <View className="mb-4">
+                <Text className="text-gray-700 font-semibold mb-2">
+                  % Giảm giá mặc định <Text className="text-red-500">*</Text>
+                </Text>
+                <View className="flex-row items-center">
+                  <TextInput
+                    value={formData.benefit_percentage}
+                    onChangeText={(text) =>
+                      setFormData({
+                        ...formData,
+                        benefit_percentage: text.replace(/[^\d]/g, ""),
+                      })
+                    }
+                    placeholder="0"
+                    keyboardType="numeric"
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+                  />
+                  <Text className="ml-2 text-gray-700 font-semibold">%</Text>
+                </View>
+                <Text className="text-gray-400 text-xs mt-1">
+                  Phần trăm giảm giá mặc định khi áp dụng hạng này
+                </Text>
+              </View>
+
+              {/* Description */}
+              <View className="mb-6">
+                <Text className="text-gray-700 font-semibold mb-2">
+                  Mô tả
+                </Text>
+                <TextInput
+                  value={formData.description}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, description: text })
+                  }
+                  placeholder="Mô tả thêm về hạng thành viên..."
+                  multiline
+                  numberOfLines={3}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900"
+                />
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                onPress={handleSave}
+                className="bg-indigo-600 py-4 rounded-xl items-center mb-4"
+              >
+                <Text className="text-white font-bold text-base">
+                  {editingLevel ? "Cập nhật" : "Tạo mới"}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Toast */}
+      {toastMessage ? (
+        <View className="absolute bottom-10 left-4 right-4 z-50">
+          <View
+            className={`rounded-xl px-4 py-3 flex-row items-center ${
+              toastType === "success" ? "bg-emerald-500" : "bg-red-500"
+            }`}
+          >
+            <Text className="text-white font-semibold flex-1">
+              {toastMessage}
+            </Text>
+            <TouchableOpacity onPress={() => setToastMessage("")}>
+              <Text className="text-white/80 text-sm">Đóng</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
