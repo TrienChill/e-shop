@@ -4,6 +4,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Check, Grid, Heart, List, Minus, Plus, Search, ShoppingBag, ShoppingCart, X } from "lucide-react-native";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useEffect, useState, useCallback } from "react";
+import { Platform, useWindowDimensions } from "react-native";
 import {
   ActivityIndicator,
   Alert,
@@ -496,6 +497,261 @@ export default function CategoriesScreen() {
     );
   };
 
+  const { width: winWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web' && winWidth >= 1024;
+
+  // ═══════════════════════════════ WEB LAYOUT ═══════════════════════════════
+  if (isWeb) {
+    const selectedRootCat = rootCategories.find(c => c.id === selectedRootId);
+    const selectedSubCat = subCategories.find(c => c.id === selectedSubId);
+
+    return (
+      <View style={webS.root}>
+        {/* ── Left Sidebar: Root categories ── */}
+        <View style={webS.sidebar}>
+          <Text style={webS.sidebarTitle}>Danh mục</Text>
+          {rootCategories.map(cat => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[webS.rootItem, selectedRootId === cat.id && webS.rootItemActive]}
+              onPress={() => { setSelectedRootId(cat.id); setSelectedSubId(null); setSelectedChildId(null); }}
+              activeOpacity={0.75}
+            >
+              {cat.image_url && (
+                <Image source={{ uri: cat.image_url }} style={webS.rootItemImg} />
+              )}
+              <Text style={[webS.rootItemText, selectedRootId === cat.id && webS.rootItemTextActive]}>
+                {cat.name_vi || cat.name}
+              </Text>
+              {selectedRootId === cat.id && <View style={webS.rootItemDot} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* ── Center: Sub-categories or Product grid ── */}
+        <View style={webS.main}>
+          {/* Breadcrumb */}
+          <View style={webS.breadcrumb}>
+            <Text style={webS.breadcrumbText}>{getBreadcrumbs()}</Text>
+          </View>
+
+          {!selectedSubId ? (
+            // Sub-category grid
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={webS.sectionHeading}>
+                {selectedRootCat?.name_vi || selectedRootCat?.name || 'Danh mục'}
+              </Text>
+              <View style={webS.subGrid}>
+                {subCategories.map(cat => (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={webS.subCard}
+                    activeOpacity={0.8}
+                    onPress={() => { setSelectedSubId(cat.id); setSelectedChildId(null); }}
+                  >
+                    <Image
+                      source={{ uri: cat.image_url || 'https://via.placeholder.com/200' }}
+                      style={webS.subCardImg}
+                      resizeMode="cover"
+                    />
+                    <View style={webS.subCardInfo}>
+                      <Text style={webS.subCardName}>{cat.name_vi || cat.name}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          ) : (
+            // Product list view
+            <View style={{ flex: 1 }}>
+              {/* Sub-cat chips + sort toolbar */}
+              <View style={webS.toolbar}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={webS.chipRow}>
+                  <TouchableOpacity
+                    style={[webS.chip, selectedChildId === null && webS.chipActive]}
+                    onPress={() => setSelectedChildId(null)}
+                  >
+                    <Text style={[webS.chipText, selectedChildId === null && webS.chipTextActive]}>Tất cả</Text>
+                  </TouchableOpacity>
+                  {childCategories.map(cat => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[webS.chip, selectedChildId === cat.id && webS.chipActive]}
+                      onPress={() => setSelectedChildId(cat.id)}
+                    >
+                      <Text style={[webS.chipText, selectedChildId === cat.id && webS.chipTextActive]}>
+                        {cat.name_vi || cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={webS.sortRow}>
+                  {SORT_CHIPS.map(opt => (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[webS.sortBtn, sortBy === opt.id && webS.sortBtnActive]}
+                      onPress={() => setSortBy(opt.id)}
+                    >
+                      <Text style={[webS.sortBtnText, sortBy === opt.id && webS.sortBtnTextActive]}>
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Product grid header */}
+              <View style={webS.gridHeader}>
+                <Text style={webS.gridHeading}>
+                  {selectedSubCat?.name_vi || selectedSubCat?.name}
+                  <Text style={webS.gridCount}>  ({products.length} sản phẩm)</Text>
+                </Text>
+                <View style={webS.viewToggle}>
+                  <TouchableOpacity style={[webS.toggleBtn, viewType === 'grid' && webS.toggleBtnActive]} onPress={() => setViewType('grid')}>
+                    <Grid size={16} color={viewType === 'grid' ? '#0055FF' : '#6B7280'} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[webS.toggleBtn, viewType === 'list' && webS.toggleBtnActive]} onPress={() => setViewType('list')}>
+                    <List size={16} color={viewType === 'list' ? '#0055FF' : '#6B7280'} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {loadingProducts && products.length === 0 ? (
+                <View style={webS.loadingBox}><ActivityIndicator size="large" color="#0055FF" /></View>
+              ) : (
+                <FlatList
+                  data={products}
+                  keyExtractor={item => item.id.toString()}
+                  numColumns={viewType === 'grid' ? 4 : 1}
+                  key={viewType === 'grid' ? 'web-grid' : 'web-list'}
+                  contentContainerStyle={webS.productGrid}
+                  columnWrapperStyle={viewType === 'grid' ? webS.columnWrapper : undefined}
+                  onEndReached={() => fetchProducts()}
+                  onEndReachedThreshold={0.5}
+                  ListFooterComponent={loadingProducts ? <ActivityIndicator size="small" color="#0055FF" style={{ marginVertical: 20 }} /> : null}
+                  ListEmptyComponent={
+                    !loadingProducts ? (
+                      <View style={webS.emptyBox}>
+                        <ShoppingBag size={48} color="#E5E7EB" />
+                        <Text style={webS.emptyText}>Không tìm thấy sản phẩm</Text>
+                      </View>
+                    ) : null
+                  }
+                  renderItem={({ item }) => {
+                    const isFav = wishlistIds.has(item.id);
+                    if (viewType === 'list') {
+                      return (
+                        <TouchableOpacity
+                          style={webS.listCard}
+                          activeOpacity={0.8}
+                          onPress={() => router.push({ pathname: '/(shop)/product/[id]', params: { id: item.id } } as any)}
+                        >
+                          <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={webS.listCardImg} resizeMode="cover" />
+                          <View style={webS.listCardInfo}>
+                            <Text style={webS.listCardName} numberOfLines={2}>{item.name}</Text>
+                            <View style={webS.listBadges}>
+                              {item.is_new && <View style={[webS.badge, { backgroundColor: '#10B981' }]}><Text style={webS.badgeText}>NEW</Text></View>}
+                              {item.is_sale && <View style={[webS.badge, { backgroundColor: '#EF4444' }]}><Text style={webS.badgeText}>SALE</Text></View>}
+                              {item.is_out_of_stock && <View style={[webS.badge, { backgroundColor: '#9CA3AF' }]}><Text style={webS.badgeText}>HẾT HÀNG</Text></View>}
+                            </View>
+                            <View style={webS.listPriceRow}>
+                              <Text style={webS.listPrice}>{(item.finalPrice || item.price).toLocaleString('vi-VN')} đ</Text>
+                              {item.is_sale && <Text style={webS.listOldPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>}
+                            </View>
+                          </View>
+                          <View style={webS.listActions}>
+                            <TouchableOpacity style={webS.actionCircle} onPress={() => toggleWishlist(item.id)}>
+                              <Heart size={17} color={isFav ? '#EF4444' : '#6B7280'} fill={isFav ? '#EF4444' : 'transparent'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[webS.actionCircle, webS.actionCircleBlue]}
+                              onPress={() => { setSelectedQuickProduct(item); setQuickSize(null); setQuickColor(null); setQuickQty(1); }}
+                            >
+                              <ShoppingCart size={17} color="#fff" />
+                            </TouchableOpacity>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    }
+                    return (
+                      <TouchableOpacity
+                        style={webS.gridCard}
+                        activeOpacity={0.85}
+                        onPress={() => router.push({ pathname: '/(shop)/product/[id]', params: { id: item.id } } as any)}
+                      >
+                        <View style={webS.gridCardImgWrap}>
+                          <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={webS.gridCardImg} resizeMode="cover" />
+                          <View style={webS.gridBadges}>
+                            {item.is_new && <View style={[webS.badge, { backgroundColor: '#10B981' }]}><Text style={webS.badgeText}>NEW</Text></View>}
+                            {item.is_sale && <View style={[webS.badge, { backgroundColor: '#EF4444' }]}><Text style={webS.badgeText}>SALE</Text></View>}
+                            {item.is_out_of_stock && <View style={[webS.badge, { backgroundColor: '#9CA3AF' }]}><Text style={webS.badgeText}>HẾT HÀNG</Text></View>}
+                          </View>
+                          <View style={webS.gridQuickActions}>
+                            <TouchableOpacity style={webS.actionCircle} onPress={() => toggleWishlist(item.id)}>
+                              <Heart size={15} color={isFav ? '#EF4444' : '#6B7280'} fill={isFav ? '#EF4444' : 'transparent'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[webS.actionCircle, webS.actionCircleBlue]}
+                              onPress={() => { setSelectedQuickProduct(item); setQuickSize(null); setQuickColor(null); setQuickQty(1); }}
+                            >
+                              <ShoppingCart size={15} color="#fff" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <View style={webS.gridCardInfo}>
+                          <Text style={webS.gridCardName} numberOfLines={2}>{item.name}</Text>
+                          <View style={webS.gridPriceRow}>
+                            <Text style={webS.gridPrice}>{(item.finalPrice || item.price).toLocaleString('vi-VN')} đ</Text>
+                            {item.is_sale && <Text style={webS.gridOldPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Quick Add Modal (shared) */}
+        <Modal visible={!!selectedQuickProduct} transparent animationType="slide">
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setSelectedQuickProduct(null)}>
+            <View style={styles.quickAddContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Tùy chọn sản phẩm</Text>
+                <TouchableOpacity onPress={() => setSelectedQuickProduct(null)}><X size={24} color="#000" /></TouchableOpacity>
+              </View>
+              {selectedQuickProduct && (
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  <View style={styles.quickProdInfo}>
+                    <Image source={{ uri: selectedQuickProduct.images?.[0] }} style={styles.quickProdImg} />
+                    <View style={{ flex: 1, marginLeft: 15 }}>
+                      <Text style={styles.quickProdName} numberOfLines={2}>{selectedQuickProduct.name}</Text>
+                      <Text style={styles.quickProdPrice}>{(selectedQuickProduct.finalPrice || selectedQuickProduct.price).toLocaleString('vi-VN')} đ</Text>
+                    </View>
+                  </View>
+                  <View style={styles.qtySection}>
+                    <Text style={styles.variantLabel}>Số lượng</Text>
+                    <View style={styles.qtyStepper}>
+                      <TouchableOpacity onPress={() => setQuickQty(Math.max(1, quickQty - 1))} style={styles.qtyBtn}><Minus size={20} color="#000" /></TouchableOpacity>
+                      <Text style={styles.qtyText}>{quickQty}</Text>
+                      <TouchableOpacity onPress={() => setQuickQty(quickQty + 1)} style={styles.qtyBtn}><Plus size={20} color="#000" /></TouchableOpacity>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.addToCartBtn} onPress={addToCart} disabled={addingToCart}>
+                    {addingToCart ? <ActivityIndicator color="#fff" /> : <Text style={styles.addToCartText}>Thêm vào giỏ hàng</Text>}
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
+    );
+  }
+  // ═══════════════════════════════ END WEB LAYOUT ═══════════════════════════
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -795,3 +1051,89 @@ const styles = StyleSheet.create({
   addToCartBtn: { backgroundColor: '#0055FF', height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center', shadowColor: "#0055FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 5 },
   addToCartText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
+
+// ==================== WEB STYLES ====================
+const webS = StyleSheet.create({
+  root: { flex: 1, flexDirection: 'row', backgroundColor: '#F8FAFF', height: '100%' as any },
+
+  // Left Sidebar
+  sidebar: { width: 220, backgroundColor: '#fff', borderRightWidth: 1, borderRightColor: '#F0F0F4', paddingTop: 24, paddingHorizontal: 16 },
+  sidebarTitle: { fontSize: 11, fontWeight: '800', color: '#9CA3AF', letterSpacing: 1.2, marginBottom: 12, paddingHorizontal: 4 },
+  rootItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 10, borderRadius: 12, marginBottom: 4, position: 'relative' },
+  rootItemActive: { backgroundColor: '#EEF2FF' },
+  rootItemImg: { width: 28, height: 28, borderRadius: 14, marginRight: 10, backgroundColor: '#F3F4F6' },
+  rootItemText: { fontSize: 14, fontWeight: '600', color: '#4B5563', flex: 1 },
+  rootItemTextActive: { color: '#0055FF', fontWeight: '700' },
+  rootItemDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#0055FF', marginLeft: 6 },
+
+  // Main content
+  main: { flex: 1, backgroundColor: '#F8FAFF', display: 'flex' as any, flexDirection: 'column' },
+  breadcrumb: { paddingHorizontal: 24, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F4', backgroundColor: '#fff' },
+  breadcrumbText: { fontSize: 12, color: '#9CA3AF', fontWeight: '500' },
+
+  // Sub-category grid
+  sectionHeading: { fontSize: 26, fontWeight: '900', color: '#111', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
+  subGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 16, paddingBottom: 40 },
+  subCard: { width: '22%' as any, backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
+  subCardImg: { width: '100%', aspectRatio: 1.1 },
+  subCardInfo: { padding: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
+  subCardName: { fontSize: 15, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
+
+  // Toolbar
+  toolbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F4', gap: 12 },
+  chipRow: { flexDirection: 'row', gap: 8, alignItems: 'center', flex: 1 },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 99, backgroundColor: '#F3F4F6', borderWidth: 1.5, borderColor: 'transparent' },
+  chipActive: { backgroundColor: '#EEF2FF', borderColor: '#0055FF' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#4B5563' },
+  chipTextActive: { color: '#0055FF' },
+  sortRow: { flexDirection: 'row', gap: 6 },
+  sortBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB' },
+  sortBtnActive: { backgroundColor: '#0055FF', borderColor: '#0055FF' },
+  sortBtnText: { fontSize: 12, fontWeight: '600', color: '#6B7280' },
+  sortBtnTextActive: { color: '#fff' },
+
+  // Grid header
+  gridHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16 },
+  gridHeading: { fontSize: 18, fontWeight: '800', color: '#111' },
+  gridCount: { fontSize: 14, fontWeight: '500', color: '#9CA3AF' },
+  viewToggle: { flexDirection: 'row', gap: 6 },
+  toggleBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center' },
+  toggleBtnActive: { backgroundColor: '#EEF2FF' },
+
+  // Product grid
+  productGrid: { paddingHorizontal: 16, paddingBottom: 40 },
+  columnWrapper: { gap: 14, marginBottom: 14 },
+  loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 80 },
+  emptyBox: { alignItems: 'center', paddingVertical: 80, gap: 12 },
+  emptyText: { fontSize: 16, color: '#9CA3AF' },
+
+  // Grid card
+  gridCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
+  gridCardImgWrap: { width: '100%', aspectRatio: 0.9, position: 'relative' },
+  gridCardImg: { width: '100%', height: '100%' },
+  gridBadges: { position: 'absolute', top: 10, left: 10, gap: 4 },
+  gridQuickActions: { position: 'absolute', bottom: 10, right: 10, flexDirection: 'column', gap: 6 },
+  gridCardInfo: { padding: 12 },
+  gridCardName: { fontSize: 13, fontWeight: '600', color: '#1F2937', marginBottom: 8, minHeight: 38 },
+  gridPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  gridPrice: { fontSize: 15, fontWeight: '800', color: '#0055FF' },
+  gridOldPrice: { fontSize: 12, color: '#9CA3AF', textDecorationLine: 'line-through' },
+
+  // List card
+  listCard: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 16, marginBottom: 12, padding: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#F0F0F4', alignItems: 'center' },
+  listCardImg: { width: 100, height: 100, borderRadius: 12, backgroundColor: '#F5F5F5' },
+  listCardInfo: { flex: 1, marginLeft: 16 },
+  listCardName: { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 8 },
+  listBadges: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+  listPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  listPrice: { fontSize: 16, fontWeight: '800', color: '#0055FF' },
+  listOldPrice: { fontSize: 13, color: '#9CA3AF', textDecorationLine: 'line-through' },
+  listActions: { flexDirection: 'column', gap: 8, marginLeft: 12 },
+
+  // Shared
+  badge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  badgeText: { color: '#fff', fontSize: 9, fontWeight: '900' },
+  actionCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
+  actionCircleBlue: { backgroundColor: '#0055FF', borderColor: '#0055FF' },
+});
+

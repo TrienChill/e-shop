@@ -3,7 +3,7 @@ import { getFlashSaleProducts, getMostPopularProducts } from "@/src/services/pro
 import { Banner, getActiveBanners } from "@/src/services/banner";
 import { supabase } from "@/src/lib/supabase";
 import { useRouter } from "expo-router";
-import { ArrowRight, ChevronLeft, Clock, Heart } from "lucide-react-native";
+import { ArrowRight, ChevronLeft, Clock, Heart, Zap, TrendingUp } from "lucide-react-native";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useEffect, useState, useRef } from "react";
@@ -11,11 +11,13 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -194,9 +196,7 @@ const DiscountTabs = ({ selected, onSelect, levels }: { selected: string; onSele
 
 const ProductCard = ({ product }: { product: any }) => {
   const router = useRouter();
-
   let discountBadgeText = product.discountBadgeText || "SALE";
-
   return (
     <TouchableOpacity
       style={styles.productCard}
@@ -210,15 +210,34 @@ const ProductCard = ({ product }: { product: any }) => {
         </View>
       </View>
       <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>
-          {product.name}
-        </Text>
-        <PriceDisplay
-          finalPrice={product.finalPrice}
-          originalPrice={product.originalPrice}
-          hasDiscount={true}
-          size="sm"
-        />
+        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+        <PriceDisplay finalPrice={product.finalPrice} originalPrice={product.originalPrice} hasDiscount={true} size="sm" />
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ── Web-only product card ──
+const WebProductCard = ({ product }: { product: any }) => {
+  const router = useRouter();
+  const badge = product.discountBadgeText || "SALE";
+  return (
+    <TouchableOpacity
+      style={webStyles.productCard}
+      activeOpacity={0.85}
+      onPress={() => router.push(`/(shop)/product/${product.id}`)}
+    >
+      <View style={webStyles.cardImgWrapper}>
+        <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/400' }} style={webStyles.cardImg} resizeMode="cover" />
+        <View style={webStyles.cardBadge}>
+          <Zap size={10} color="#fff" fill="#fff" />
+          <Text style={webStyles.cardBadgeText}>{badge}</Text>
+        </View>
+        <View style={webStyles.cardOverlay} />
+      </View>
+      <View style={webStyles.cardInfo}>
+        <Text style={webStyles.cardName} numberOfLines={2}>{product.name}</Text>
+        <PriceDisplay finalPrice={product.finalPrice} originalPrice={product.originalPrice} hasDiscount={true} size="sm" />
       </View>
     </TouchableOpacity>
   );
@@ -511,10 +530,147 @@ export default function FlashSaleScreen() {
     </View>
   );
 
+  const { width: winWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === 'web' && winWidth >= 1024;
+
+  // ══════════════ WEB LAYOUT ══════════════
+  if (isWeb) {
+    return (
+      <View style={webStyles.root}>
+        <StatusBar barStyle="dark-content" />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+
+          {/* ── Hero Banner ── */}
+          <View style={webStyles.hero}>
+            <View style={webStyles.heroLeft}>
+              <View style={webStyles.heroPillRow}>
+                <Zap size={14} color="#FF3B30" fill="#FF3B30" />
+                <Text style={webStyles.heroPill}>GIỚI HẠN THỜI GIAN</Text>
+              </View>
+              <Text style={webStyles.heroTitle}>Flash Sale{"\n"}Siêu Giảm Giá</Text>
+              <Text style={webStyles.heroSub}>Hàng nghìn sản phẩm giảm sâu đến 50% · Chỉ hôm nay!</Text>
+              <View style={webStyles.heroTimerRow}>
+                <Clock size={18} color="#fff" />
+                <Text style={webStyles.heroTimerLabel}>Kết thúc sau:</Text>
+                <CountdownTimer />
+              </View>
+            </View>
+            <View style={webStyles.heroRight}>
+              {flashSaleData.slice(0, 3).map((p, i) => (
+                <TouchableOpacity
+                  key={p.id}
+                  style={[webStyles.heroThumb, i === 1 && webStyles.heroThumbCenter]}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/(shop)/product/${p.id}`)}
+                >
+                  <Image source={{ uri: p.images?.[0] || 'https://via.placeholder.com/200' }} style={webStyles.heroThumbImg} resizeMode="cover" />
+                  <View style={webStyles.heroThumbBadge}>
+                    <Text style={webStyles.heroThumbBadgeText}>{p.discountBadgeText || 'SALE'}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* ── Main content: filter sidebar + product grid ── */}
+          <View style={webStyles.body}>
+            {/* Sidebar discount filter */}
+            <View style={webStyles.sidebar}>
+              <Text style={webStyles.sidebarTitle}>Mức giảm giá</Text>
+              {discountLevels.map(level => (
+                <TouchableOpacity
+                  key={level}
+                  onPress={() => setSelectedDiscount(level)}
+                  style={[webStyles.sidebarItem, selectedDiscount === level && webStyles.sidebarItemActive]}
+                >
+                  {selectedDiscount === level && <Zap size={13} color="#0055FF" fill="#0055FF" style={{ marginRight: 6 }} />}
+                  <Text style={[webStyles.sidebarItemText, selectedDiscount === level && webStyles.sidebarItemTextActive]}>
+                    {level}
+                  </Text>
+                  <View style={webStyles.sidebarItemArrow}>
+                    <ArrowRight size={13} color={selectedDiscount === level ? '#0055FF' : '#9CA3AF'} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Product grid (4 cols) */}
+            <View style={webStyles.gridArea}>
+              <View style={webStyles.gridHeader}>
+                <View style={webStyles.gridHeaderLeft}>
+                  <Zap size={20} color="#FF3B30" fill="#FF3B30" />
+                  <Text style={webStyles.gridHeaderTitle}>Sản phẩm Flash Sale</Text>
+                  <View style={webStyles.gridCount}>
+                    <Text style={webStyles.gridCountText}>{filteredData.length} sản phẩm</Text>
+                  </View>
+                </View>
+              </View>
+              <View style={webStyles.grid}>
+                {filteredData.map(p => <WebProductCard key={p.id} product={p} />)}
+                {filteredData.length === 0 && (
+                  <View style={webStyles.emptyState}>
+                    <Text style={webStyles.emptyText}>Không có sản phẩm ở mức giảm này.</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* ── Popular section ── */}
+          {popularProducts.length > 0 && (
+            <View style={webStyles.popularSection}>
+              <View style={webStyles.popularHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TrendingUp size={22} color="#0055FF" />
+                  <Text style={webStyles.popularTitle}>Nổi tiếng nhất</Text>
+                </View>
+                <TouchableOpacity style={webStyles.popularSeeAll} onPress={() => router.push('/(shop)/(tabs)/categories' as any)}>
+                  <Text style={webStyles.popularSeeAllText}>Xem tất cả</Text>
+                  <ArrowRight size={16} color="#0055FF" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {popularProducts.map(item => {
+                  const isFav = wishlistItems.some(w => w.product_id === item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={webStyles.popularCard}
+                      onPress={() => router.push(`/(shop)/product/${item.id}`)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={webStyles.popularImgWrapper}>
+                        <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={webStyles.popularImg} resizeMode="cover" />
+                        <TouchableOpacity style={webStyles.popularFav} onPress={() => handleToggleFavoritePopular(item.id, isFav)}>
+                          <Heart size={15} color="#EF4444" fill={isFav ? '#EF4444' : 'transparent'} />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={webStyles.popularInfo}>
+                        <View style={webStyles.popularStats}>
+                          <MaterialIcons name="star" size={13} color="#F59E0B" />
+                          <Text style={webStyles.popularRating}>{item.average_rating || '5.0'}</Text>
+                          <Text style={webStyles.popularDot}>·</Text>
+                          <Heart size={11} color="#EF4444" fill="#EF4444" />
+                          <Text style={webStyles.popularHeart}>{item.heart_count || 0}</Text>
+                        </View>
+                        <Text style={webStyles.popularName} numberOfLines={2}>{item.name}</Text>
+                        <PriceDisplay hasDiscount={item.hasDiscount} finalPrice={item.finalPrice} originalPrice={item.originalPrice} size="sm" />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ══════════════ MOBILE LAYOUT (unchanged) ══════════════
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-
       <FlatList
         data={filteredData}
         keyExtractor={(item) => item.id.toString()}
@@ -790,3 +946,173 @@ const styles = StyleSheet.create({
     color: COLORS.dark,
   },
 });
+
+// ==================== WEB STYLES ====================
+const webStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F8FAFF' },
+
+  // Hero
+  hero: {
+    flexDirection: 'row',
+    backgroundColor: '#0A1628',
+    paddingHorizontal: 80,
+    paddingVertical: 56,
+    alignItems: 'center',
+    gap: 48,
+    minHeight: 320,
+  },
+  heroLeft: { flex: 1 },
+  heroPillRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  heroPill: {
+    color: '#FF3B30', fontWeight: '800', fontSize: 12, letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  heroTitle: {
+    fontSize: 52, fontWeight: '900', color: '#FFFFFF', lineHeight: 60,
+    marginBottom: 12,
+  },
+  heroSub: { fontSize: 16, color: 'rgba(255,255,255,0.65)', lineHeight: 24, marginBottom: 28 },
+  heroTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  heroTimerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
+  heroRight: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
+  heroThumb: {
+    width: 130, height: 160, borderRadius: 20, overflow: 'hidden',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
+  },
+  heroThumbCenter: { width: 160, height: 200, marginBottom: -20 },
+  heroThumbImg: { width: '100%', height: '100%' },
+  heroThumbBadge: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: '#FF3B30', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  heroThumbBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+
+  // Body layout
+  body: {
+    flexDirection: 'row',
+    paddingHorizontal: 48,
+    paddingTop: 40,
+    gap: 32,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+
+  // Sidebar
+  sidebar: {
+    width: 200,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    height: 'auto',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    alignSelf: 'flex-start',
+  },
+  sidebarTitle: { fontSize: 15, fontWeight: '800', color: '#111', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  sidebarItem: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 10, paddingHorizontal: 12,
+    borderRadius: 12, marginBottom: 6,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1.5, borderColor: 'transparent',
+  },
+  sidebarItemActive: { backgroundColor: '#EFF6FF', borderColor: '#0055FF' },
+  sidebarItemText: { flex: 1, fontSize: 14, color: '#4B5563', fontWeight: '500' },
+  sidebarItemTextActive: { color: '#0055FF', fontWeight: '700' },
+  sidebarItemArrow: { marginLeft: 'auto' as any },
+
+  // Grid area
+  gridArea: { flex: 1 },
+  gridHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 20,
+  },
+  gridHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gridHeaderTitle: { fontSize: 20, fontWeight: '800', color: '#111' },
+  gridCount: {
+    backgroundColor: '#FEF2F2', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 3,
+  },
+  gridCountText: { fontSize: 12, color: '#EF4444', fontWeight: '700' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  emptyState: { flex: 1, alignItems: 'center', paddingVertical: 60 },
+  emptyText: { color: '#9CA3AF', fontSize: 16 },
+
+  // Web Product Card
+  productCard: {
+    width: '22%' as any, // ~4 cols
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  cardImgWrapper: { width: '100%', aspectRatio: 0.9, position: 'relative' },
+  cardImg: { width: '100%', height: '100%' },
+  cardOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 60,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+  },
+  cardBadge: {
+    position: 'absolute', top: 12, left: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#FF3B30', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  cardBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  cardInfo: { padding: 14 },
+  cardName: { fontSize: 14, fontWeight: '600', color: '#1F2937', marginBottom: 8, lineHeight: 20, minHeight: 40 },
+
+  // Popular section
+  popularSection: {
+    paddingHorizontal: 48, paddingTop: 40, paddingBottom: 20,
+    maxWidth: 1400, alignSelf: 'center', width: '100%',
+  },
+  popularHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 20,
+  },
+  popularTitle: { fontSize: 22, fontWeight: '800', color: '#111' },
+  popularSeeAll: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  popularSeeAllText: { color: '#0055FF', fontSize: 14, fontWeight: '600' },
+  popularCard: {
+    width: 200, marginRight: 16,
+    backgroundColor: '#fff', borderRadius: 20,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  popularImgWrapper: { width: '100%', height: 200, position: 'relative' },
+  popularImg: { width: '100%', height: '100%' },
+  popularFav: {
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: '#fff', borderRadius: 20,
+    width: 32, height: 32,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  popularInfo: { padding: 12 },
+  popularStats: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+  popularRating: { fontSize: 12, fontWeight: '700', color: '#1F2937' },
+  popularDot: { color: '#9CA3AF', fontSize: 12 },
+  popularHeart: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
+  popularName: { fontSize: 14, fontWeight: '700', color: '#1F2937', lineHeight: 20, marginBottom: 6 },
+});
+
