@@ -1,15 +1,15 @@
-import { MaterialIcons } from "@expo/vector-icons";
-import { useRouter, usePathname, useLocalSearchParams } from "expo-router";
-import React, { useState, useEffect } from "react";
 import { useWebUI } from "@/src/context/WebUIContext";
+import { MaterialIcons } from "@expo/vector-icons";
+import { useLocalSearchParams, usePathname, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
-  Platform,
 } from "react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -45,6 +45,7 @@ export default function WebHeader({ cartCount = 0 }: WebHeaderProps) {
 
   const navItems = [
     { path: "/", label: "Trang chủ", icon: "home" },
+    { path: "/(shop)/(tabs)/categories", label: "Danh mục", icon: "grid-view" },
     { path: "/(shop)/(tabs)/wishlist", label: "Yêu thích", icon: "favorite-border" },
     { path: "/(shop)/(tabs)/cart", label: "Giỏ hàng", icon: "shopping-bag", hasBadge: true },
     { path: "/(shop)/(tabs)/profile", label: "Tài khoản", icon: "person-outline" },

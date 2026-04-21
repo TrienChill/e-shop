@@ -585,9 +585,6 @@ const HomeScreen = () => {
               <MaterialIcons name="access-time" size={20} color="#ef4444" />
               <Text style={styles.flashSaleTitle}>Flash Sale</Text>
             </View>
-            <View style={styles.countdownContainer}>
-              <Text style={styles.countdownText}>00:36:58</Text>
-            </View>
           </View>
 
           <View style={styles.flashSaleGrid}>

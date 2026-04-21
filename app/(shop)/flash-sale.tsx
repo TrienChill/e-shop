@@ -401,7 +401,6 @@ export default function FlashSaleScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ChevronLeft size={28} color={COLORS.dark} />
         </TouchableOpacity>
-        <CountdownTimer />
       </View>
 
       <View style={styles.titleSection}>
@@ -549,11 +548,7 @@ export default function FlashSaleScreen() {
               </View>
               <Text style={webStyles.heroTitle}>Flash Sale{"\n"}Siêu Giảm Giá</Text>
               <Text style={webStyles.heroSub}>Hàng nghìn sản phẩm giảm sâu đến 50% · Chỉ hôm nay!</Text>
-              <View style={webStyles.heroTimerRow}>
-                <Clock size={18} color="#fff" />
-                <Text style={webStyles.heroTimerLabel}>Kết thúc sau:</Text>
-                <CountdownTimer />
-              </View>
+
             </View>
             <View style={webStyles.heroRight}>
               {flashSaleData.slice(0, 3).map((p, i) => (
