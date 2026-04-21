@@ -151,23 +151,39 @@ export default function SearchScreen() {
         queryBuilder = queryBuilder.textSearch('fts', query.trim(), { config: 'simple', type: 'websearch' });
       }
 
-      // Add filter conditions if customFilters is provided
-      if (customFilters) {
-        if (customFilters.categories && customFilters.categories.length > 0) {
-          queryBuilder = queryBuilder.in('category_id', customFilters.categories);
-        }
-        // Assuming size and color fields exist in DB or JSONB for simplicity
+      // Apply category filter
+      if (customFilters?.categories && customFilters.categories.length > 0) {
+        queryBuilder = queryBuilder.in('category_id', customFilters.categories);
+      }
+
+      // Apply price filter at DB level (on base price)
+      if (customFilters?.minPrice != null) {
+        queryBuilder = queryBuilder.gte('price', customFilters.minPrice);
+      }
+      if (customFilters?.maxPrice != null) {
+        queryBuilder = queryBuilder.lte('price', customFilters.maxPrice);
       }
 
       const { data, error } = await queryBuilder;
       if (error) throw error;
-      
+
       let processed = (data || []).map(calculateDiscountedPrice);
+
+      // After calculating discounted price, re-apply price filter on finalPrice
+      if (customFilters?.minPrice != null) {
+        processed = processed.filter(p => (p.finalPrice ?? p.price) >= customFilters.minPrice);
+      }
+      if (customFilters?.maxPrice != null) {
+        processed = processed.filter(p => (p.finalPrice ?? p.price) <= customFilters.maxPrice);
+      }
 
       // Sort results
       if (customFilters?.sortBy) {
-        if (customFilters.sortBy === 'price_high_low') processed.sort((a, b) => (b.finalPrice || b.price) - (a.finalPrice || a.price));
-        else if (customFilters.sortBy === 'price_low_high') processed.sort((a, b) => (a.finalPrice || a.price) - (b.finalPrice || b.price));
+        if (customFilters.sortBy === 'price_high_low') {
+          processed.sort((a, b) => (b.finalPrice ?? b.price) - (a.finalPrice ?? a.price));
+        } else if (customFilters.sortBy === 'price_low_high') {
+          processed.sort((a, b) => (a.finalPrice ?? a.price) - (b.finalPrice ?? b.price));
+        }
       }
 
       setSearchResults(processed);
@@ -178,6 +194,7 @@ export default function SearchScreen() {
       setLoadingSearch(false);
     }
   };
+
 
   // Hàm xóa nội dung tìm kiếm
   const clearSearch = () => {

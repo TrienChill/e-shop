@@ -1,10 +1,12 @@
-import { Check } from "lucide-react-native";
+import { Check, SlidersHorizontal } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import {
+  Image,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,30 +16,27 @@ interface FilterSidebarWebProps {
   initialFilters?: any;
 }
 
-const SIZES = ["XS", "S", "M", "L", "XL", "2XL"];
-const COLORS = [
-  { id: "white", hex: "#FFFFFF", border: "#E5E7EB" },
-  { id: "black", hex: "#111827" },
-  { id: "blue", hex: "#3B82F6" },
-  { id: "red", hex: "#EF4444" },
-  { id: "teal", hex: "#14B8A6" },
-  { id: "yellow", hex: "#F59E0B" },
-];
-
 const SORT_OPTIONS = [
   { id: "popular", label: "Phổ biến" },
   { id: "newest", label: "Mới nhất" },
-  { id: "price_high_low", label: "Giá từ Cao đến Thấp" },
-  { id: "price_low_high", label: "Giá từ Thấp đến Cao" },
+  { id: "price_high_low", label: "Giá Cao → Thấp" },
+  { id: "price_low_high", label: "Giá Thấp → Cao" },
+];
+
+const PRICE_PRESETS = [
+  { label: "Dưới 200K", min: 0, max: 200000 },
+  { label: "200K – 500K", min: 200000, max: 500000 },
+  { label: "500K – 1Tr", min: 500000, max: 1000000 },
+  { label: "Trên 1Tr", min: 1000000, max: 99999999 },
 ];
 
 export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChange, initialFilters }) => {
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [selectedCats, setSelectedCats] = useState<string[]>(initialFilters?.categories || []);
-  const [sizeType, setSizeType] = useState<"clothes" | "shoes">("clothes");
-  const [selectedSize, setSelectedSize] = useState(initialFilters?.size || "");
-  const [selectedColor, setSelectedColor] = useState(initialFilters?.color || "");
   const [sortBy, setSortBy] = useState(initialFilters?.sortBy || "popular");
+  const [minPrice, setMinPrice] = useState(initialFilters?.minPrice?.toString() || "");
+  const [maxPrice, setMaxPrice] = useState(initialFilters?.maxPrice?.toString() || "");
+  const [activePricePreset, setActivePricePreset] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -47,7 +46,6 @@ export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChan
           .select("*")
           .eq("is_active", true)
           .order("display_order", { ascending: true });
-        
         if (error) throw error;
         setDbCategories(data || []);
       } catch (err) {
@@ -57,15 +55,15 @@ export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChan
     fetchCategories();
   }, []);
 
-  // Trigger onFilterChange when any filter changes
+  // Trigger onFilterChange whenever any filter state changes
   useEffect(() => {
     onFilterChange({
       categories: selectedCats,
-      size: selectedSize,
-      color: selectedColor,
-      sortBy
+      minPrice: minPrice ? parseInt(minPrice, 10) : null,
+      maxPrice: maxPrice ? parseInt(maxPrice, 10) : null,
+      sortBy,
     });
-  }, [selectedCats, selectedSize, selectedColor, sortBy]);
+  }, [selectedCats, minPrice, maxPrice, sortBy]);
 
   const toggleCategory = (id: string) => {
     setSelectedCats(prev =>
@@ -73,96 +71,151 @@ export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChan
     );
   };
 
+  const handlePricePreset = (index: number) => {
+    if (activePricePreset === index) {
+      setActivePricePreset(null);
+      setMinPrice("");
+      setMaxPrice("");
+    } else {
+      setActivePricePreset(index);
+      const preset = PRICE_PRESETS[index];
+      setMinPrice(preset.min === 0 ? "" : preset.min.toString());
+      setMaxPrice(preset.max === 99999999 ? "" : preset.max.toString());
+    }
+  };
+
+  const handleMinPriceChange = (val: string) => {
+    setMinPrice(val.replace(/[^0-9]/g, ""));
+    setActivePricePreset(null);
+  };
+
+  const handleMaxPriceChange = (val: string) => {
+    setMaxPrice(val.replace(/[^0-9]/g, ""));
+    setActivePricePreset(null);
+  };
+
   const handleClear = () => {
     setSelectedCats([]);
-    setSelectedSize("");
-    setSelectedColor("");
     setSortBy("popular");
+    setMinPrice("");
+    setMaxPrice("");
+    setActivePricePreset(null);
   };
+
+  const activeFilterCount =
+    selectedCats.length +
+    (minPrice || maxPrice ? 1 : 0) +
+    (sortBy !== "popular" ? 1 : 0);
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Bộ lọc</Text>
+        <View style={styles.headerLeft}>
+          <SlidersHorizontal size={18} color="#111" style={{ marginRight: 8 }} />
+          <Text style={styles.headerTitle}>Bộ lọc</Text>
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </View>
         <TouchableOpacity onPress={handleClear}>
           <Text style={styles.clearText}>Xóa tất cả</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Categories */}
+        {/* ── Categories ── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Danh mục</Text>
-          <View style={styles.catList}>
+          <View style={styles.catGrid}>
             {dbCategories.map(cat => {
               const isSelected = selectedCats.includes(cat.id.toString());
               return (
-                <TouchableOpacity 
-                  key={cat.id} 
-                  onPress={() => toggleCategory(cat.id.toString())} 
-                  style={[styles.catItem, isSelected && styles.catItemActive]}
+                <TouchableOpacity
+                  key={cat.id}
+                  onPress={() => toggleCategory(cat.id.toString())}
+                  style={styles.catCard}
+                  activeOpacity={0.75}
                 >
-                  <Text style={[styles.catName, isSelected && styles.catNameActive]}>
+                  <View style={[styles.catImgWrapper, isSelected && styles.catImgWrapperActive]}>
+                    <Image
+                      source={{ uri: cat.image_url || "https://via.placeholder.com/200" }}
+                      style={styles.catImage}
+                    />
+                    {isSelected && (
+                      <View style={styles.catCheckBadge}>
+                        <Check size={8} color="#fff" strokeWidth={4} />
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[styles.catName, isSelected && styles.catNameActive]}
+                    numberOfLines={1}
+                  >
                     {cat.name_vi || cat.name}
                   </Text>
-                  {isSelected && <Check size={16} color="#3B82F6" />}
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {/* Size */}
+        {/* ── Price Range ── */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>Kích cỡ</Text>
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                onPress={() => setSizeType("clothes")}
-                style={[styles.toggleBtn, sizeType === "clothes" && styles.toggleBtnActive]}
-              >
-                <Text style={[styles.toggleText, sizeType === "clothes" && styles.toggleTextActive]}>Áo/Quần</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.sizeContainer}>
-            {SIZES.map(size => (
-              <TouchableOpacity
-                key={size}
-                onPress={() => setSelectedSize(size === selectedSize ? "" : size)}
-                style={[styles.sizeItem, selectedSize === size && styles.sizeItemActive]}
-              >
-                <Text style={[styles.sizeText, selectedSize === size && styles.sizeTextActive]}>{size}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+          <Text style={styles.sectionLabel}>Khoảng giá</Text>
 
-        {/* Color */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Màu sắc</Text>
-          <View style={styles.colorList}>
-            {COLORS.map(color => (
+          {/* Preset chips */}
+          <View style={styles.presetCol}>
+            {PRICE_PRESETS.map((preset, idx) => (
               <TouchableOpacity
-                key={color.id}
-                onPress={() => setSelectedColor(color.id === selectedColor ? "" : color.id)}
-                style={[
-                  styles.colorCircle,
-                  { backgroundColor: color.hex },
-                  color.border ? { borderWidth: 1, borderColor: color.border } : {}
-                ]}
+                key={idx}
+                onPress={() => handlePricePreset(idx)}
+                style={[styles.presetChip, activePricePreset === idx && styles.presetChipActive]}
+                activeOpacity={0.75}
               >
-                {selectedColor === color.id && (
-                  <View style={styles.colorBadge}>
-                    <Check size={12} color={color.id === "white" ? "#3B82F6" : "#fff"} strokeWidth={4} />
+                <Text style={[styles.presetText, activePricePreset === idx && styles.presetTextActive]}>
+                  {preset.label}
+                </Text>
+                {activePricePreset === idx && (
+                  <View style={styles.presetCheck}>
+                    <Check size={9} color="#fff" strokeWidth={3} />
                   </View>
                 )}
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Manual inputs */}
+          <View style={styles.priceInputRow}>
+            <View style={styles.priceInputWrapper}>
+              <Text style={styles.priceInputLabel}>Từ (đ)</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="0"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={minPrice ? parseInt(minPrice).toLocaleString("vi-VN") : ""}
+                onChangeText={handleMinPriceChange}
+              />
+            </View>
+            <View style={styles.priceSeparator} />
+            <View style={styles.priceInputWrapper}>
+              <Text style={styles.priceInputLabel}>Đến (đ)</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="Max"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="numeric"
+                value={maxPrice ? parseInt(maxPrice).toLocaleString("vi-VN") : ""}
+                onChangeText={handleMaxPriceChange}
+              />
+            </View>
+          </View>
         </View>
 
-        {/* Sort */}
+        {/* ── Sort ── */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Sắp xếp</Text>
           <View style={styles.sortWrapper}>
@@ -171,9 +224,16 @@ export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChan
                 key={opt.id}
                 onPress={() => setSortBy(opt.id)}
                 style={[styles.sortBtn, sortBy === opt.id && styles.sortBtnActive]}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.sortText, sortBy === opt.id && styles.sortTextActive]}>{opt.label}</Text>
-                {sortBy === opt.id && <View style={styles.sortBadge}><Check size={10} color="#fff" strokeWidth={4} /></View>}
+                <Text style={[styles.sortText, sortBy === opt.id && styles.sortTextActive]}>
+                  {opt.label}
+                </Text>
+                {sortBy === opt.id && (
+                  <View style={styles.sortBadge}>
+                    <Check size={9} color="#fff" strokeWidth={4} />
+                  </View>
+                )}
               </TouchableOpacity>
             ))}
           </View>
@@ -185,55 +245,129 @@ export const FilterSidebarWeb: React.FC<FilterSidebarWebProps> = ({ onFilterChan
 
 const styles = StyleSheet.create({
   container: {
-    width: 250,
+    width: 240,
     backgroundColor: "#fff",
     borderRightWidth: 1,
-    borderRightColor: "#E5E7EB",
-    paddingRight: 20,
-    height: '100%',
+    borderRightColor: "#F3F4F6",
+    paddingRight: 16,
+    height: "100%",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: "#111" },
-  clearText: { fontSize: 14, color: "#3B82F6", fontWeight: "600" },
+  headerLeft: { flexDirection: "row", alignItems: "center" },
+  headerTitle: { fontSize: 17, fontWeight: "800", color: "#111" },
+  filterBadge: {
+    marginLeft: 7,
+    backgroundColor: "#3B82F6",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  clearText: { fontSize: 13, color: "#3B82F6", fontWeight: "600" },
   scrollContent: { paddingBottom: 40 },
-  section: { marginBottom: 30 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  sectionLabel: { fontSize: 16, fontWeight: "700", color: "#111", marginBottom: 10 },
+  section: { marginBottom: 28 },
+  sectionLabel: { fontSize: 15, fontWeight: "700", color: "#111", marginBottom: 12 },
 
-  // Categories
-  catList: { gap: 8 },
-  catItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F9FAFB" },
-  catItemActive: { backgroundColor: "#EFF6FF" },
-  catName: { fontSize: 14, color: "#4B5563", fontWeight: "500" },
-  catNameActive: { color: "#3B82F6", fontWeight: "600" },
+  // Categories – icon grid
+  catGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  catCard: {
+    alignItems: "center",
+    width: 52,
+  },
+  catImgWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F3F4F6",
+    marginBottom: 5,
+    borderWidth: 2,
+    borderColor: "transparent",
+    overflow: "visible",
+  },
+  catImgWrapperActive: { borderColor: "#3B82F6" },
+  catImage: { width: 48, height: 48, borderRadius: 24 },
+  catCheckBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    backgroundColor: "#3B82F6",
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  catName: { fontSize: 10, fontWeight: "500", color: "#6B7280", textAlign: "center" },
+  catNameActive: { color: "#3B82F6", fontWeight: "700" },
 
-  // Size
-  toggleContainer: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 8, padding: 2 },
-  toggleBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  toggleBtnActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 },
-  toggleText: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
-  toggleTextActive: { color: "#3B82F6" },
-  sizeContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  sizeItem: { width: "30%", height: 36, justifyContent: "center", alignItems: "center", borderRadius: 8, backgroundColor: "#F3F4F6" },
-  sizeItemActive: { backgroundColor: "#3B82F6" },
-  sizeText: { fontSize: 13, fontWeight: "600", color: "#4B5563" },
-  sizeTextActive: { color: "#FFF" },
-
-  // Color
-  colorList: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  colorCircle: { width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2, elevation: 1 },
-  colorBadge: { position: "absolute", top: -2, right: -2, backgroundColor: "#3B82F6", width: 16, height: 16, borderRadius: 8, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#fff" },
+  // Price
+  presetCol: { gap: 6, marginBottom: 14 },
+  presetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  presetChipActive: { backgroundColor: "#EFF6FF", borderColor: "#3B82F6" },
+  presetText: { fontSize: 13, color: "#4B5563", fontWeight: "500" },
+  presetTextActive: { color: "#3B82F6", fontWeight: "600" },
+  presetCheck: {
+    backgroundColor: "#3B82F6",
+    borderRadius: 8,
+    padding: 3,
+  },
+  priceInputRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  priceInputWrapper: { flex: 1 },
+  priceInputLabel: { fontSize: 11, color: "#9CA3AF", marginBottom: 5, fontWeight: "500" },
+  priceInput: {
+    height: 40,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    color: "#111",
+    fontWeight: "600",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+  },
+  priceSeparator: { width: 14, height: 2, backgroundColor: "#D1D5DB", marginTop: 12 },
 
   // Sort
-  sortWrapper: { gap: 8 },
-  sortBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F9FAFB", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  sortBtnActive: { backgroundColor: "#EFF6FF" },
-  sortText: { fontSize: 14, color: "#4B5563", fontWeight: "500" },
+  sortWrapper: { gap: 6 },
+  sortBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  sortBtnActive: { backgroundColor: "#EFF6FF", borderColor: "#3B82F6" },
+  sortText: { fontSize: 13, color: "#4B5563", fontWeight: "500" },
   sortTextActive: { color: "#3B82F6", fontWeight: "600" },
-  sortBadge: { backgroundColor: "#3B82F6", borderRadius: 8, padding: 2 },
+  sortBadge: { backgroundColor: "#3B82F6", borderRadius: 7, padding: 3 },
 });

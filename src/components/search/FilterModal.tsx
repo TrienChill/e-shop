@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react-native";
+import { Check, X, SlidersHorizontal } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/src/lib/supabase";
 import {
@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -21,32 +22,27 @@ interface FilterModalProps {
   onApply: (filters: any) => void;
 }
 
-
-
-const SIZES = ["XS", "S", "M", "L", "XL", "2XL"];
-const COLORS = [
-  { id: "white", hex: "#FFFFFF", border: "#E5E7EB" },
-  { id: "black", hex: "#111827" },
-  { id: "blue", hex: "#3B82F6" },
-  { id: "red", hex: "#EF4444" },
-  { id: "teal", hex: "#14B8A6" },
-  { id: "yellow", hex: "#F59E0B" },
-];
-
 const SORT_OPTIONS = [
   { id: "popular", label: "Phổ biến" },
   { id: "newest", label: "Mới nhất" },
-  { id: "price_high_low", label: "Giá từ Cao đến Thấp" },
-  { id: "price_low_high", label: "Giá từ Thấp đến Cao" },
+  { id: "price_high_low", label: "Giá Cao → Thấp" },
+  { id: "price_low_high", label: "Giá Thấp → Cao" },
+];
+
+const PRICE_PRESETS = [
+  { label: "Dưới 200K", min: 0, max: 200000 },
+  { label: "200K – 500K", min: 200000, max: 500000 },
+  { label: "500K – 1Tr", min: 500000, max: 1000000 },
+  { label: "Trên 1Tr", min: 1000000, max: 99999999 },
 ];
 
 export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, onApply }) => {
   const [dbCategories, setDbCategories] = useState<any[]>([]);
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
-  const [sizeType, setSizeType] = useState<"clothes" | "shoes">("clothes");
-  const [selectedSize, setSelectedSize] = useState("M");
-  const [selectedColor, setSelectedColor] = useState("white");
   const [sortBy, setSortBy] = useState("popular");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [activePricePreset, setActivePricePreset] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -56,7 +52,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
           .select("*")
           .eq("is_active", true)
           .order("display_order", { ascending: true });
-        
         if (error) throw error;
         setDbCategories(data || []);
       } catch (err) {
@@ -72,121 +67,158 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
     );
   };
 
+  const handlePricePreset = (index: number) => {
+    if (activePricePreset === index) {
+      // Bỏ chọn nếu bấm lại
+      setActivePricePreset(null);
+      setMinPrice("");
+      setMaxPrice("");
+    } else {
+      setActivePricePreset(index);
+      const preset = PRICE_PRESETS[index];
+      setMinPrice(preset.min === 0 ? "" : preset.min.toString());
+      setMaxPrice(preset.max === 99999999 ? "" : preset.max.toString());
+    }
+  };
+
+  const handleMinPriceChange = (val: string) => {
+    setMinPrice(val.replace(/[^0-9]/g, ""));
+    setActivePricePreset(null);
+  };
+
+  const handleMaxPriceChange = (val: string) => {
+    setMaxPrice(val.replace(/[^0-9]/g, ""));
+    setActivePricePreset(null);
+  };
+
   const handleClear = () => {
     setSelectedCats([]);
-    setSelectedSize("M");
-    setSelectedColor("");
     setSortBy("popular");
+    setMinPrice("");
+    setMaxPrice("");
+    setActivePricePreset(null);
   };
 
   const handleApply = () => {
     onApply({
       categories: selectedCats,
-      size: selectedSize,
-      color: selectedColor,
-      sortBy
+      minPrice: minPrice ? parseInt(minPrice, 10) : null,
+      maxPrice: maxPrice ? parseInt(maxPrice, 10) : null,
+      sortBy,
     });
     onClose();
   };
+
+  const activeFilterCount =
+    selectedCats.length +
+    (minPrice || maxPrice ? 1 : 0) +
+    (sortBy !== "popular" ? 1 : 0);
 
   return (
     <Modal visible={isVisible} animationType="slide" transparent={false}>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Bộ lọc</Text>
+          <View style={styles.headerLeft}>
+            <SlidersHorizontal size={22} color="#111" style={{ marginRight: 10 }} />
+            <Text style={styles.headerTitle}>Bộ lọc</Text>
+            {activeFilterCount > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
+          </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <X size={24} color="#111" />
           </TouchableOpacity>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {/* Categories */}
+          {/* ── Categories ── */}
           <View style={styles.section}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catList}>
-              {dbCategories.map(cat => (
-                <TouchableOpacity key={cat.id} onPress={() => toggleCategory(cat.id.toString())} style={styles.catItem}>
-                  <View style={styles.imageWrapper}>
-                    <Image source={{ uri: cat.image_url || 'https://via.placeholder.com/200' }} style={styles.catImage} />
-                    {selectedCats.includes(cat.id.toString()) && (
-                      <View style={styles.badge}>
-                        <Check size={10} color="#fff" strokeWidth={4} />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={styles.catName}>{cat.name_vi || cat.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <Text style={styles.sectionLabel}>Danh mục</Text>
+            <View style={styles.catGrid}>
+              {dbCategories.map(cat => {
+                const isSelected = selectedCats.includes(cat.id.toString());
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    onPress={() => toggleCategory(cat.id.toString())}
+                    style={[styles.catCard, isSelected && styles.catCardActive]}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.catImgWrapper, isSelected && styles.catImgWrapperActive]}>
+                      <Image
+                        source={{ uri: cat.image_url || "https://via.placeholder.com/200" }}
+                        style={styles.catImage}
+                      />
+                      {isSelected && (
+                        <View style={styles.catCheckBadge}>
+                          <Check size={10} color="#fff" strokeWidth={4} />
+                        </View>
+                      )}
+                    </View>
+                    <Text
+                      style={[styles.catName, isSelected && styles.catNameActive]}
+                      numberOfLines={1}
+                    >
+                      {cat.name_vi || cat.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
-          {/* Size Section */}
+          {/* ── Price Range ── */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>Kích cỡ</Text>
-              <View style={styles.toggleContainer}>
+            <Text style={styles.sectionLabel}>Khoảng giá</Text>
+
+            {/* Preset chips */}
+            <View style={styles.presetRow}>
+              {PRICE_PRESETS.map((preset, idx) => (
                 <TouchableOpacity
-                  onPress={() => setSizeType("clothes")}
-                  style={[styles.toggleBtn, sizeType === "clothes" && styles.toggleBtnActive]}
+                  key={idx}
+                  onPress={() => handlePricePreset(idx)}
+                  style={[styles.presetChip, activePricePreset === idx && styles.presetChipActive]}
+                  activeOpacity={0.75}
                 >
-                  <Text style={[styles.toggleText, sizeType === "clothes" && styles.toggleTextActive]}>Quần áo</Text>
+                  <Text style={[styles.presetText, activePricePreset === idx && styles.presetTextActive]}>
+                    {preset.label}
+                  </Text>
                 </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Manual inputs */}
+            <View style={styles.priceInputRow}>
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.priceInputLabel}>Từ (đ)</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  placeholder="0"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                  value={minPrice ? parseInt(minPrice).toLocaleString("vi-VN") : ""}
+                  onChangeText={handleMinPriceChange}
+                />
+              </View>
+              <View style={styles.priceSeparator} />
+              <View style={styles.priceInputWrapper}>
+                <Text style={styles.priceInputLabel}>Đến (đ)</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  placeholder="Tối đa"
+                  placeholderTextColor="#9CA3AF"
+                  keyboardType="numeric"
+                  value={maxPrice ? parseInt(maxPrice).toLocaleString("vi-VN") : ""}
+                  onChangeText={handleMaxPriceChange}
+                />
               </View>
             </View>
-
-            <View style={styles.sizeContainer}>
-              {SIZES.map(size => (
-                <TouchableOpacity
-                  key={size}
-                  onPress={() => setSelectedSize(size)}
-                  style={[styles.sizeItem, selectedSize === size && styles.sizeItemActive]}
-                >
-                  <Text style={[styles.sizeText, selectedSize === size && styles.sizeTextActive]}>{size}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
-          {/* Color Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Màu sắc</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorList}>
-              {COLORS.map(color => (
-                <TouchableOpacity
-                  key={color.id}
-                  onPress={() => setSelectedColor(color.id)}
-                  style={[
-                    styles.colorCircle,
-                    { backgroundColor: color.hex },
-                    color.border ? { borderWidth: 1, borderColor: color.border } : {}
-                  ]}
-                >
-                  {selectedColor === color.id && (
-                    <View style={styles.colorBadge}>
-                      <Check size={12} color={color.id === "white" ? "#3B82F6" : "#fff"} strokeWidth={4} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Price Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionLabel}>Giá tiền</Text>
-              <Text style={styles.priceLabel}>100.000đ — 2.500.000đ</Text>
-            </View>
-            {/* Visual Range Slider Mockup */}
-            <View style={styles.sliderContainer}>
-              <View style={styles.sliderTrack} />
-              <View style={[styles.sliderFill, { width: '60%', left: '10%' }]} />
-              <View style={[styles.sliderKnob, { left: '10%' }]} />
-              <View style={[styles.sliderKnob, { left: '70%' }]} />
-            </View>
-          </View>
-
-          {/* Sort Section */}
+          {/* ── Sort ── */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Sắp xếp theo</Text>
             <View style={styles.sortWrapper}>
@@ -195,9 +227,16 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
                   key={opt.id}
                   onPress={() => setSortBy(opt.id)}
                   style={[styles.sortBtn, sortBy === opt.id && styles.sortBtnActive]}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[styles.sortText, sortBy === opt.id && styles.sortTextActive]}>{opt.label}</Text>
-                  {sortBy === opt.id && <View style={styles.sortBadge}><Check size={10} color="#fff" strokeWidth={4} /></View>}
+                  <Text style={[styles.sortText, sortBy === opt.id && styles.sortTextActive]}>
+                    {opt.label}
+                  </Text>
+                  {sortBy === opt.id && (
+                    <View style={styles.sortBadge}>
+                      <Check size={10} color="#fff" strokeWidth={4} />
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -210,7 +249,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({ isVisible, onClose, on
             <Text style={styles.clearText}>Xóa tất cả</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleApply} style={styles.applyBtn}>
-            <Text style={styles.applyText}>Áp dụng</Text>
+            <Text style={styles.applyText}>Áp dụng {activeFilterCount > 0 ? `(${activeFilterCount})` : ""}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -225,59 +264,155 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
-  headerTitle: { fontSize: 28, fontWeight: "800", color: "#111" },
-  closeBtn: { padding: 5 },
-  scrollContent: { paddingBottom: 100 },
-  section: { paddingHorizontal: 20, marginBottom: 30 },
-  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  sectionLabel: { fontSize: 20, fontWeight: "800", color: "#000" },
+  headerLeft: { flexDirection: "row", alignItems: "center" },
+  headerTitle: { fontSize: 22, fontWeight: "800", color: "#111" },
+  filterBadge: {
+    marginLeft: 8,
+    backgroundColor: "#3B82F6",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  closeBtn: { padding: 6, backgroundColor: "#F3F4F6", borderRadius: 20 },
+  scrollContent: { paddingBottom: 120 },
+  section: { paddingHorizontal: 20, marginTop: 28 },
+  sectionLabel: { fontSize: 18, fontWeight: "800", color: "#000", marginBottom: 16 },
 
-  // Categories
-  catList: { paddingRight: 20 },
-  catItem: { alignItems: "center", marginRight: 20 },
-  imageWrapper: { width: 70, height: 70, borderRadius: 35, overflow: "visible", backgroundColor: "#F3F4F6", marginBottom: 8 },
-  catImage: { width: "100%", height: "100%", borderRadius: 35 },
-  badge: { position: "absolute", top: 0, right: 0, backgroundColor: "#3B82F6", width: 22, height: 22, borderRadius: 11, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#fff" },
-  catName: { fontSize: 13, fontWeight: "500", color: "#4B5563" },
-
-  // Size
-  toggleContainer: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 12, padding: 3 },
-  toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  toggleBtnActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  toggleText: { fontSize: 13, color: "#6B7280", fontWeight: "600" },
-  toggleTextActive: { color: "#3B82F6" },
-  sizeContainer: { flexDirection: "row", backgroundColor: "#F3F4F6", borderRadius: 25, padding: 5, justifyContent: "space-between" },
-  sizeItem: { flex: 1, height: 40, justifyContent: "center", alignItems: "center", borderRadius: 20 },
-  sizeItemActive: { backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.15, shadowRadius: 5, elevation: 3 },
-  sizeText: { fontSize: 14, fontWeight: "700", color: "#A5B4FC" },
-  sizeTextActive: { color: "#3B82F6" },
-
-  // Color
-  colorList: { paddingVertical: 5 },
-  colorCircle: { width: 44, height: 44, borderRadius: 22, marginRight: 15, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
-  colorBadge: { position: "absolute", top: -2, right: -2, backgroundColor: "#3B82F6", width: 20, height: 20, borderRadius: 10, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#fff" },
+  // Categories grid
+  catGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  catCard: {
+    alignItems: "center",
+    width: (width - 40 - 36) / 4, // 4 cột, gap 12×3=36, padding 20×2=40
+  },
+  catCardActive: {},
+  catImgWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: "visible",
+    backgroundColor: "#F3F4F6",
+    marginBottom: 6,
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  catImgWrapperActive: {
+    borderColor: "#3B82F6",
+  },
+  catImage: { width: 64, height: 64, borderRadius: 32 },
+  catCheckBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    backgroundColor: "#3B82F6",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  catName: { fontSize: 11, fontWeight: "500", color: "#6B7280", textAlign: "center" },
+  catNameActive: { color: "#3B82F6", fontWeight: "700" },
 
   // Price
-  priceLabel: { fontSize: 16, fontWeight: "600", color: "#111" },
-  sliderContainer: { height: 60, justifyContent: "center", paddingHorizontal: 10 },
-  sliderTrack: { height: 4, backgroundColor: "#E5E7EB", borderRadius: 2 },
-  sliderFill: { position: "absolute", height: 4, backgroundColor: "#3B82F6" },
-  sliderKnob: { position: "absolute", width: 28, height: 28, borderRadius: 14, backgroundColor: "#fff", shadowColor: "#000", shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5, borderWidth: 1, borderColor: "#E5E7EB" },
+  presetRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  presetChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  presetChipActive: {
+    backgroundColor: "#EFF6FF",
+    borderColor: "#3B82F6",
+  },
+  presetText: { fontSize: 13, color: "#4B5563", fontWeight: "600" },
+  presetTextActive: { color: "#3B82F6" },
+  priceInputRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  priceInputWrapper: { flex: 1 },
+  priceInputLabel: { fontSize: 12, color: "#9CA3AF", marginBottom: 6, fontWeight: "500" },
+  priceInput: {
+    height: 48,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: "#111",
+    fontWeight: "600",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+  },
+  priceSeparator: {
+    width: 20,
+    height: 2,
+    backgroundColor: "#D1D5DB",
+    borderRadius: 1,
+    marginTop: 18,
+  },
 
   // Sort
   sortWrapper: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  sortBtn: { flexDirection: "row", alignItems: "center", backgroundColor: "#F3F4F6", paddingHorizontal: 20, paddingVertical: 12, borderRadius: 25 },
-  sortBtnActive: { backgroundColor: "#EFF6FF" },
+  sortBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 25,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  sortBtnActive: { backgroundColor: "#EFF6FF", borderColor: "#3B82F6" },
   sortText: { fontSize: 14, color: "#4B5563", fontWeight: "600" },
   sortTextActive: { color: "#3B82F6" },
-  sortBadge: { marginLeft: 8, backgroundColor: "#3B82F6", borderRadius: 10, padding: 2 },
+  sortBadge: { marginLeft: 8, backgroundColor: "#3B82F6", borderRadius: 10, padding: 3 },
 
   // Footer
-  footer: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", paddingHorizontal: 20, paddingVertical: 20, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#F3F4F6", gap: 15 },
-  clearBtn: { flex: 1, height: 56, borderRadius: 20, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: "#3B82F6" },
-  clearText: { color: "#3B82F6", fontSize: 16, fontWeight: "700" },
-  applyBtn: { flex: 2, height: 56, backgroundColor: "#3B82F6", borderRadius: 20, justifyContent: "center", alignItems: "center" },
-  applyText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  footer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingBottom: 30,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    gap: 12,
+  },
+  clearBtn: {
+    flex: 1,
+    height: 54,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+  },
+  clearText: { color: "#3B82F6", fontSize: 15, fontWeight: "700" },
+  applyBtn: {
+    flex: 2,
+    height: 54,
+    backgroundColor: "#3B82F6",
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  applyText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });
