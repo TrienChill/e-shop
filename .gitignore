@@ -45,3 +45,7 @@ app-example
 # Security
 .env
 .env*.local
+
+# Supabase
+supabase/.temp/
+supabase/.branch/

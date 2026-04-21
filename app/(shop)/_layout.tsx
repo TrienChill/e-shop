@@ -3,6 +3,7 @@ import { useWebUI } from '@/src/context/WebUIContext';
 import WebDrawer from '@/src/components/web/WebDrawer';
 import { View, Text } from 'react-native';
 import CartContent from '@/src/features/cart/components/CartContent';
+import { ChatButton } from '@/src/components/Chat/ChatButton';
 
 export default function ShopLayout() {
   const { isCartDrawerOpen, closeCartDrawer } = useWebUI();
@@ -24,6 +25,9 @@ export default function ShopLayout() {
       >
         <CartContent />
       </WebDrawer>
+
+      {/* AI Chatbox Floating Button */}
+      <ChatButton />
     </>
   );
 }
