@@ -819,6 +819,27 @@ export default function ProductDetailScreen() {
                     ))}
                   </ScrollView>
                 )}
+
+                {/* Nút Thử đồ ảo */}
+                {Platform.OS === "web" && (
+                  <TouchableOpacity
+                    style={webStyles.tryOnBtn}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      const productImageUrl = encodeURIComponent(productImages[activeIndex] || productImages[0] || "");
+                      const colorParam = selectedColor ? encodeURIComponent(selectedColor) : "";
+                      const url = `/try-on?productImageUrl=${productImageUrl}&selectedColor=${colorParam}`;
+                      if (Platform.OS === "web") {
+                        window.location.href = url;
+                      } else {
+                        router.push(url as any);
+                      }
+                    }}
+                  >
+                    <Shirt size={20} color="#fff" />
+                    <Text style={webStyles.tryOnBtnText}>Thử đồ ảo</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Right: Product Info — sticky panel */}
@@ -2590,6 +2611,22 @@ const webStyles = StyleSheet.create({
     width: 72,
     height: 72,
     backgroundColor: "#E5E7EB",
+  },
+  tryOnBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  tryOnBtnText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
   },
   backBtn: {
     alignSelf: "flex-start",
