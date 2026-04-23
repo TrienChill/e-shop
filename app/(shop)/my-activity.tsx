@@ -921,10 +921,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   shadowEffect: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
+    boxShadow: "0 10px 10px rgba(0, 0, 0, 0.1)",
     elevation: 8,
   },
   historyButton: {

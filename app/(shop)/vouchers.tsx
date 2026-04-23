@@ -66,10 +66,9 @@ const VoucherTicket = ({
           backgroundColor: "#FFF",
           overflow: "hidden",
           minHeight: 150,
-          shadowColor: isExpiring ? "#FCA3A3" : "#3B82F6",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.1,
-          shadowRadius: 12,
+          boxShadow: isExpiring
+            ? "0 4px 12px rgba(252, 163, 163, 0.1)"
+            : "0 4px 12px rgba(59, 130, 246, 0.1)",
           elevation: 3,
         }}
       >
@@ -197,10 +196,7 @@ const CircularProgress = ({
             padding: 2,
             borderWidth: 2,
             borderColor: "#FFF",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
+            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
           }}
         >
           <CheckCircle2 size={14} color="#FFF" />
@@ -494,10 +490,7 @@ export default function VouchersScreen() {
                 borderRadius: 22,
                 alignItems: "center",
                 justifyContent: "center",
-                shadowColor: "#BFDBFE",
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.5,
-                shadowRadius: 8,
+                boxShadow: "0 4px 8px rgba(191, 219, 254, 0.5)",
                 elevation: 5,
               }}
             >
@@ -592,10 +585,7 @@ export default function VouchersScreen() {
               backgroundColor: "#1E40AF",
               borderRadius: 20,
               padding: 20,
-              shadowColor: "#3B82F6",
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.3,
-              shadowRadius: 16,
+              boxShadow: "0 8px 16px rgba(59, 130, 246, 0.3)",
               elevation: 8,
             }}
           >
@@ -813,10 +803,7 @@ export default function VouchersScreen() {
                             borderRadius: 24,
                             alignItems: "center",
                             justifyContent: "center",
-                            shadowColor: "#000",
-                            shadowOffset: { width: 0, height: 2 },
-                            shadowOpacity: 0.05,
-                            shadowRadius: 4,
+                            boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
                             elevation: 2,
                             marginRight: 16,
                             borderWidth: 1,

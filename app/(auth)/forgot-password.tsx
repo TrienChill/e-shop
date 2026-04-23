@@ -39,7 +39,7 @@ export default function ForgotPasswordScreen() {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
       {/* Background Decorators (Abstract Blobs) */}
-      <View style={styles.backgroundBlobContainer} pointerEvents="none">
+      <View style={[styles.backgroundBlobContainer, { pointerEvents: "none" }]}>
         <View style={styles.blobTopRight} />
         <View style={styles.blobBottomLeft} />
       </View>

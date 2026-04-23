@@ -50,11 +50,8 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
     zIndex: 10,
-    // Shadow for iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    // Shadow for web and mobile
+    boxShadow: "0 2px 3px rgba(0, 0, 0, 0.05)",
     // Elevation for Android
     elevation: 3,
   },

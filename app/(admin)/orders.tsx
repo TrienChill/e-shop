@@ -493,8 +493,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", backgroundColor: "white",
     borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB",
     paddingHorizontal: 16, height: 48, width: 380,
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)", elevation: 2,
   },
   searchInput: { flex: 1, marginLeft: 12, fontSize: 14, outlineStyle: "none" as any },
   tabsContainer: { marginBottom: 24 },
@@ -513,8 +512,7 @@ const styles = StyleSheet.create({
   tableCard: {
     backgroundColor: "white", borderRadius: 16, borderWidth: 1,
     borderColor: "#E5E7EB", overflow: "hidden",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05, shadowRadius: 2, elevation: 2,
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)", elevation: 2,
   },
   tableHeader: {
     flexDirection: "row", backgroundColor: "#F9FAFB",
@@ -571,8 +569,7 @@ const styles = StyleSheet.create({
     position: "absolute", bottom: 40, right: 40,
     width: 56, height: 56, borderRadius: 28, backgroundColor: "#111827",
     alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3, shadowRadius: 8, elevation: 8,
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)", elevation: 8,
   },
   scrollTopButtonHover: { backgroundColor: "#374151", transform: [{ translateY: -2 }] },
 
@@ -630,8 +627,7 @@ const styles = StyleSheet.create({
   modalCard: {
     backgroundColor: "white", borderRadius: 24, padding: 40, width: 440,
     alignItems: "center",
-    shadowColor: "#000", shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.25, shadowRadius: 40, elevation: 20,
+    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)", elevation: 20,
   },
   modalIconSuccess: {
     width: 64, height: 64, borderRadius: 32, backgroundColor: "#10B981",
