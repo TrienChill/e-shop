@@ -934,11 +934,6 @@ export default function ProductEditorScreen() {
                           <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.sku} onChangeText={(val) => updateVariantField(v.id, 'sku', val)} />
                         </View>
 
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 10, color: '#6B7280' }}>Giá (VNĐ)</Text>
-                          <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.price !== undefined && v.price !== null ? String(v.price) : ""} onChangeText={(val) => updateVariantField(v.id, 'price', val)} keyboardType="numeric" />
-                        </View>
-
                         <View style={{ flex: 0.8 }}>
                           <Text style={{ fontSize: 10, color: '#6B7280' }}>Kho</Text>
                           <TextInput style={[styles.smallInput, { paddingVertical: 4, height: 34 }]} value={v.stock !== undefined && v.stock !== null ? String(v.stock) : ""} onChangeText={(val) => updateVariantField(v.id, 'stock', val)} keyboardType="numeric" />
