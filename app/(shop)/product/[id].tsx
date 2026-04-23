@@ -128,6 +128,9 @@ export default function ProductDetailScreen() {
   const [quantity, setQuantity] = useState(1);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // State cho dialog chọn màu khi thử đồ ảo
+  const [isColorPickerForTryOnVisible, setColorPickerForTryOnVisible] = useState(false);
+
   // 1. Tạo ref cho ScrollView ảnh
   const imageScrollRef = useRef<FlatList>(null);
   const colorScrollRef = useRef<any>(null);
@@ -310,8 +313,73 @@ export default function ProductDetailScreen() {
   };
 
   const handleTryOn = () => {
-    const primaryImage = productImages[0];
-    router.push({ pathname: "/try-on", params: { productImageUrl: primaryImage } });
+    // Kiểm tra nếu sản phẩm có màu sắc mà chưa chọn
+    if (hasColors && !selectedColor) {
+      setColorPickerForTryOnVisible(true);
+      return;
+    }
+
+    // Lấy ảnh theo màu sắc đã chọn, nếu không có thì lấy ảnh đầu tiên
+    let productImageForTryOn: string;
+
+    if (selectedColor && variants.length > 0) {
+      // Tìm variant có màu được chọn
+      const selectedVariant = variants.find((v) => v.color === selectedColor);
+      if (selectedVariant) {
+        // Tìm ảnh trong displayImages có variant_id trùng với variant đã chọn
+        const colorImage = displayImages.find(
+          (img: any) => img.variant_id === selectedVariant.id
+        );
+        if (colorImage) {
+          productImageForTryOn = colorImage.url.startsWith("http")
+            ? colorImage.url
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${colorImage.url}`;
+        } else {
+          productImageForTryOn = productImages[0];
+        }
+      } else {
+        productImageForTryOn = productImages[0];
+      }
+    } else {
+      productImageForTryOn = productImages[0];
+    }
+
+    router.push({
+      pathname: "/try-on",
+      params: {
+        productImageUrl: productImageForTryOn,
+        selectedColor: selectedColor || "",
+      },
+    });
+  };
+
+  // Hàm xử lý khi chọn màu từ dialog thử đồ
+  const handleColorSelectForTryOn = (color: string) => {
+    setSelectedColor(color);
+    setColorPickerForTryOnVisible(false);
+    // Gọi lại handleTryOn sau khi chọn màu
+    setTimeout(() => {
+      // Tìm variant có màu được chọn
+      const selectedVariant = variants.find((v) => v.color === color);
+      if (selectedVariant) {
+        const colorImage = displayImages.find(
+          (img: any) => img.variant_id === selectedVariant.id
+        );
+        const productImageForTryOn = colorImage
+          ? colorImage.url.startsWith("http")
+            ? colorImage.url
+            : `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${colorImage.url}`
+          : productImages[0];
+
+        router.push({
+          pathname: "/try-on",
+          params: {
+            productImageUrl: productImageForTryOn,
+            selectedColor: color,
+          },
+        });
+      }
+    }, 100);
   };
 
   // Hàm xử lý xác nhận bên trong Pop-up Modal
@@ -1625,6 +1693,66 @@ export default function ProductDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ══════════════ Dialog chọn màu cho Thử đồ ảo ══════════════ */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isColorPickerForTryOnVisible}
+        onRequestClose={() => setColorPickerForTryOnVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setColorPickerForTryOnVisible(false)}
+          />
+          <View style={styles.colorPickerModalContent}>
+            <View style={styles.colorPickerHeader}>
+              <Text style={styles.colorPickerTitle}>Chọn màu sắc để thử đồ</Text>
+              <TouchableOpacity
+                onPress={() => setColorPickerForTryOnVisible(false)}
+                style={{ padding: 4 }}
+              >
+                <Text style={{ fontSize: 20, color: "#9CA3AF", fontWeight: "bold" }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.colorPickerSubtitle}>
+              Vui lòng chọn màu sắc để xem ảnh sản phẩm đúng với màu bạn muốn thử
+            </Text>
+            <View style={styles.colorPickerGrid}>
+              {uniqueColors.map((color: string, index: number) => {
+                const colorStock = getColorStock(color);
+                const isOutOfStock = colorStock === 0;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    activeOpacity={0.8}
+                    onPress={() => !isOutOfStock && handleColorSelectForTryOn(color)}
+                    disabled={isOutOfStock}
+                    style={[
+                      styles.colorPickerItem,
+                      isOutOfStock && styles.colorPickerItemDisabled,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.colorPickerItemText,
+                        isOutOfStock && styles.colorPickerItemTextDisabled,
+                      ]}
+                    >
+                      {color}
+                    </Text>
+                    {isOutOfStock && (
+                      <Text style={styles.colorPickerItemStock}>Hết hàng</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2337,6 +2465,64 @@ const styles = StyleSheet.create({
     color: "#10B981",
     marginTop: 3,
     fontWeight: "500",
+  },
+  // ──────────────── Color Picker for Try-On Modal ────────────────
+  colorPickerModalContent: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  colorPickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  colorPickerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  colorPickerSubtitle: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  colorPickerGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  colorPickerItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
+  },
+  colorPickerItemDisabled: {
+    backgroundColor: "#F9FAFB",
+    borderColor: "#E5E7EB",
+    opacity: 0.6,
+  },
+  colorPickerItemText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#374151",
+    textAlign: "center",
+  },
+  colorPickerItemTextDisabled: {
+    color: "#9CA3AF",
+  },
+  colorPickerItemStock: {
+    fontSize: 11,
+    color: "#EF4444",
+    textAlign: "center",
+    marginTop: 2,
   },
 });
 

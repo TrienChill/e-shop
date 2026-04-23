@@ -21,14 +21,30 @@ const API_URL = "http://localhost:8000/api/try-on";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
 
+// Màu sắc tiếng Việt
+const colorTranslations: Record<string, string> = {
+  Black: "Đen",
+  White: "Trắng",
+  Red: "Đỏ",
+  Blue: "Xanh dương",
+  Yellow: "Vàng",
+  Green: "Xanh lá",
+  Pink: "Hồng",
+  Gray: "Xám",
+  Orange: "Cam",
+  Brown: "Nâu",
+  Purple: "Tím",
+};
+
 type TryOnState = "idle" | "loading" | "result" | "error";
 
 export default function VirtualTryOnScreen() {
-  const { productImageUrl } = useLocalSearchParams<{ productImageUrl?: string }>();
+  const { productImageUrl, selectedColor } = useLocalSearchParams<{ productImageUrl?: string; selectedColor?: string }>();
   const router = useRouter();
 
   const [personImage, setPersonImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [clothImage] = useState<string>(productImageUrl || "");
+  const [clothColor, setClothColor] = useState<string>(selectedColor || "");
   const [state, setState] = useState<TryOnState>("idle");
   const [resultUrl, setResultUrl] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -208,7 +224,9 @@ export default function VirtualTryOnScreen() {
             )}
             <View style={[styles.overlayBadge, styles.productBadge]}>
               <Shirt size={12} color="#fff" />
-              <Text style={[styles.overlayBadgeText, { marginLeft: 4 }]}>Sản phẩm</Text>
+              <Text style={[styles.overlayBadgeText, { marginLeft: 4 }]}>
+                {clothColor ? `${colorTranslations[clothColor] || clothColor}` : "Sản phẩm"}
+              </Text>
             </View>
           </View>
         </View>
