@@ -287,11 +287,8 @@ export default function ProductEditorScreen() {
     }
 
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.6,
-      selectionLimit: 0, // 0 = chọn nhiều ảnh cùng lúc
+      allowsMultipleSelection: true,
     });
 
     if (!result.canceled) {
