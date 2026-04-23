@@ -40,7 +40,7 @@ serve(async (req) => {
     if (dbError) throw dbError
 
     // Format products list into a string
-    const productsContext = products?.map(p => 
+    const productsContext = products?.map(p =>
       `- ${p.name} (ID: ${p.id}): Giá ${p.price} VNĐ. Mô tả: ${p.description || 'Không có'}.`
     ).join('\n') || 'Không có sản phẩm nào.'
 
@@ -53,13 +53,13 @@ ${productsContext}
 
 QUY TẮC QUAN TRỌNG:
 1. CHỈ tư vấn những sản phẩm có trong danh sách trên. TUYỆT ĐỐI KHÔNG bịa ra sản phẩm không có.
-2. Trả lời ngắn gọn, thân thiện, và tự nhiên. 
-3. Nếu khách hỏi sản phẩm không có, hãy xin lỗi và gợi ý một sản phẩm khác tương tự có trong danh sách.
+2. Trả lời RẤT NGẮN GỌN, SÚC TÍCH (tối đa 3-4 câu).
+3. Nếu khách hỏi sản phẩm không có, hãy xin lỗi và CHỈ GỢI Ý TỐI ĐA 2 sản phẩm khác tương tự có trong danh sách. KHÔNG liệt kê dài dòng.
 4. Cung cấp thông tin giá cả rõ ràng (thêm 'VNĐ' vào sau giá).`
 
     // Construct Gemini messages payload
     // Gemini 1.5 expects contents array: { role: 'user' | 'model', parts: [{ text }] }
-    
+
     // Convert generic history to Gemini format if provided. 
     // Format expected in history: [{ role: 'user' | 'assistant', content: string }]
     const geminiHistory = history.map((msg: any) => ({
@@ -73,7 +73,7 @@ QUY TẮC QUAN TRỌNG:
     ]
 
     // 3. Call Google Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -85,7 +85,7 @@ QUY TẮC QUAN TRỌNG:
         contents: contents,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 8192,
         }
       })
     })

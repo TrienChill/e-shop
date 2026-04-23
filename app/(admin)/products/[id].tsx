@@ -1,12 +1,13 @@
 import { supabase } from "@/src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { ArrowLeft, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-native";
+import { ArrowLeft, ChevronDown, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { fetchAllCategories, CategoryNode } from "@/src/utils/categoryTree";
 
 // Type definitions
 interface ProductImage {
@@ -46,6 +48,11 @@ export default function ProductEditorScreen() {
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [uploading, setUploading] = useState(false);
 
+  // Category State
+  const [categories, setCategories] = useState<CategoryNode[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+
   // Variant State
   const [variants, setVariants] = useState<any[]>([]);
   const [newColor, setNewColor] = useState("");
@@ -61,9 +68,9 @@ export default function ProductEditorScreen() {
 
   // Tạo snapshot chuỗi dữ liệu hiện tại để so sánh
   const currentDataStr = React.useMemo(() => JSON.stringify({
-    name, price, shortDescription, description, specifications, variants, 
+    name, price, shortDescription, description, specifications, variants, selectedCategoryId,
     productImages: productImages.map(Math.random) // Cách ngẫu nhiên ngắn gọn để chỉ định hình ảnh đã thay đổi
-  }), [name, price, shortDescription, description, specifications, variants, productImages]);
+  }), [name, price, shortDescription, description, specifications, variants, productImages, selectedCategoryId]);
 
   // Khởi tạo trạng thái ban đầu của sản phẩm
   useEffect(() => {
@@ -177,6 +184,41 @@ export default function ProductEditorScreen() {
     return groups;
   }, [variants]);
 
+  // Load categories
+  const loadCategories = React.useCallback(async () => {
+    try {
+      const data = await fetchAllCategories();
+      const { buildTree } = await import("@/src/utils/categoryTree");
+      setCategories(buildTree(data));
+    } catch (err) {
+      console.error("Lỗi tải danh mục:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  // Flatten categories for display
+  const flatCategories = React.useMemo(() => {
+    const result: CategoryNode[] = [];
+    const flatten = (nodes: CategoryNode[]) => {
+      for (const node of nodes) {
+        result.push(node);
+        if (node.children.length > 0) flatten(node.children);
+      }
+    };
+    flatten(categories);
+    return result;
+  }, [categories]);
+
+  // Get selected category name
+  const selectedCategoryName = React.useMemo(() => {
+    if (!selectedCategoryId) return null;
+    const cat = flatCategories.find(c => c.id === selectedCategoryId);
+    return cat ? cat.name_vi || cat.name : null;
+  }, [selectedCategoryId, flatCategories]);
+
   // Hàm lấy ảnh mô tả cho một màu sắc cụ thể
   const getImageForColor = (color: string) => {
     return productImages.find(img => 
@@ -205,6 +247,7 @@ export default function ProductEditorScreen() {
       setDescription(data.description || "");
       setShortDescription(data.short_description || "");
       setSpecifications(data.specifications || []);
+      setSelectedCategoryId(data.category_id || null);
 
       // Fetch Images from product_images table
       fetchProductImages(data.id);
@@ -465,6 +508,7 @@ export default function ProductEditorScreen() {
         is_active: isProductActive,
         images: imageUrlsForProduct, // <--- ĐẨY MẢNG ẢNH VÀO CỘT IMAGES CỦA BẢNG PRODUCTS Ở ĐÂY
         specifications, // <--- THỰC HIỆN LƯU THÔNG SỐ KỸ THUẬT Ở ĐÂY
+        category_id: selectedCategoryId,
       };
 
       // --- KẾT THÚC ĐOẠN CODE FIX ẢNH BÌA ---
@@ -633,6 +677,20 @@ export default function ProductEditorScreen() {
 
           <Text style={styles.label}>Giá cơ bản (VNĐ) *</Text>
           <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="numeric" />
+
+          {/* Danh mục */}
+          <Text style={styles.label}>Danh mục</Text>
+          <Pressable
+            style={[styles.categoryPickerBtn, selectedCategoryId ? styles.categoryPickerBtnActive : null]}
+            onPress={() => setShowCategoryPicker(true)}
+          >
+            {selectedCategoryId ? (
+              <Text style={styles.categoryPickerText}>{selectedCategoryName}</Text>
+            ) : (
+              <Text style={styles.categoryPickerPlaceholder}>Chọn danh mục...</Text>
+            )}
+            <ChevronDown size={18} color={selectedCategoryId ? "#2563EB" : "#9CA3AF"} />
+          </Pressable>
 
           <Text style={styles.label}>Mô tả ngắn (Hiển thị dưới tên SP)</Text>
           <TextInput
@@ -900,6 +958,79 @@ export default function ProductEditorScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Modal chọn danh mục */}
+      <Modal
+        visible={showCategoryPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCategoryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Chọn Danh mục</Text>
+              <Pressable onPress={() => setShowCategoryPicker(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseBtnText}>✕</Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.categoryList}>
+              {/* Tùy chọn "Không phân loại" */}
+              <Pressable
+                style={[
+                  styles.categoryItem,
+                  selectedCategoryId === null && styles.categoryItemActive,
+                ]}
+                onPress={() => {
+                  setSelectedCategoryId(null);
+                  setShowCategoryPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.categoryItemText,
+                    selectedCategoryId === null && styles.categoryItemTextActive,
+                  ]}
+                >
+                  Không phân loại
+                </Text>
+              </Pressable>
+
+              {/* Danh sách danh mục phẳng */}
+              {flatCategories.map((cat) => (
+                <Pressable
+                  key={cat.id}
+                  style={[
+                    styles.categoryItem,
+                    selectedCategoryId === cat.id && styles.categoryItemActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedCategoryId(cat.id);
+                    setShowCategoryPicker(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.categoryItemText,
+                      { paddingLeft: cat.depth * 20 + 8 },
+                      selectedCategoryId === cat.id && styles.categoryItemTextActive,
+                    ]}
+                  >
+                    {cat.depth > 0 ? "└ " : ""}
+                    {cat.name_vi || cat.name}
+                    {!cat.is_active && " (Ẩn)"}
+                  </Text>
+                </Pressable>
+              ))}
+
+              {flatCategories.length === 0 && (
+                <Text style={styles.emptyCategoryText}>Chưa có danh mục nào</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -971,4 +1102,71 @@ const styles = StyleSheet.create({
   specItem: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F3F4F6" },
   specLabel: { fontSize: 12, color: "#6B7280", fontWeight: "600" },
   specValue: { fontSize: 14, color: "#111827", marginTop: 2 },
+
+  // Category Picker Styles
+  categoryPickerBtn: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
+    backgroundColor: "#F9FAFB",
+  },
+  categoryPickerBtnActive: {
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+  },
+  categoryPickerText: { fontSize: 15, color: "#111827", flex: 1 },
+  categoryPickerPlaceholder: { fontSize: 15, color: "#9CA3AF", flex: 1 },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  modalTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalCloseBtnText: { fontSize: 16, color: "#374151" },
+  categoryList: { paddingVertical: 8 },
+  categoryItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  categoryItemActive: { backgroundColor: "#EFF6FF" },
+  categoryItemText: { fontSize: 15, color: "#374151" },
+  categoryItemTextActive: { color: "#2563EB", fontWeight: "600" },
+  emptyCategoryText: {
+    textAlign: "center",
+    paddingVertical: 40,
+    fontSize: 14,
+    color: "#9CA3AF",
+  },
 });
