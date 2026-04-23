@@ -1,5 +1,10 @@
+/* eslint-disable */
 // @ts-nocheck
+
+// Bỏ qua cảnh báo module unresolved của Node.js vì đây là Deno
+// @ts-ignore
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+// @ts-ignore
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -7,7 +12,47 @@ const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
-serve(async (req) => {
+// Retry logic for API calls
+async function fetchWithRetry(url: string, options: any, maxRetries = 3, delayMs = 2000): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // If rate limited (429) or server error (500-503), retry
+      if (response.status === 429 || (response.status >= 500 && response.status < 600)) {
+        const data = await response.json();
+        const errorMessage = data.error?.message || `HTTP ${response.status}`;
+
+        if (attempt < maxRetries - 1) {
+          // Exponential backoff: 2s, 4s, 8s
+          const waitTime = delayMs * Math.pow(2, attempt);
+          console.log(`API overloaded (${errorMessage}). Retrying in ${waitTime}ms... (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        throw new Error(`AI đang quá tải. Vui lòng thử lại sau vài giây.`);
+      }
+
+      return response;
+    } catch (e) {
+      lastError = e as Error;
+
+      // If it's a network error, also retry
+      if (attempt < maxRetries - 1) {
+        const waitTime = delayMs * Math.pow(2, attempt);
+        console.log(`Network error. Retrying in ${waitTime}ms... (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+
+  throw lastError || new Error('Max retries exceeded');
+}
+
+serve(async (req: any) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -40,7 +85,7 @@ serve(async (req) => {
     if (dbError) throw dbError
 
     // Format products list into a string
-    const productsContext = products?.map(p =>
+    const productsContext = products?.map((p: any) =>
       `- ${p.name} (ID: ${p.id}): Giá ${p.price} VNĐ. Mô tả: ${p.description || 'Không có'}.`
     ).join('\n') || 'Không có sản phẩm nào.'
 
@@ -57,11 +102,7 @@ QUY TẮC QUAN TRỌNG:
 3. Nếu khách hỏi sản phẩm không có, hãy xin lỗi và CHỈ GỢI Ý TỐI ĐA 2 sản phẩm khác tương tự có trong danh sách. KHÔNG liệt kê dài dòng.
 4. Cung cấp thông tin giá cả rõ ràng (thêm 'VNĐ' vào sau giá).`
 
-    // Construct Gemini messages payload
-    // Gemini 1.5 expects contents array: { role: 'user' | 'model', parts: [{ text }] }
-
-    // Convert generic history to Gemini format if provided. 
-    // Format expected in history: [{ role: 'user' | 'assistant', content: string }]
+    // Convert generic history to Gemini format
     const geminiHistory = history.map((msg: any) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: msg.content }]
@@ -72,23 +113,26 @@ QUY TẮC QUAN TRỌNG:
       { role: 'user', parts: [{ text: message }] }
     ]
 
-    // 3. Call Google Gemini API
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemPrompt }]
+    // 3. Call Google Gemini API với retry (Sử dụng model gemini-1.5-flash)
+    const response = await fetchWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        contents: contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 8192,
-        }
-      })
-    })
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemPrompt }]
+          },
+          contents: contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+          }
+        })
+      }
+    )
 
     const data = await response.json()
 
@@ -103,7 +147,7 @@ QUY TẮC QUAN TRỌNG:
       JSON.stringify({ reply }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),

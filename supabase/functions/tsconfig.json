@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "allowUnreachableCode": true,
+    "allowUnusedLabels": true,
+    "checkJs": false,
+    "lib": ["esnext", "dom", "dom.iterable", "dom.asynciterable"],
+    "strict": false,
+    "noImplicitAny": false
+  },
+  "exclude": ["**/node_modules", "**/.next", "**/build"]
+}
