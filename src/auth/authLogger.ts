@@ -57,11 +57,14 @@ export type AuthEventType =
   | 'LOGIN_ERROR'
   | 'LOGIN_BLOCKED_ROLE_PLATFORM'   // admin/staff cố đăng nhập trên mobile
   | 'SESSION_RESTORED'
+  | 'SESSION_EXPIRED'               // refresh token hết hạn hoặc không hợp lệ
+  | 'SESSION_CLEARED'               // xóa session hỏng khỏi storage
   | 'ROLE_FETCH_START'
   | 'ROLE_FETCH_SUCCESS'
   | 'ROLE_FETCH_ERROR'
   | 'LOGOUT'
-  | 'AUTH_STATE_CHANGE';
+  | 'AUTH_STATE_CHANGE'
+  | 'AUTH_ERROR';                   // lỗi auth tổng quát
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +292,58 @@ export const authLogger = {
       userId: params.userId,
       platform: params.platform,
       meta: { supabaseEvent: params.event },
+    });
+    printLog(entry);
+  },
+
+  /**
+   * Ghi log khi session hết hạn hoặc refresh token không hợp lệ.
+   */
+  sessionExpired(params: {
+    userId?: string | null;
+    reason: string;
+    platform?: AuthPlatform;
+  }): void {
+    const entry = buildEntry('WARN', 'SESSION_EXPIRED', {
+      userId: params.userId,
+      platform: params.platform,
+      reason: params.reason,
+    });
+    printLog(entry);
+  },
+
+  /**
+   * Ghi log khi session hỏng được xóa khỏi storage.
+   */
+  sessionCleared(params: {
+    reason: string;
+    platform?: AuthPlatform;
+  }): void {
+    const entry = buildEntry('INFO', 'SESSION_CLEARED', {
+      platform: params.platform,
+      reason: params.reason,
+    });
+    printLog(entry);
+  },
+
+  /**
+   * Ghi log lỗi auth tổng quát.
+   */
+  error(params: {
+    context: string;
+    message: string;
+    error?: string;
+    userId?: string | null;
+    platform?: AuthPlatform;
+  }): void {
+    const entry = buildEntry('ERROR', 'AUTH_ERROR', {
+      userId: params.userId,
+      platform: params.platform,
+      errorMessage: params.message,
+      meta: {
+        context: params.context,
+        originalError: params.error,
+      },
     });
     printLog(entry);
   },

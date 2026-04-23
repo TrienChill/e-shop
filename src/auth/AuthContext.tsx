@@ -1,12 +1,17 @@
 import { supabase } from "@/src/lib/supabase";
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   authLogger,
   getCurrentPlatform,
   isRoleAllowedOnPlatform,
 } from "./authLogger";
 import type { UserRole } from "./types";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const SUPABASE_AUTH_STORAGE_KEY = "@supabase.auth.token";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +56,100 @@ async function fetchMyRole(userId: string): Promise<UserRole | null> {
   return nextRole;
 }
 
+// ─── Helper Functions ─────────────────────────────────────────────────────────
+
+/**
+ * Check if error is related to invalid/expired refresh token
+ */
+function isRefreshTokenError(error: any): boolean {
+  if (!error) return false;
+  
+  const message = error.message || "";
+  const status = error.status || error.code;
+  
+  // Check for various refresh token related errors
+  const refreshTokenPatterns = [
+    "Refresh Token Not Found",
+    "Invalid Refresh Token",
+    "refresh_token",
+    "invalid_grant",
+    "invalid_token",
+    "session not found",
+    "Session not found",
+    "JWT expired",
+    "token expired",
+    "Token expired",
+  ];
+  
+  const isRefreshError = refreshTokenPatterns.some(
+    (pattern) => message.toLowerCase().includes(pattern.toLowerCase())
+  );
+  
+  // Check status codes
+  const isAuthStatusError = status === 400 || status === 401 || status === 403;
+  
+  return isRefreshError || isAuthStatusError;
+}
+
+/**
+ * Clear ALL authentication data from storage
+ * This ensures no corrupted session data remains
+ */
+async function clearAllAuthData(): Promise<void> {
+  try {
+    // Clear Supabase auth token from AsyncStorage
+    const keys = await AsyncStorage.getAllKeys();
+    const authKeys = keys.filter(
+      (key) =>
+        key.includes("supabase") ||
+        key.includes("auth") ||
+        key.includes("@react-native-auth")
+    );
+    
+    if (authKeys.length > 0) {
+      await AsyncStorage.multiRemove(authKeys);
+    }
+    
+    // Also try to clear the specific key if it exists
+    try {
+      await AsyncStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
+    } catch {
+      // Key might not exist, ignore
+    }
+  } catch (error) {
+    // If clearing fails, still try to sign out from Supabase
+    console.warn("Failed to clear auth storage:", error);
+  }
+}
+
+/**
+ * Handle corrupted/expired session by signing out and clearing storage
+ */
+async function handleCorruptedSession(error: any): Promise<void> {
+  const errorMessage = error?.message || String(error);
+  
+  authLogger.sessionExpired({
+    reason: errorMessage,
+    platform,
+  });
+  
+  // First clear local storage to prevent re-loading corrupted session
+  await clearAllAuthData();
+  
+  authLogger.sessionCleared({
+    reason: "Corrupted session data cleared",
+    platform,
+  });
+  
+  // Then sign out from Supabase (this also clears their internal state)
+  try {
+    await supabase.auth.signOut();
+  } catch (signOutError) {
+    // Even if signOut fails, we've already cleared local storage
+    console.warn("Supabase signOut failed:", signOutError);
+  }
+}
+
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -87,26 +186,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!mounted) return;
 
       if (error) {
         // Nếu lỗi liên quan đến Refresh Token không hợp lệ hoặc không tìm thấy, 
         // thực hiện đăng xuất để xóa token hỏng khỏi storage.
-        if (
-          error.message?.includes("Refresh Token Not Found") || 
-          error.message?.includes("invalid_grant") ||
-          (error as any).status === 400 || 
-          (error as any).status === 401
-        ) {
-          supabase.auth.signOut().catch(() => {});
-          setSession(null);
-          setRole(null);
-          setRoleResolved(true);
-          setLoading(false);
-          setSessionInitialized(true);
+        if (isRefreshTokenError(error)) {
+          await handleCorruptedSession(error);
+          
+          if (mounted) {
+            setSession(null);
+            setRole(null);
+            setRoleResolved(true);
+            setLoading(false);
+            setSessionInitialized(true);
+          }
           return;
         }
+        
+        // For other errors, still log and handle
+        authLogger.error({
+          context: "getSession",
+          message: "Failed to restore session",
+          error: error?.message || String(error),
+        });
       }
       
       authLogger.sessionRestored({
@@ -122,8 +226,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSessionInitialized(true);
       // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
-    }).catch((err) => {
+    }).catch(async (err) => {
       if (mounted) {
+        // Check if it's a refresh token error even in catch
+        if (isRefreshTokenError(err)) {
+          await handleCorruptedSession(err);
+        }
+        
         setRoleResolved(true);
         setLoading(false);
         setSessionInitialized(true);
@@ -196,6 +305,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [isPlatformBlocked, role, userId]);
 
   const signOut = async () => {
+    // Clear local storage first, then sign out from Supabase
+    await clearAllAuthData();
     await supabase.auth.signOut();
   };
 
