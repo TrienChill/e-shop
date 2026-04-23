@@ -221,10 +221,40 @@ export default function ProductEditorScreen() {
 
   // Hàm lấy ảnh mô tả cho một màu sắc cụ thể
   const getImageForColor = (color: string) => {
-    return productImages.find(img => 
-      img.image_type === 'variant' && 
+    return productImages.find(img =>
+      img.image_type === 'variant' &&
       (img.colorKey === color || (img.variant_id && (variants.find(v => v.id === img.variant_id)?.color || "Không phân màu") === color))
     );
+  };
+
+  // Hàm di chuyển ảnh lên (thứ tự giảm = ưu tiên cao hơn)
+  const moveImageUp = (index: number) => {
+    if (index === 0) return; // Đã ở vị trí cao nhất
+    setProductImages(prev => {
+      const updated = [...prev];
+      // Cập nhật display_order tạm thời: swap 2 phần tử
+      const tempOrder = updated[index].display_order;
+      updated[index].display_order = updated[index - 1].display_order;
+      updated[index - 1].display_order = tempOrder;
+      // Swap vị trí trong mảng
+      [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+      return updated;
+    });
+  };
+
+  // Hàm di chuyển ảnh xuống
+  const moveImageDown = (index: number) => {
+    if (index === productImages.length - 1) return; // Đã ở vị trí thấp nhất
+    setProductImages(prev => {
+      const updated = [...prev];
+      // Cập nhật display_order tạm thời: swap 2 phần tử
+      const tempOrder = updated[index].display_order;
+      updated[index].display_order = updated[index + 1].display_order;
+      updated[index + 1].display_order = tempOrder;
+      // Swap vị trí trong mảng
+      [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+      return updated;
+    });
   };
 
   // Fetch dữ liệu nếu là Edit Mode
@@ -781,24 +811,46 @@ export default function ProductEditorScreen() {
 
                 <View style={styles.imageControls}>
                   <View style={styles.controlRow}>
-                    <Pressable
-                      style={[styles.smallBtn, img.is_thumbnail && styles.activeBtn]}
-                      onPress={() => {
-                        setProductImages(prev => prev.map((p, i) => ({
-                          ...p,
-                          is_thumbnail: i === index
-                        })));
-                      }}
-                    >
-                      <Text style={[styles.smallBtnText, img.is_thumbnail && styles.activeBtnText]}>Làm ảnh bìa</Text>
-                    </Pressable>
+                    <View style={styles.orderControlGroup}>
+                      <Text style={styles.orderLabel}>Thứ tự: {index + 1}</Text>
+                      <View style={styles.orderButtons}>
+                        <Pressable
+                          style={[styles.orderBtn, index === 0 && styles.orderBtnDisabled]}
+                          onPress={() => moveImageUp(index)}
+                          disabled={index === 0}
+                        >
+                          <Text style={[styles.orderBtnText, index === 0 && styles.orderBtnTextDisabled]}>▲</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.orderBtn, index === productImages.length - 1 && styles.orderBtnDisabled]}
+                          onPress={() => moveImageDown(index)}
+                          disabled={index === productImages.length - 1}
+                        >
+                          <Text style={[styles.orderBtnText, index === productImages.length - 1 && styles.orderBtnTextDisabled]}>▼</Text>
+                        </Pressable>
+                      </View>
+                    </View>
 
-                    <Pressable
-                      style={styles.removeIconBtn}
-                      onPress={() => setProductImages(prev => prev.filter((_, i) => i !== index))}
-                    >
-                      <Trash2 size={16} color="#EF4444" />
-                    </Pressable>
+                    <View style={styles.rightControls}>
+                      <Pressable
+                        style={[styles.smallBtn, img.is_thumbnail && styles.activeBtn]}
+                        onPress={() => {
+                          setProductImages(prev => prev.map((p, i) => ({
+                            ...p,
+                            is_thumbnail: i === index
+                          })));
+                        }}
+                      >
+                        <Text style={[styles.smallBtnText, img.is_thumbnail && styles.activeBtnText]}>Bìa</Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={styles.removeIconBtn}
+                        onPress={() => setProductImages(prev => prev.filter((_, i) => i !== index))}
+                      >
+                        <Trash2 size={16} color="#EF4444" />
+                      </Pressable>
+                    </View>
                   </View>
 
                   <View style={styles.typeSelector}>
@@ -1062,6 +1114,14 @@ const styles = StyleSheet.create({
   thumbnailBadgeText: { color: "white", fontSize: 10, fontWeight: "bold" },
   imageControls: { flex: 1, gap: 8 },
   controlRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  orderControlGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  orderLabel: { fontSize: 12, color: "#6B7280", fontWeight: "600", minWidth: 60 },
+  orderButtons: { flexDirection: "row", gap: 4 },
+  orderBtn: { width: 28, height: 28, borderRadius: 6, backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#2563EB", justifyContent: "center", alignItems: "center" },
+  orderBtnDisabled: { backgroundColor: "#F3F4F6", borderColor: "#D1D5DB" },
+  orderBtnText: { fontSize: 12, color: "#2563EB", fontWeight: "bold" },
+  orderBtnTextDisabled: { color: "#9CA3AF" },
+  rightControls: { flexDirection: "row", alignItems: "center", gap: 8 },
   smallBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: "#E5E7EB" },
   activeBtn: { backgroundColor: "#2563EB" },
   smallBtnText: { fontSize: 11, color: "#4B5563", fontWeight: "600" },
