@@ -14,6 +14,7 @@ export default function ShopLayout() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="checkout" />
       <Stack.Screen name="product/[id]" />
+      <Stack.Screen name="try-on" />
       </Stack>
 
       {/* Global Web Drawers */}

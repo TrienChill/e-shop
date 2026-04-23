@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Heart,
   Share2,
+  Shirt,
   Star,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -306,6 +307,11 @@ export default function ProductDetailScreen() {
     }
     // Đã chọn đủ ở ngoài -> Thêm vào với số lượng là 1
     addToCartService(1);
+  };
+
+  const handleTryOn = () => {
+    const primaryImage = productImages[0];
+    router.push({ pathname: "/try-on", params: { productImageUrl: primaryImage } });
   };
 
   // Hàm xử lý xác nhận bên trong Pop-up Modal
@@ -1392,14 +1398,27 @@ export default function ProductDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Nút Thêm vào giỏ */}
-        <TouchableOpacity
-          style={styles.addBagBtn}
-          activeOpacity={0.85}
-          onPress={handleAddToBag}
-        >
-          <Text style={styles.addBagText}>Thêm vào giỏ</Text>
-        </TouchableOpacity>
+        {/* Action buttons row */}
+        <View style={styles.actionRow}>
+          {/* Nút Thử đồ ảo */}
+          <TouchableOpacity
+            style={styles.tryOnBtn}
+            activeOpacity={0.85}
+            onPress={handleTryOn}
+          >
+            <Shirt size={18} color="#3B82F6" />
+            <Text style={styles.tryOnBtnText}>Thử đồ ảo</Text>
+          </TouchableOpacity>
+
+          {/* Nút Thêm vào giỏ */}
+          <TouchableOpacity
+            style={styles.addBagBtn}
+            activeOpacity={0.85}
+            onPress={handleAddToBag}
+          >
+            <Text style={styles.addBagText}>Thêm vào giỏ</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       {/* ══════════════ 9. Pop-up Product Variations (Modal) ══════════════ */}
       <Modal
@@ -2011,6 +2030,7 @@ const styles = StyleSheet.create({
   },
   addBagBtn: {
     backgroundColor: "#3B82F6",
+    flex: 1,
     paddingHorizontal: 24,
     height: 46,
     borderRadius: 23,
@@ -2027,6 +2047,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     letterSpacing: 0.3,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  tryOnBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#EFF6FF",
+    borderWidth: 1.5,
+    borderColor: "#3B82F6",
+    paddingHorizontal: 16,
+    height: 46,
+    borderRadius: 23,
+  },
+  tryOnBtnText: {
+    color: "#3B82F6",
+    fontSize: 14,
+    fontWeight: "700",
   },
   // ──────────────── Pop-up (Modal) Styles ────────────────
   modalOverlay: {

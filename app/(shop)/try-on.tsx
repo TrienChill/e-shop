@@ -1,0 +1,464 @@
+import CommonHeader from "@/src/components/layout/Header";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, Camera, CheckCircle2, RefreshCw, Save, Shirt } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+const API_URL = "http://localhost:8000/api/try-on";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
+
+type TryOnState = "idle" | "loading" | "result" | "error";
+
+export default function VirtualTryOnScreen() {
+  const { productImageUrl } = useLocalSearchParams<{ productImageUrl?: string }>();
+  const router = useRouter();
+
+  const [personImage, setPersonImage] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [clothImage] = useState<string>(productImageUrl || "");
+  const [state, setState] = useState<TryOnState>("idle");
+  const [resultUrl, setResultUrl] = useState<string>("");
+  const [errorMsg, setErrorMsg] = useState<string>("");
+
+  const objectUrlRef = useRef<string>("");
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+      }
+    };
+  }, []);
+
+  const pickPersonImage = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Cần quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const filename = asset.uri.split("/").pop() || "person.jpg";
+        const match = /\.(\w+)$/.exec(filename);
+        const ext = match ? match[1] : "jpg";
+        const name = `photo_${Date.now()}.${ext}`;
+        const type = asset.mimeType || `image/${ext}`;
+
+        setPersonImage({ uri: asset.uri, name, type });
+        setState("idle");
+        setResultUrl("");
+      }
+    } catch {
+      Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại.");
+    }
+  };
+
+  const handleTryOn = async () => {
+    if (!personImage) {
+      Alert.alert("Thiếu ảnh", "Vui lòng tải lên ảnh của bạn trước.");
+      return;
+    }
+
+    if (!clothImage) {
+      Alert.alert("Thiếu ảnh sản phẩm", "Không có ảnh sản phẩm để thử.");
+      return;
+    }
+
+    setState("loading");
+    setErrorMsg("");
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = "";
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("person_image", {
+        uri: personImage.uri,
+        name: personImage.name,
+        type: personImage.type,
+      } as unknown as Blob);
+
+      formData.append("cloth_image", {
+        uri: clothImage,
+        name: "cloth.jpg",
+        type: "image/jpeg",
+      } as unknown as Blob);
+
+      formData.append("category", "upper_body");
+
+      const response = await fetch(API_URL, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(text || `Lỗi server: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      objectUrlRef.current = objectUrl;
+      setResultUrl(objectUrl);
+      setState("result");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi gọi API.";
+      setErrorMsg(msg);
+      setState("error");
+    }
+  };
+
+  const handleRetry = () => {
+    setState("idle");
+    setResultUrl("");
+    setErrorMsg("");
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = "";
+    }
+  };
+
+  const handleSaveImage = async () => {
+    try {
+      const response = await fetch(resultUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        Alert.alert("Thành công", "Ảnh kết quả đã được xử lý. Bạn có thể chụp màn hình để lưu lại.");
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      Alert.alert("Lỗi", "Không thể lưu ảnh.");
+    }
+  };
+
+  const canTryOn = !!personImage && !!clothImage;
+
+  return (
+    <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <CommonHeader
+        title="Thử đồ ảo"
+        renderLeft={() => (
+          <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={24} color="#0F172A" />
+          </TouchableOpacity>
+        )}
+      />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Section 1: Two image boxes */}
+        <View style={styles.imageRow}>
+          {/* Person image */}
+          <TouchableOpacity
+            style={[styles.imageBox, styles.personBox]}
+            onPress={pickPersonImage}
+            activeOpacity={0.7}
+          >
+            {personImage ? (
+              <Image source={{ uri: personImage.uri }} style={styles.imagePreview} resizeMode="cover" />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Camera size={32} color="#9CA3AF" />
+                <Text style={styles.placeholderLabel}>Tải ảnh của bạn</Text>
+              </View>
+            )}
+            <View style={styles.overlayBadge}>
+              <Text style={styles.overlayBadgeText}>
+                {personImage ? "Đổi ảnh" : "Chọn ảnh"}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Product image */}
+          <View style={[styles.imageBox, styles.productBox]}>
+            {clothImage ? (
+              <Image source={{ uri: clothImage }} style={styles.imagePreview} resizeMode="cover" />
+            ) : (
+              <View style={styles.imagePlaceholder}>
+                <Shirt size={32} color="#9CA3AF" />
+                <Text style={styles.placeholderLabel}>Chưa có sản phẩm</Text>
+              </View>
+            )}
+            <View style={[styles.overlayBadge, styles.productBadge]}>
+              <Shirt size={12} color="#fff" />
+              <Text style={[styles.overlayBadgeText, { marginLeft: 4 }]}>Sản phẩm</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Section 2: Action button */}
+        <TouchableOpacity
+          style={[styles.primaryButton, !canTryOn && styles.primaryButtonDisabled]}
+          onPress={handleTryOn}
+          disabled={!canTryOn || state === "loading"}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.primaryButtonText, !canTryOn && styles.primaryButtonTextDisabled]}>
+            Bắt đầu thử đồ
+          </Text>
+        </TouchableOpacity>
+
+        {/* Section 3: Loading state */}
+        {state === "loading" && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3B82F6" />
+            <Text style={styles.loadingText}>
+              AI đang xử lý ghép đồ, vui lòng đợi khoảng 15-30 giây...
+            </Text>
+          </View>
+        )}
+
+        {/* Section 4: Result */}
+        {state === "result" && (
+          <View style={styles.resultContainer}>
+            <View style={styles.resultHeader}>
+              <CheckCircle2 size={20} color="#10B981" />
+              <Text style={styles.resultTitle}>Kết quả thử đồ</Text>
+            </View>
+
+            <Image
+              source={{ uri: resultUrl }}
+              style={styles.resultImage}
+              resizeMode="contain"
+            />
+
+            <View style={styles.resultActions}>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleRetry}
+                activeOpacity={0.7}
+              >
+                <RefreshCw size={18} color="#3B82F6" />
+                <Text style={styles.secondaryButtonText}>Thử lại</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleSaveImage}
+                activeOpacity={0.7}
+              >
+                <Save size={18} color="#3B82F6" />
+                <Text style={styles.secondaryButtonText}>Lưu ảnh</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Error state */}
+        {state === "error" && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>Đã xảy ra lỗi</Text>
+            <Text style={styles.errorText}>{errorMsg}</Text>
+            <TouchableOpacity
+              style={styles.retryErrorButton}
+              onPress={handleRetry}
+              activeOpacity={0.7}
+            >
+              <RefreshCw size={16} color="#fff" />
+              <Text style={styles.retryErrorText}>Thử lại</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F9FAFB",
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  imageRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 20,
+  },
+  imageBox: {
+    width: IMAGE_BOX_SIZE,
+    height: IMAGE_BOX_SIZE,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#E5E7EB",
+  },
+  personBox: {
+    borderWidth: 2,
+    borderColor: "#3B82F6",
+    borderStyle: "dashed",
+  },
+  productBox: {
+    borderWidth: 2,
+    borderColor: "#10B981",
+    borderStyle: "dashed",
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+  },
+  placeholderLabel: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+  },
+  imagePreview: {
+    width: "100%",
+    height: "100%",
+  },
+  overlayBadge: {
+    position: "absolute",
+    bottom: 8,
+    alignSelf: "center",
+    backgroundColor: "rgba(59, 130, 246, 0.85)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  productBadge: {
+    backgroundColor: "rgba(16, 185, 129, 0.85)",
+  },
+  overlayBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  primaryButton: {
+    backgroundColor: "#3B82F6",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  primaryButtonDisabled: {
+    backgroundColor: "#D1D5DB",
+  },
+  primaryButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  primaryButtonTextDisabled: {
+    color: "#9CA3AF",
+  },
+  loadingContainer: {
+    alignItems: "center",
+    paddingVertical: 32,
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#6B7280",
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  resultContainer: {
+    marginTop: 4,
+  },
+  resultHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+  },
+  resultImage: {
+    width: "100%",
+    height: SCREEN_WIDTH * 1.2,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  resultActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  secondaryButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#3B82F6",
+    backgroundColor: "#fff",
+  },
+  secondaryButtonText: {
+    color: "#3B82F6",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  errorContainer: {
+    alignItems: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    gap: 12,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#EF4444",
+  },
+  errorText: {
+    fontSize: 13,
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+  retryErrorButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#EF4444",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  retryErrorText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});
