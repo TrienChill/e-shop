@@ -374,8 +374,8 @@ export default function ProductEditorScreen() {
 
   // --- 0. Quản lý thông số kỹ thuật (Specifications) ---
   const addSpecification = () => {
-    if (!newSpecName || !newSpecValue) return alert("Vui lòng nhập đầy đủ tên và giá trị thông số!");
-    setSpecifications([...specifications, { name: newSpecName, value: newSpecValue }]);
+    if (!newSpecName) return alert("Vui lòng nhập tên thông số!");
+    setSpecifications([...specifications, { name: newSpecName, value: newSpecValue || "" }]);
     setNewSpecName("");
     setNewSpecValue("");
   };
@@ -716,9 +716,9 @@ export default function ProductEditorScreen() {
             />
             <TextInput 
               style={[styles.smallInput, { flex: 1 }]} 
-              placeholder="Giá trị (VD: Cotton 100%)" 
+              placeholder="Giá trị (VD: Cotton 100%, 500g)"
               value={newSpecValue} 
-              onChangeText={setNewSpecValue} 
+              onChangeText={setNewSpecValue}
             />
             <Pressable style={styles.addSpecBtn} onPress={addSpecification}>
               <Plus size={20} color="white" />
