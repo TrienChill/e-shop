@@ -291,15 +291,16 @@ export default function ProductEditorScreen() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.6,
+      selectionLimit: 0, // 0 = chọn nhiều ảnh cùng lúc
     });
 
     if (!result.canceled) {
-      const newImages: ProductImage[] = result.assets.map(asset => ({
+      const newImages: ProductImage[] = result.assets.map((asset, index) => ({
         localUri: asset.uri,
         url: "", // Will be filled after upload
         image_type: 'general',
-        is_thumbnail: productImages.length === 0, // Default first image as thumbnail
-        display_order: productImages.length,
+        is_thumbnail: productImages.length === 0 && index === 0, // Chỉ ảnh đầu tiên là thumbnail khi chưa có ảnh
+        display_order: productImages.length + index,
       }));
       setProductImages([...productImages, ...newImages]);
     }
