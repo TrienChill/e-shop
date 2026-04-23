@@ -2,12 +2,14 @@ import CommonHeader from "@/src/components/layout/Header";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Camera, CheckCircle2, RefreshCw, Save, Shirt } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
+import { readAsStringAsync, EncodingType } from "expo-file-system/legacy";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +18,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const API_URL = "http://localhost:8000/api/try-on";
+// API URL - có thể thay đổi theo môi trường
+const API_URL = process.env.EXPO_PUBLIC_TRYON_API_URL || "http://localhost:8000/api/try-on";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
@@ -44,7 +47,7 @@ export default function VirtualTryOnScreen() {
 
   const [personImage, setPersonImage] = useState<{ uri: string; name: string; type: string } | null>(null);
   const [clothImage] = useState<string>(productImageUrl || "");
-  const [clothColor, setClothColor] = useState<string>(selectedColor || "");
+  const [clothColor] = useState<string>(selectedColor || "");
   const [state, setState] = useState<TryOnState>("idle");
   const [resultUrl, setResultUrl] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -53,11 +56,18 @@ export default function VirtualTryOnScreen() {
 
   useEffect(() => {
     return () => {
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current);
+      if (objectUrlRef.current && Platform.OS !== "web") {
+        // revokeObjectURL chỉ cần thiết trên web
       }
     };
   }, []);
+
+  // Helper function để revoke object URL (chỉ web)
+  const revokeObjectUrl = (url: string) => {
+    if (Platform.OS === "web" && url) {
+      URL.revokeObjectURL(url);
+    }
+  };
 
   const pickPersonImage = async () => {
     try {
@@ -90,6 +100,44 @@ export default function VirtualTryOnScreen() {
     }
   };
 
+  // Hàm chuyển đổi file thành base64
+  const fileToBase64 = async (uri: string): Promise<string> => {
+    try {
+      // Nếu là URL từ xa (bắt đầu bằng http)
+      if (uri.startsWith("http")) {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      // Nếu là file cục bộ (bắt đầu bằng file:// hoặc content://)
+      if (Platform.OS === "web") {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        // React Native: sử dụng expo-file-system/legacy
+        const base64 = await readAsStringAsync(uri, {
+          encoding: EncodingType.Base64,
+        });
+        return `data:image/jpeg;base64,${base64}`;
+      }
+    } catch (error) {
+      console.error("Error converting to base64:", error);
+      throw new Error("Không thể đọc ảnh");
+    }
+  };
+
   const handleTryOn = async () => {
     if (!personImage) {
       Alert.alert("Thiếu ảnh", "Vui lòng tải lên ảnh của bạn trước.");
@@ -105,43 +153,56 @@ export default function VirtualTryOnScreen() {
     setErrorMsg("");
 
     if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
+      revokeObjectUrl(objectUrlRef.current);
       objectUrlRef.current = "";
     }
 
     try {
-      const formData = new FormData();
-      formData.append("person_image", {
-        uri: personImage.uri,
-        name: personImage.name,
-        type: personImage.type,
-      } as unknown as Blob);
+      // Chuyển ảnh thành base64
+      const personBase64 = await fileToBase64(personImage.uri);
+      const clothBase64 = await fileToBase64(clothImage);
 
-      formData.append("cloth_image", {
-        uri: clothImage,
-        name: "cloth.jpg",
-        type: "image/jpeg",
-      } as unknown as Blob);
-
-      formData.append("category", "upper_body");
-
+      // Gửi request với JSON body
       const response = await fetch(API_URL, {
         method: "POST",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          person_image: personBase64,
+          cloth_image: clothBase64,
+          category: "upper_body",
+        }),
       });
 
       if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(text || `Lỗi server: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Lỗi server: ${response.status}`);
       }
 
+      // Nhận ảnh kết quả dạng blob
       const blob = await response.blob();
+
+      if (blob.size === 0) {
+        throw new Error("Server trả về ảnh rỗng");
+      }
+
+      // Tạo object URL để hiển thị
       const objectUrl = URL.createObjectURL(blob);
       objectUrlRef.current = objectUrl;
       setResultUrl(objectUrl);
       setState("result");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi gọi API.";
+    } catch (err: any) {
+      let msg = "Đã xảy ra lỗi khi gọi API.";
+
+      if (err.name === "AbortError") {
+        msg = "Yêu cầu bị timeout. Vui lòng thử lại sau.";
+      } else if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("net::ERR")) {
+        msg = "Không thể kết nối đến server thử đồ. Vui lòng kiểm tra:\n• Server thử đồ đang chạy\n• Kết nối internet của bạn";
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+
       setErrorMsg(msg);
       setState("error");
     }
