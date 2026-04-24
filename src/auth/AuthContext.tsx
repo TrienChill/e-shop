@@ -127,6 +127,7 @@ async function clearAllAuthData(): Promise<void> {
  */
 async function handleCorruptedSession(error: any): Promise<void> {
   const errorMessage = error?.message || String(error);
+  const platform = getCurrentPlatform();
   
   authLogger.sessionExpired({
     reason: errorMessage,
@@ -186,20 +187,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
+    const signInAnon = async () => {
+      try {
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError) throw anonError;
+        if (mounted) {
+          if (anonData.session) {
+            setSession(anonData.session);
+          } else {
+            setRoleResolved(true);
+            setLoading(false);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to sign in anonymously:", err);
+        if (mounted) {
+          setRoleResolved(true);
+          setLoading(false);
+        }
+      }
+    };
+
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!mounted) return;
 
       if (error) {
         // Nếu lỗi liên quan đến Refresh Token không hợp lệ hoặc không tìm thấy, 
-        // thực hiện đăng xuất để xóa token hỏng khỏi storage.
+        // thực hiện đăng xuất để xóa token hỏng khỏi storage và cấp lại session ẩn danh.
         if (isRefreshTokenError(error)) {
           await handleCorruptedSession(error);
           
           if (mounted) {
             setSession(null);
             setRole(null);
-            setRoleResolved(true);
-            setLoading(false);
+            await signInAnon();
             setSessionInitialized(true);
           }
           return;
@@ -219,23 +240,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         platform,
       });
       setSession(session);
-      // Nếu không có session → không cần fetch role, đánh dấu đã resolved ngay
+
+      // Nếu không có session → cấp phát tài khoản ẩn danh
       if (!session) {
-        setRoleResolved(true);
-        setLoading(false);
+        await signInAnon();
       }
-      setSessionInitialized(true);
+      
+      if (mounted) {
+        setSessionInitialized(true);
+      }
       // Nếu có session → giữ loading=true, chờ useEffect role fetch xử lý
     }).catch(async (err) => {
       if (mounted) {
         // Check if it's a refresh token error even in catch
         if (isRefreshTokenError(err)) {
           await handleCorruptedSession(err);
+          await signInAnon();
+        } else {
+          setRoleResolved(true);
+          setLoading(false);
         }
         
-        setRoleResolved(true);
-        setLoading(false);
-        setSessionInitialized(true);
+        if (mounted) {
+          setSessionInitialized(true);
+        }
       }
     });
 
