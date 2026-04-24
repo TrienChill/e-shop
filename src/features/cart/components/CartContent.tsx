@@ -1,7 +1,7 @@
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { addToGuestCart } from "@/src/services/guestCart";
+import { addToGuestCart, getGuestCart, removeFromGuestCart, updateGuestCartQuantity } from "@/src/services/guestCart";
 import {
   Check,
   X as CloseIcon,
@@ -230,6 +230,7 @@ const EmptyCartState = () => (
 export default function CartContent() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [guestCartItems, setGuestCartItems] = useState<CartItem[]>([]);
   const [popularItems, setPopularItems] = useState<PopularProductItem[]>([]);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
@@ -264,10 +265,20 @@ export default function CartContent() {
     if (!item) return;
 
     const newQty = item.quantity + 1;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      await updateGuestCartQuantity(id, newQty);
+      setGuestCartItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
+      );
+      return;
+    }
+
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
-
     await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
   };
 
@@ -276,14 +287,32 @@ export default function CartContent() {
     if (!item || item.quantity <= 1) return;
 
     const newQty = item.quantity - 1;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      await updateGuestCartQuantity(id, newQty);
+      setGuestCartItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
+      );
+      return;
+    }
+
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
-
     await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
   };
 
   const deleteItem = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      await removeFromGuestCart(id);
+      setGuestCartItems((prev) => prev.filter((i) => i.id !== id));
+      return;
+    }
+
     setCartItems((prev) => prev.filter((i) => i.id !== id));
     await supabase.from("cart_items").delete().eq("id", id);
   };
@@ -350,6 +379,20 @@ export default function CartContent() {
         await addToGuestCart(guestItem);
         setSelectionModalVisible(false);
         Alert.alert("Đã thêm vào giỏ hàng", "Giỏ hàng sẽ được lưu trên thiết bị này.");
+        // Reload guest cart để hiển thị
+        const rawGuest = await getGuestCart();
+        setGuestCartItems(rawGuest.map((item) => ({
+          id: item.id,
+          name: item.name,
+          size: item.size || "M",
+          color: item.color,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          finalPrice: item.hasDiscount ? item.originalPrice : item.price,
+          hasDiscount: item.hasDiscount,
+          image: item.image,
+          quantity: item.quantity,
+        })));
         return;
       }
 
@@ -405,7 +448,9 @@ export default function CartContent() {
   };
 
   const isAllSelected =
-    cartItems.length > 0 && selectedIds.size === cartItems.length;
+    cartItems.length > 0 &&
+    selectedIds.size === cartItems.length &&
+    guestCartItems.length === 0;
 
   const toggleSelectAll = async () => {
     if (isAllSelected) {
@@ -419,17 +464,24 @@ export default function CartContent() {
     }
   };
 
+  // Ghép guest cart + user cart để tính toán
+  const allCartItems = [...guestCartItems, ...cartItems];
+  // Guest items luôn được coi là "selected" (không có checkbox)
+  const allSelectedIds = new Set([
+    ...guestCartItems.map((i) => i.id),
+    ...selectedIds,
+  ]);
+
   // Tính tổng theo giá đã giảm (chỉ tính sản phẩm được tích chọn)
-  const total = cartItems
-    .filter((i) => selectedIds.has(i.id))
+  const total = allCartItems
+    .filter((i) => allSelectedIds.has(i.id))
     .reduce((s, i) => s + i.finalPrice * i.quantity, 0);
   // Tổng giá gốc – dùng để tính mức tiết kiệm
-  const subtotal = cartItems
-    .filter((i) => selectedIds.has(i.id))
+  const subtotal = allCartItems
+    .filter((i) => allSelectedIds.has(i.id))
     .reduce((s, i) => s + i.originalPrice * i.quantity, 0);
   const savings = subtotal - total;
-  const isEmpty = cartItems.length === 0;
-  const cartCount = cartItems.reduce((s, i) => s + i.quantity, 0);
+  const isEmpty = allCartItems.length === 0;
 
 
 
@@ -442,12 +494,28 @@ export default function CartContent() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      // ── Guest: đọc từ AsyncStorage ─────────────────────────────────────────
       if (!user) {
+        const rawGuest = await getGuestCart();
+        const guestItems: CartItem[] = rawGuest.map((item) => ({
+          id: item.id,
+          name: item.name,
+          size: item.size || "M",
+          color: item.color,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          finalPrice: item.hasDiscount ? item.originalPrice : item.price,
+          hasDiscount: item.hasDiscount,
+          image: item.image,
+          quantity: item.quantity,
+        }));
+        setGuestCartItems(guestItems);
         setLoadingCart(false);
         return;
       }
 
-      // 1. Fetch cart_items join với products (bao gồm cả is_selected từ DB)
+      // ── Authenticated: đọc từ DB ────────────────────────────────────────────
       const { data, error } = await supabase
         .from("cart_items")
         .select(
@@ -583,18 +651,19 @@ export default function CartContent() {
         });
         setPopularItems(formatted);
       }
-    } catch (e) { }
+    } catch (err) {
+      console.error("Lỗi fetch popular products:", err);
+    }
   }
 
 
   useFocusEffect(
     useCallback(() => {
-      // Chỉ hiện loading xoay vòng ở lần đầu tiên vào app
-      // Các lần update sau (do trigger realtime) sẽ fetch ngầm (silent)
       const isInitial = cartItems.length === 0 && wishlistItems.length === 0;
       fetchCartItems(!isInitial);
       fetchWishlist();
       fetchPopularProducts();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshTrigger]),
   );
 
@@ -647,6 +716,19 @@ export default function CartContent() {
                 onDecrease={decrease}
                 isSelected={selectedIds.has(item.id)}
                 onToggleSelect={toggleSelect}
+                onDelete={deleteItem}
+              />
+            ))}
+
+            {/* ── Guest Cart Items (không có checkbox) ── */}
+            {guestCartItems.map((item) => (
+              <CartItemRow
+                key={item.id}
+                item={item}
+                onIncrease={increase}
+                onDecrease={decrease}
+                isSelected={true}
+                onToggleSelect={() => {}}
                 onDelete={deleteItem}
               />
             ))}
