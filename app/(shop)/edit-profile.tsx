@@ -1,9 +1,9 @@
 import CommonHeader from '@/src/components/layout/Header';
 import { supabase } from '@/src/lib/supabase';
-import { router } from 'expo-router';
-import { ArrowLeft, Pencil, Camera } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { decode } from 'base64-arraybuffer';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { ArrowLeft, Camera } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -82,21 +82,21 @@ const EditProfileScreen = () => {
 
   const uploadAvatar = async (userId: string): Promise<string | null> => {
     if (!newAvatarUri) return null;
-    
+
     try {
       // Result uri fetch to get blob data or use base64 (already have base64 toggle in picker)
       // Since it's React Native, using base64 with base64-arraybuffer is often more reliable for Supabase
       const base64Str = await fetch(newAvatarUri).then(res => res.blob()).then(blob => {
-          return new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.readAsDataURL(blob);
-              reader.onloadend = () => resolve(reader.result as string);
-          });
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = () => resolve(reader.result as string);
+        });
       });
-      
+
       const cleanBase64 = base64Str.split('base64,')[1];
       const fileName = `${userId}/${Date.now()}.jpg`;
-      
+
       const { data, error } = await supabase.storage
         .from('avatars')
         .upload(fileName, decode(cleanBase64), {
@@ -109,7 +109,7 @@ const EditProfileScreen = () => {
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
         .getPublicUrl(fileName);
-        
+
       return publicUrl;
     } catch (error) {
       console.error('Lỗi upload ảnh:', error);
@@ -129,7 +129,7 @@ const EditProfileScreen = () => {
       if (!user) throw new Error("Vui lòng đăng nhập lại.");
 
       let finalAvatarUrl = avatarUrl;
-      
+
       // 1. Xử lý Upload ảnh nếu có chọn ảnh mới
       if (newAvatarUri) {
         const uploadedUrl = await uploadAvatar(user.id);
@@ -204,7 +204,7 @@ const EditProfileScreen = () => {
           <View style={styles.avatarContainer}>
             <View style={styles.avatarWrapper}>
               <Image
-                source={newAvatarUri ? { uri: newAvatarUri } : (avatarUrl ? { uri: avatarUrl } : { uri: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=200&auto=format&fit=crop' })}
+                source={newAvatarUri ? { uri: newAvatarUri } : (avatarUrl ? { uri: avatarUrl } : { uri: 'https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg' })}
                 style={styles.avatarImage}
               />
               <TouchableOpacity style={styles.editPencil} onPress={pickImage}>
