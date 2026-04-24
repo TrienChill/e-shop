@@ -1,4 +1,5 @@
 import AddressEditModal from "@/src/components/checkout/AddressEditModal";
+import AddressSelector from "@/src/components/checkout/AddressSelector";
 import ShippingOptions from "@/src/components/checkout/ShippingOptions";
 import PriceDisplay from "@/src/components/common/PriceDisplay";
 import VoucherCollection from "@/src/components/common/VoucherCollection";
@@ -152,15 +153,14 @@ const GuestCustomerForm = React.memo(({
         autoCapitalize="none"
       />
 
-      <Text style={styles.guestFormLabel}>Địa chỉ giao hàng *</Text>
+      {/* Số nhà / Đường */}
+      <Text style={styles.guestFormLabel}>Số nhà, tên đường *</Text>
       <TextInput
         style={[inputStyle, styles.guestAddressInput]}
-        placeholder="Nhập địa chỉ giao hàng đầy đủ (số nhà, đường, quận, thành phố)"
+        placeholder="VD: 123 Nguyễn Trãi, Phường 5"
         placeholderTextColor="#9CA3AF"
         value={customerAddress}
         onChangeText={setCustomerAddress}
-        multiline
-        numberOfLines={3}
         textAlignVertical="top"
       />
     </View>
@@ -231,6 +231,16 @@ export default function CheckoutScreen() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
+
+  // Guest GHN location (for shipping fee calculation)
+  const [guestDistrictId, setGuestDistrictId] = useState<number | null>(null);
+  const [guestWardCode, setGuestWardCode] = useState<string | null>(null);
+  const [guestFullAddress, setGuestFullAddress] = useState<{
+    street: string;
+    ward: string;
+    district: string;
+    province: string;
+  } | null>(null);
 
   // ── Active cart source (guest vs authenticated) ───────────────────────────────
   const activeCart = isGuest ? guestCartItems : cartItems;
@@ -618,12 +628,19 @@ export default function CheckoutScreen() {
       };
 
       if (isGuest) {
-        // Guest: use direct form fields
+        // Guest: use direct form fields + GHN location
+        const fullAddr = guestFullAddress
+          ? `${guestFullAddress.street ? guestFullAddress.street + ', ' : ''}${guestFullAddress.ward}, ${guestFullAddress.district}, ${guestFullAddress.province}`
+          : customerAddress.trim();
         orderPayload = {
           ...orderPayload,
           receiver_name: customerName.trim(),
           phone_contact: customerPhone.trim(),
           shipping_address: customerAddress.trim(),
+          full_shipping_address: fullAddr,
+          shipping_district_id: guestDistrictId ? Number(guestDistrictId) : null,
+          shipping_ward_code: guestWardCode || null,
+          shipping_method_id: selectedShippingId,
         };
       } else {
         // Authenticated: use saved address
@@ -797,15 +814,34 @@ export default function CheckoutScreen() {
               {isGuest && <GuestBanner router={router} />}
 
               {isGuest ? (
-                /* ── Guest: inline customer form (no address selector) ── */
-                <GuestCustomerForm
-                  customerName={customerName} setCustomerName={setCustomerName}
-                  customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
-                  customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
-                  customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
-                  isWeb
-                  webStyles={webStyles}
-                />
+                /* ── Guest: inline customer form + GHN address picker ── */
+                <>
+                  <GuestCustomerForm
+                    customerName={customerName} setCustomerName={setCustomerName}
+                    customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
+                    customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
+                    customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
+                    isWeb
+                    webStyles={webStyles}
+                  />
+                  <View style={webStyles.guestFormSection}>
+                    <Text style={styles.guestFormTitle}>Địa chỉ giao hàng</Text>
+                    <AddressSelector
+                      onLocationSelected={(_, district, ward, fullAddress) => {
+                        setCustomerDistrictId(district?.DistrictID ?? null);
+                        setCustomerWardCode(ward?.WardCode ?? null);
+                        if (fullAddress) {
+                          setGuestFullAddress(fullAddress);
+                          setCustomerAddress(
+                            fullAddress.street
+                              ? `${fullAddress.street}, ${fullAddress.ward}, ${fullAddress.district}, ${fullAddress.province}`
+                              : `${fullAddress.ward}, ${fullAddress.district}, ${fullAddress.province}`
+                          );
+                        }
+                      }}
+                    />
+                  </View>
+                </>
               ) : (
                 /* ── Authenticated: address selector ── */
                 <View style={webStyles.addressCard}>
@@ -964,13 +1000,32 @@ export default function CheckoutScreen() {
             {isGuest && <GuestBanner router={router} />}
 
             {isGuest ? (
-              /* ── Guest: inline customer form ── */
-              <GuestCustomerForm
-                customerName={customerName} setCustomerName={setCustomerName}
-                customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
-                customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
-                customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
-              />
+              /* ── Guest: inline customer form + GHN address picker ── */
+              <>
+                <GuestCustomerForm
+                  customerName={customerName} setCustomerName={setCustomerName}
+                  customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
+                  customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
+                  customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
+                />
+                <View style={styles.guestFormSection}>
+                  <Text style={styles.guestFormTitle}>Địa chỉ giao hàng</Text>
+                  <AddressSelector
+                    onLocationSelected={(_, district, ward, fullAddress) => {
+                      setCustomerDistrictId(district?.DistrictID ?? null);
+                      setCustomerWardCode(ward?.WardCode ?? null);
+                      if (fullAddress) {
+                        setGuestFullAddress(fullAddress);
+                        setCustomerAddress(
+                          fullAddress.street
+                            ? `${fullAddress.street}, ${fullAddress.ward}, ${fullAddress.district}, ${fullAddress.province}`
+                            : `${fullAddress.ward}, ${fullAddress.district}, ${fullAddress.province}`
+                        );
+                      }
+                    }}
+                  />
+                </View>
+              </>
             ) : (
               /* ── Authenticated: address selector ── */
               <View style={styles.addressBlock}>
