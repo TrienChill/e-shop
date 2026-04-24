@@ -185,7 +185,13 @@ export default function ToReceiveScreen() {
       products (
         name,
         images,
-        variants
+        variants,
+        product_images (
+          id, url, display_order, is_thumbnail, image_type, variant_id
+        ),
+        product_variants (
+          id, color, size, price, stock, sku
+        )
       )
     )
   `,

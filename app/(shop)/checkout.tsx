@@ -72,6 +72,41 @@ const C = {
   error: "#EF4444",
 };
 
+// ── Helper: fetch product image URL for guest cart items ───────────────────────
+const fetchProductImageUrl = async (productId: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from("product_images")
+      .select("url, variant_id, image_type")
+      .eq("product_id", productId)
+      .neq("image_type", "description")
+      .order("display_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("images")
+        .eq("id", productId)
+        .maybeSingle();
+      if (product?.images?.[0]) {
+        const firstImage = product.images[0];
+        return firstImage.startsWith("http")
+          ? firstImage
+          : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${firstImage}`;
+      }
+      return "https://via.placeholder.com/200";
+    }
+
+    const url = data.url;
+    if (url.startsWith("http")) return url;
+    return `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${url}`;
+  } catch {
+    return "https://via.placeholder.com/200";
+  }
+};
+
 // ── Guest checkout components (định nghĩa bên ngoài để tránh re-mount TextInput) ──
 
 const GuestBanner = React.memo(
@@ -496,6 +531,12 @@ export default function CheckoutScreen() {
                 variants,
                 product_discounts (
                   id, discount_type, discount_value, is_active, start_date, end_date
+                ),
+                product_images (
+                  id, url, display_order, is_thumbnail, image_type, variant_id
+                ),
+                product_variants (
+                  id, color, size, price, stock, sku
                 )
               )
             `,
@@ -607,7 +648,20 @@ export default function CheckoutScreen() {
           setCustomerWardCode(null);
           setDynamicShippingFee(0);
 
-          const guestItems = await getGuestCart();
+          const rawGuestItems = await getGuestCart();
+          // Fetch missing images for guest cart items
+          const guestItems = await Promise.all(
+            rawGuestItems.map(async (item) => {
+              let imageUrl = item.image;
+              if (!imageUrl && item.product_id) {
+                imageUrl = await fetchProductImageUrl(item.product_id);
+              }
+              return {
+                ...item,
+                image: imageUrl || "https://via.placeholder.com/200",
+              };
+            })
+          );
           setGuestCartItems(guestItems);
         }
       } catch (err) {

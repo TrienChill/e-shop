@@ -327,33 +327,80 @@ export const COLOR_TRANSLATIONS: Record<string, string> = {
   brown: "Nâu",
 };
 
+const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const BUCKET_NAME = "product-images";
+
+const buildImageUrl = (imagePath: string | undefined): string => {
+  if (!imagePath) return "https://via.placeholder.com/400";
+  if (imagePath.startsWith("http")) return imagePath;
+  return `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${imagePath}`;
+};
+
 // Hàm lấy URL ảnh sản phẩm dựa trên màu sắc được chọn
 export const getProductImageByColor = (product: any, color: string): string => {
   if (!product) return "https://via.placeholder.com/400";
 
-  const selectedColor = color; // e.g: "White"
+  const selectedColor = color;
 
-  // Tìm image_index trong JSON variants.options dựa trên color
-  const colorOption = product.variants?.options?.find(
-    (opt: any) => opt.color?.toLowerCase() === selectedColor?.toLowerCase(),
-  );
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CÁCH MỚI (ưu tiên): Dùng bảng product_images + product_variants (variant_id)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const productImages: any[] = product.product_images || [];
+  const productVariants: any[] = product.product_variants || [];
 
-  // Nếu tìm thấy màu thì lấy image_index, không thì mặc định là 0
-  const targetIndex =
-    colorOption?.image_index !== undefined ? colorOption.image_index : 0;
+  if (productImages.length > 0) {
+    // 1. Tìm variant theo color
+    const matchedVariant = productVariants.find(
+      (v: any) => v.color?.toLowerCase() === selectedColor?.toLowerCase(),
+    );
 
-  // Lấy tên file ảnh từ mảng images theo index
-  const imageName = product.images?.[targetIndex] || product.images?.[0];
+    if (matchedVariant?.id) {
+      // 2. Tìm image có variant_id khớp với variant vừa tìm
+      const colorImage = productImages.find(
+        (img: any) =>
+          img.variant_id === matchedVariant.id && img.image_type !== "description",
+      );
+      if (colorImage?.url) {
+        return buildImageUrl(colorImage.url);
+      }
+    }
 
-  // Xử lý URL ảnh từ Supabase Storage
-  let imageUrl = "https://via.placeholder.com/400";
-  if (imageName) {
-    imageUrl = imageName.startsWith("http")
-      ? imageName
-      : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${imageName}`;
+    // 3. Fallback: Tìm image đầu tiên cho màu đó (không có variant_id cụ thể)
+    const anyColorImage = productImages.find(
+      (img: any) => img.image_type !== "description",
+    );
+    if (anyColorImage?.url) {
+      return buildImageUrl(anyColorImage.url);
+    }
+
+    // 4. Last resort: lấy ảnh đầu tiên bất kỳ
+    if (productImages[0]?.url) {
+      return buildImageUrl(productImages[0].url);
+    }
   }
 
-  return imageUrl;
+  // ─────────────────────────────────────────────────────────────────────────────
+  // CÁCH CŨ (fallback): Dùng product.images[] + variants.options[].image_index
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    // Nếu mảng images đã chứa full URL → trả về ngay
+    if (product.images[0]?.startsWith("http")) {
+      return product.images[0];
+    }
+
+    // Ngược lại tìm image_index theo color
+    const colorOption = product.variants?.options?.find(
+      (opt: any) => opt.color?.toLowerCase() === selectedColor?.toLowerCase(),
+    );
+    const targetIndex =
+      colorOption?.image_index !== undefined ? colorOption.image_index : 0;
+    const imageName = product.images[targetIndex] || product.images[0];
+    if (imageName) {
+      return buildImageUrl(imageName);
+    }
+  }
+
+  return "https://via.placeholder.com/400";
 };
 
 // Hàm tính toán giá đã giảm

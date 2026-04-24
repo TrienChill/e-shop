@@ -39,6 +39,7 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
   id: string;
+  product_id?: string;
   name: string;
   size: string;
   color: string;
@@ -73,6 +74,43 @@ const C = {
   bg2: "#F3F4F6",
   blue: "#2563EB",
   white: "#FFFFFF",
+};
+
+// ─── Helper: fetch product image URL from product_images table ─────────────────
+const fetchProductImageUrl = async (productId: string): Promise<string> => {
+  try {
+    const { data, error } = await supabase
+      .from("product_images")
+      .select("url, variant_id, image_type")
+      .eq("product_id", productId)
+      .neq("image_type", "description")
+      .order("display_order", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      // Fallback to products.images column
+      const { data: product } = await supabase
+        .from("products")
+        .select("images")
+        .eq("id", productId)
+        .maybeSingle();
+      if (product?.images?.[0]) {
+        const firstImage = product.images[0];
+        return firstImage.startsWith("http")
+          ? firstImage
+          : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${firstImage}`;
+      }
+      return "https://via.placeholder.com/200";
+    }
+
+    // Build full URL from filename
+    const url = data.url;
+    if (url.startsWith("http")) return url;
+    return `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${url}`;
+  } catch {
+    return "https://via.placeholder.com/200";
+  }
 };
 
 // ─── Cart Item Row ─────────────────────────────────────────────────────────────
@@ -175,7 +213,7 @@ const WishlistRow = ({
     {/* Image + delete */}
     <View style={styles.cartImageWrap}>
       <Image
-        source={{ uri: item.image }}
+        source={{ uri: item.image || "https://via.placeholder.com/200" }}
         style={styles.cartImage}
         resizeMode="cover"
       />
@@ -387,6 +425,7 @@ export default function CartContent() {
         const rawGuest = await getGuestCart();
         setGuestCartItems(rawGuest.map((item) => ({
           id: item.id,
+          product_id: item.product_id,
           name: item.name,
           size: item.size || "M",
           color: item.color,
@@ -394,7 +433,7 @@ export default function CartContent() {
           originalPrice: item.originalPrice,
           finalPrice: item.hasDiscount ? item.originalPrice : item.price,
           hasDiscount: item.hasDiscount,
-          image: item.image,
+          image: item.image || "https://via.placeholder.com/200",
           quantity: item.quantity,
         })));
         return;
@@ -502,18 +541,30 @@ export default function CartContent() {
       // ── Guest: đọc từ AsyncStorage ─────────────────────────────────────────
       if (!user) {
         const rawGuest = await getGuestCart();
-        const guestItems: CartItem[] = rawGuest.map((item) => ({
-          id: item.id,
-          name: item.name,
-          size: item.size || "M",
-          color: item.color,
-          price: item.price,
-          originalPrice: item.originalPrice,
-          finalPrice: item.hasDiscount ? item.originalPrice : item.price,
-          hasDiscount: item.hasDiscount,
-          image: item.image,
-          quantity: item.quantity,
-        }));
+
+        // Fetch missing images for guest cart items
+        const guestItems: CartItem[] = await Promise.all(
+          rawGuest.map(async (item) => {
+            // If image is missing, fetch it from the database
+            let imageUrl = item.image;
+            if (!imageUrl && item.product_id) {
+              imageUrl = await fetchProductImageUrl(item.product_id);
+            }
+            return {
+              id: item.id,
+              product_id: item.product_id,
+              name: item.name,
+              size: item.size || "M",
+              color: item.color,
+              price: item.price,
+              originalPrice: item.originalPrice,
+              finalPrice: item.hasDiscount ? item.originalPrice : item.price,
+              hasDiscount: item.hasDiscount,
+              image: imageUrl || "https://via.placeholder.com/200",
+              quantity: item.quantity,
+            };
+          })
+        );
         setGuestCartItems(guestItems);
         setLoadingCart(false);
         return;
@@ -537,6 +588,12 @@ export default function CartContent() {
           variants,
           product_discounts (
             id, discount_type, discount_value, is_active, start_date, end_date
+          ),
+          product_images (
+            id, url, display_order, is_thumbnail, image_type, variant_id
+          ),
+          product_variants (
+            id, color, size, price, stock, sku
           )
         )
       `,
