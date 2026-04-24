@@ -6,7 +6,7 @@ import {
 } from "@/src/auth/authLogger";
 import type { UserRole } from "@/src/auth/types";
 import { supabase } from "@/src/lib/supabase";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -305,6 +305,19 @@ const App = () => {
     }
   }
 
+  // --- Xử lý tiếp tục với tư cách Khách ---
+  const { redirect } = useLocalSearchParams<{ redirect?: string }>();
+
+  function handleGuestContinue() {
+    // Nếu có redirect param (e.g. /login?redirect=/checkout), quay về trang đó
+    if (redirect) {
+      router.replace(redirect as any);
+    } else {
+      // Mặc định quay về trang chủ
+      router.replace("/");
+    }
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -406,6 +419,17 @@ const App = () => {
               ) : (
                 <Text style={styles.signInButtonText}>Sign In</Text>
               )}
+            </TouchableOpacity>
+
+            {/* Continue as Guest */}
+            <TouchableOpacity
+              style={styles.guestButton}
+              activeOpacity={0.7}
+              onPress={handleGuestContinue}
+            >
+              <Text style={styles.guestButtonText}>
+                Tiếp tục với tư cách Khách
+              </Text>
             </TouchableOpacity>
 
             {/* Divider */}
@@ -606,6 +630,22 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 18,
     fontWeight: "600",
+  },
+  guestButton: {
+    width: "100%",
+    height: 52,
+    borderRadius: 26,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    backgroundColor: "#FAFAFA",
+  },
+  guestButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
   },
 
   // Divider Styles

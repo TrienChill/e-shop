@@ -1,9 +1,9 @@
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
+import { addToGuestCart } from "@/src/services/guestCart";
 import {
   Check,
-  ChevronLeft,
   X as CloseIcon,
   Minus,
   Plus,
@@ -13,18 +13,17 @@ import {
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
   PopularCard,
   PopularProductItem,
@@ -332,7 +331,27 @@ export default function CartContent() {
     try {
       setIsProcessingAdd(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+
+      if (!user) {
+        // Guest: save to AsyncStorage
+        const guestItem = {
+          product_id: String(selectingProduct.id),
+          name: selectingProduct.name,
+          price: selectingProduct.price,
+          originalPrice: selectingProduct.price,
+          hasDiscount: false,
+          quantity: 1,
+          image: selectingProduct.images?.[0] || "",
+          color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",
+          size: selectedSize || "",
+          rawColor: selectedColor || "",
+          rawSize: selectedSize || "",
+        };
+        await addToGuestCart(guestItem);
+        setSelectionModalVisible(false);
+        Alert.alert("Đã thêm vào giỏ hàng", "Giỏ hàng sẽ được lưu trên thiết bị này.");
+        return;
+      }
 
       const { data: existingCart } = await supabase
         .from('cart_items')

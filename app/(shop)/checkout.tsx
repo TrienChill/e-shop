@@ -10,6 +10,7 @@ import {
   getProductImageByColor,
 } from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { getGuestCart, clearGuestCart } from "@/src/services/guestCart";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
@@ -18,13 +19,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Gift,
+  Info,
   Pencil,
   ShoppingBag,
   X
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   Modal,
@@ -34,6 +37,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -121,7 +125,19 @@ export default function CheckoutScreen() {
     ghnWardCode: null as string | null,
   });
 
-  const productsTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // ── Guest checkout state ──────────────────────────────────────────────────────
+  const [isGuest, setIsGuest] = useState(false);
+  const [guestCartItems, setGuestCartItems] = useState<any[]>([]);
+
+  // Guest customer form fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+
+  // ── Active cart source (guest vs authenticated) ───────────────────────────────
+  const activeCart = isGuest ? guestCartItems : cartItems;
+  const productsTotal = activeCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const openAddAddress = () => {
     setEditAddressData({
@@ -153,6 +169,81 @@ export default function CheckoutScreen() {
       ghnWardCode: addr.ghn_ward_code ? String(addr.ghn_ward_code) : null,
     });
     setEditModalVisible(true);
+  };
+
+  // ── Guest checkout components ───────────────────────────────────────────────────
+  const GuestBanner = () => (
+    <View style={styles.guestBanner}>
+      <View style={styles.guestBannerIconWrap}>
+        <Info size={20} color="#9A3412" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.guestBannerTitle}>Đặt hàng với tư cách Khách</Text>
+        <Text style={styles.guestBannerText}>
+          Đăng nhập để tích điểm, theo dõi đơn hàng dễ dàng và nhiều ưu đãi hơn.
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={styles.guestBannerBtn}
+        onPress={() => router.push("/login?redirect=/checkout")}
+      >
+        <Text style={styles.guestBannerBtnText}>Đăng nhập</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const GuestCustomerForm = ({ isWeb }: { isWeb?: boolean }) => {
+    const inputStyle = isWeb ? webStyles.guestInput : styles.guestInput;
+    const sectionStyle = isWeb ? webStyles.guestFormSection : styles.guestFormSection;
+
+    return (
+      <View style={sectionStyle}>
+        <Text style={styles.guestFormTitle}>Thông tin người nhận</Text>
+
+        <Text style={styles.guestFormLabel}>Họ và tên *</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="Nhập họ và tên người nhận"
+          placeholderTextColor="#9CA3AF"
+          value={customerName}
+          onChangeText={setCustomerName}
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.guestFormLabel}>Số điện thoại *</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="Nhập số điện thoại"
+          placeholderTextColor="#9CA3AF"
+          value={customerPhone}
+          onChangeText={setCustomerPhone}
+          keyboardType="phone-pad"
+        />
+
+        <Text style={styles.guestFormLabel}>Email (không bắt buộc)</Text>
+        <TextInput
+          style={inputStyle}
+          placeholder="Nhập email để nhận thông tin đơn hàng"
+          placeholderTextColor="#9CA3AF"
+          value={customerEmail}
+          onChangeText={setCustomerEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+
+        <Text style={styles.guestFormLabel}>Địa chỉ giao hàng *</Text>
+        <TextInput
+          style={[inputStyle, styles.guestAddressInput]}
+          placeholder="Nhập địa chỉ giao hàng đầy đủ (số nhà, đường, quận, thành phố)"
+          placeholderTextColor="#9CA3AF"
+          value={customerAddress}
+          onChangeText={setCustomerAddress}
+          multiline
+          numberOfLines={3}
+          textAlignVertical="top"
+        />
+      </View>
+    );
   };
 
   const reloadAddresses = async () => {
@@ -289,138 +380,165 @@ export default function CheckoutScreen() {
     const fetchCheckoutInfo = async () => {
       try {
         setLoading(true);
+
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
 
-        const { data: addresses } = await supabase
-          .from("user_addresses")
-          .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default")
-          .eq("user_id", user.id)
-          .order('is_default', { ascending: false });
+        if (user) {
+          // ── Authenticated user ────────────────────────────────────────────────
+          setIsGuest(false);
 
-        if (addresses && addresses.length > 0) {
-          setAllAddresses(addresses);
-          const defaultAddr = addresses[0];
+          const { data: addresses } = await supabase
+            .from("user_addresses")
+            .select("id, receiver_name, phone_number, province_city, district, ward_commune, street_address, ghn_district_id, ghn_ward_code, is_default")
+            .eq("user_id", user.id)
+            .order('is_default', { ascending: false });
 
-          setUserProfile({
-            name: defaultAddr.receiver_name,
-            phone: defaultAddr.phone_number,
-            email: user.email,
-          });
-          setUserAddress(defaultAddr);
+          if (addresses && addresses.length > 0) {
+            setAllAddresses(addresses);
+            const defaultAddr = addresses[0];
 
-          if (defaultAddr.ghn_district_id) setCustomerDistrictId(Number(defaultAddr.ghn_district_id));
-          if (defaultAddr.ghn_ward_code) setCustomerWardCode(String(defaultAddr.ghn_ward_code));
-        } else {
-          setAllAddresses([]);
-        }
+            setUserProfile({
+              name: defaultAddr.receiver_name,
+              phone: defaultAddr.phone_number,
+              email: user.email,
+            });
+            setUserAddress(defaultAddr);
 
-        const { data: cartData } = await supabase
-          .from("cart_items")
-          .select(`
-            id,
-            product_id,
-            quantity,
-            color,
-            size,
-            products (
-              name,
-              price,
-              images,
-              variants,
-              product_discounts (
-                id, discount_type, discount_value, is_active, start_date, end_date
-              )
-            )
-          `)
-          .eq("user_id", user.id)
-          .eq("is_selected", true);
+            // Auto-fill customer form
+            setCustomerName(defaultAddr.receiver_name || "");
+            setCustomerPhone(defaultAddr.phone_number || "");
+            setCustomerEmail(user.email || "");
 
-        const { data: rawUserVoucherData, error: voucherErr } = await supabase
-          .from("user_vouchers")
-          .select(`
-            id,
-            is_used,
-            vouchers!inner (
-              id, code, discount_type, discount_value, min_order_value, max_discount, expired_at, is_active, usage_limit, used_count
-            )
-          `)
-          .eq("user_id", user.id)
-          .eq("is_used", false)
-          .eq("vouchers.is_active", true);
+            if (defaultAddr.ghn_district_id) setCustomerDistrictId(Number(defaultAddr.ghn_district_id));
+            if (defaultAddr.ghn_ward_code) setCustomerWardCode(String(defaultAddr.ghn_ward_code));
+          } else {
+            setAllAddresses([]);
+            setCustomerName("");
+            setCustomerPhone("");
+            setCustomerEmail(user.email || "");
+          }
 
-        if (voucherErr) {
-          console.error("Lỗi fetch voucher:", voucherErr);
-        }
-
-        const userVoucherData = rawUserVoucherData?.filter((uv: any) => {
-          if (!uv.vouchers.expired_at) return true;
-          return new Date(uv.vouchers.expired_at) > new Date();
-        });
-
-        if (userVoucherData && userVoucherData.length > 0) {
-          const formattedVouchers = userVoucherData.map((uv: any) => {
-            const v = uv.vouchers;
-            return {
-              id: v.id,
-              user_voucher_id: uv.id,
-              title: v.code,
-              description: v.discount_type === "percentage"
-                ? `Giảm ${v.discount_value}%${v.max_discount ? ` tối đa ${v.max_discount.toLocaleString("vi-VN")}đ` : ''} cho đơn hàng`
-                : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ cho đơn hàng`,
-              validUntil: v.expired_at ? new Date(v.expired_at).toLocaleDateString("vi-VN") : "Không thời hạn",
-              discount: Number(v.discount_value),
-              type: v.discount_type,
-              minOrderValue: Number(v.min_order_value || 0),
-              maxDiscount: Number(v.max_discount || 0),
-              usageLimit: v.usage_limit,
-              usedCount: v.used_count || 0,
-              icon: Number(v.discount_value) > 10 ? Gift : ShoppingBag,
-            };
-          });
-
-          setDbVouchers(formattedVouchers);
-        }
-
-        if (cartData) {
-          const formattedItems = cartData.map((item: any) => {
-            const p = item.products;
-            const withDiscount = calculateDiscountedPrice(p);
-
-            return {
-              id: item.id,
-              product_id: item.product_id,
-              name: p.name,
-              price: withDiscount.finalPrice,
-              originalPrice: withDiscount.originalPrice,
-              hasDiscount: withDiscount.hasDiscount,
-              quantity: item.quantity,
-              image: getProductImageByColor(p, item.color),
-              color: COLOR_TRANSLATIONS[item.color] || item.color,
-              size: item.size,
-              rawColor: item.color,
-              rawSize: item.size,
-            };
-          });
-          setCartItems(formattedItems);
-        }
-
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select(`
-            id,
-            membership_levels (
+          const { data: cartData } = await supabase
+            .from("cart_items")
+            .select(`
               id,
-              level_name,
-              benefit_percentage,
-              min_spending
-            )
-          `)
-          .eq("id", user.id)
-          .single();
+              product_id,
+              quantity,
+              color,
+              size,
+              products (
+                name,
+                price,
+                images,
+                variants,
+                product_discounts (
+                  id, discount_type, discount_value, is_active, start_date, end_date
+                )
+              )
+            `)
+            .eq("user_id", user.id)
+            .eq("is_selected", true);
 
-        if (profileData?.membership_levels) {
-          setUserMembership(profileData.membership_levels);
+          const { data: rawUserVoucherData, error: voucherErr } = await supabase
+            .from("user_vouchers")
+            .select(`
+              id,
+              is_used,
+              vouchers!inner (
+                id, code, discount_type, discount_value, min_order_value, max_discount, expired_at, is_active, usage_limit, used_count
+              )
+            `)
+            .eq("user_id", user.id)
+            .eq("is_used", false)
+            .eq("vouchers.is_active", true);
+
+          if (voucherErr) {
+            console.error("Lỗi fetch voucher:", voucherErr);
+          }
+
+          const userVoucherData = rawUserVoucherData?.filter((uv: any) => {
+            if (!uv.vouchers.expired_at) return true;
+            return new Date(uv.vouchers.expired_at) > new Date();
+          });
+
+          if (userVoucherData && userVoucherData.length > 0) {
+            const formattedVouchers = userVoucherData.map((uv: any) => {
+              const v = uv.vouchers;
+              return {
+                id: v.id,
+                user_voucher_id: uv.id,
+                title: v.code,
+                description: v.discount_type === "percentage"
+                  ? `Giảm ${v.discount_value}%${v.max_discount ? ` tối đa ${v.max_discount.toLocaleString("vi-VN")}đ` : ''} cho đơn hàng`
+                  : `Giảm ${v.discount_value.toLocaleString("vi-VN")}đ cho đơn hàng`,
+                validUntil: v.expired_at ? new Date(v.expired_at).toLocaleDateString("vi-VN") : "Không thời hạn",
+                discount: Number(v.discount_value),
+                type: v.discount_type,
+                minOrderValue: Number(v.min_order_value || 0),
+                maxDiscount: Number(v.max_discount || 0),
+                usageLimit: v.usage_limit,
+                usedCount: v.used_count || 0,
+                icon: Number(v.discount_value) > 10 ? Gift : ShoppingBag,
+              };
+            });
+            setDbVouchers(formattedVouchers);
+          }
+
+          if (cartData) {
+            const formattedItems = cartData.map((item: any) => {
+              const p = item.products;
+              const withDiscount = calculateDiscountedPrice(p);
+              return {
+                id: item.id,
+                product_id: item.product_id,
+                name: p.name,
+                price: withDiscount.finalPrice,
+                originalPrice: withDiscount.originalPrice,
+                hasDiscount: withDiscount.hasDiscount,
+                quantity: item.quantity,
+                image: getProductImageByColor(p, item.color),
+                color: COLOR_TRANSLATIONS[item.color] || item.color,
+                size: item.size,
+                rawColor: item.color,
+                rawSize: item.size,
+              };
+            });
+            setCartItems(formattedItems);
+          }
+
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select(`
+              id,
+              membership_levels (
+                id,
+                level_name,
+                benefit_percentage,
+                min_spending
+              )
+            `)
+            .eq("id", user.id)
+            .single();
+
+          if (profileData?.membership_levels) {
+            setUserMembership(profileData.membership_levels);
+          }
+
+        } else {
+          // ── Guest user ────────────────────────────────────────────────────────
+          setIsGuest(true);
+          setAllAddresses([]);
+          setUserAddress(null);
+          setCartItems([]);
+          setDbVouchers([]);
+          setUserMembership(null);
+          setSelectedVoucher(null);
+          setCustomerDistrictId(null);
+          setCustomerWardCode(null);
+          setDynamicShippingFee(0);
+
+          const guestItems = await getGuestCart();
+          setGuestCartItems(guestItems);
         }
       } catch (err) {
         console.error("Lỗi fetch checkout:", err);
@@ -433,55 +551,92 @@ export default function CheckoutScreen() {
   }, [refreshTrigger]);
 
   const handlePlaceOrder = async () => {
-    if (!userAddress || cartItems.length === 0) {
-      setPaymentStatus("idle");
-      alert("Vui lòng kiểm tra lại địa chỉ và giỏ hàng!");
-      return;
-    }
-
-    if (!userAddress.ghn_district_id || !userAddress.ghn_ward_code) {
-      setPaymentStatus("idle");
-      alert(
-        "Địa chỉ giao hàng chưa được cập nhật theo chuẩn mới.\n\n" +
-        "Vui lòng vào Cài đặt → Địa chỉ giao hàng → Chỉnh sửa lại địa chỉ " +
-        "và chọn lại Quận/Huyện, Phường/Xã từ danh sách."
-      );
-      return;
+    // ── Guest validation ──────────────────────────────────────────────────────────
+    if (isGuest) {
+      if (!customerName.trim() || !customerPhone.trim() || !customerAddress.trim()) {
+        setPaymentStatus("idle");
+        Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ Tên, Số điện thoại và Địa chỉ giao hàng.");
+        return;
+      }
+      if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
+        setPaymentStatus("idle");
+        Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng định dạng email.");
+        return;
+      }
+      if (guestCartItems.length === 0) {
+        setPaymentStatus("idle");
+        Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm vào giỏ hàng.");
+        return;
+      }
+    } else {
+      // ── Authenticated validation ────────────────────────────────────────────────
+      if (!userAddress || cartItems.length === 0) {
+        setPaymentStatus("idle");
+        Alert.alert("Vui lòng kiểm tra lại địa chỉ và giỏ hàng!");
+        return;
+      }
+      if (!userAddress.ghn_district_id || !userAddress.ghn_ward_code) {
+        setPaymentStatus("idle");
+        Alert.alert(
+          "Địa chỉ giao hàng chưa được cập nhật theo chuẩn mới.\n\n" +
+          "Vui lòng vào Cài đặt → Địa chỉ giao hàng → Chỉnh sửa lại địa chỉ " +
+          "và chọn lại Quận/Huyện, Phường/Xã từ danh sách."
+        );
+        return;
+      }
     }
 
     setPaymentStatus("processing");
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Chưa đăng nhập");
+
+      // ── Build order payload ─────────────────────────────────────────────────────
+      let orderPayload: Record<string, any> = {
+        user_id: user?.id ?? null,
+        total_amount: finalTotal,
+        status: "pending",
+        shipping_fee: shippingFee,
+        discount_amount: finalDiscount,
+      };
+
+      if (isGuest) {
+        // Guest: use direct form fields
+        orderPayload = {
+          ...orderPayload,
+          customer_name: customerName.trim(),
+          customer_phone: customerPhone.trim(),
+          customer_email: customerEmail.trim() || null,
+          shipping_address: customerAddress.trim(),
+        };
+      } else {
+        // Authenticated: use saved address
+        orderPayload = {
+          ...orderPayload,
+          user_id: user!.id,
+          shipping_address: `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`,
+          full_shipping_address: `${userAddress.street_address}, ${userAddress.ward_commune ? userAddress.ward_commune + ', ' : ''}${userAddress.district}, ${userAddress.province_city}`,
+          phone_contact: userProfile?.phone,
+          receiver_name: userProfile?.name,
+          receiver_phone: userProfile?.phone,
+          address_id: userAddress.id,
+          platform_voucher_id: selectedVoucher?.id || null,
+          shipping_method_id: selectedShippingId,
+          shipping_district_id: userAddress.ghn_district_id ? Number(userAddress.ghn_district_id) : null,
+          shipping_ward_code: userAddress.ghn_ward_code ? String(userAddress.ghn_ward_code) : null,
+        };
+      }
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
-        .insert([
-          {
-            user_id: user.id,
-            total_amount: finalTotal,
-            shipping_address: `${userAddress.street_address}, ${userAddress.district}, ${userAddress.province_city}`,
-            full_shipping_address: `${userAddress.street_address}, ${userAddress.ward_commune ? userAddress.ward_commune + ', ' : ''}${userAddress.district}, ${userAddress.province_city}`,
-            phone_contact: userProfile?.phone,
-            receiver_name: userProfile?.name,
-            receiver_phone: userProfile?.phone,
-            address_id: userAddress.id,
-            status: "pending",
-            platform_voucher_id: selectedVoucher?.id || null,
-            discount_amount: finalDiscount,
-            shipping_fee: shippingFee,
-            shipping_method_id: selectedShippingId,
-            shipping_district_id: userAddress.ghn_district_id ? Number(userAddress.ghn_district_id) : null,
-            shipping_ward_code: userAddress.ghn_ward_code ? String(userAddress.ghn_ward_code) : null,
-          },
-        ])
+        .insert([orderPayload])
         .select()
         .single();
 
       if (orderError) throw orderError;
 
-      const orderItemsPayload = cartItems.map((item) => {
+      // ── Insert order items ─────────────────────────────────────────────────────
+      const orderItemsPayload = activeCart.map((item) => {
         const productId = Number(item.product_id);
         if (isNaN(productId)) {
           console.error("Lỗi: product_id không phải là số!", item);
@@ -501,7 +656,8 @@ export default function CheckoutScreen() {
 
       if (itemsError) throw itemsError;
 
-      for (const item of cartItems) {
+      // ── Decrement stock ────────────────────────────────────────────────────────
+      for (const item of activeCart) {
         try {
           let query = supabase
             .from("product_variants")
@@ -540,13 +696,14 @@ export default function CheckoutScreen() {
         }
       }
 
-      if (selectedVoucher?.user_voucher_id) {
+      // ── Authenticated-only cleanup ──────────────────────────────────────────────
+      if (!isGuest && selectedVoucher?.user_voucher_id) {
         await supabase
           .from("user_vouchers")
           .update({
             is_used: true,
             used_at: new Date().toISOString(),
-            order_id: orderData.id
+            order_id: orderData.id,
           })
           .eq("id", selectedVoucher.user_voucher_id);
 
@@ -568,15 +725,28 @@ export default function CheckoutScreen() {
         }
       }
 
-      const { error: deleteCartError } = await supabase
-        .from("cart_items")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("is_selected", true);
+      if (isGuest) {
+        // Clear guest cart from AsyncStorage
+        await clearGuestCart();
+        setGuestCartItems([]);
+      } else {
+        // Delete selected cart items from DB
+        const { error: deleteCartError } = await supabase
+          .from("cart_items")
+          .delete()
+          .eq("user_id", user!.id)
+          .eq("is_selected", true);
 
-      if (deleteCartError) throw deleteCartError;
+        if (deleteCartError) throw deleteCartError;
+      }
 
       setPaymentStatus("success");
+
+      Alert.alert(
+        "Đặt hàng thành công!",
+        `Mã đơn hàng của bạn: ${orderData.id}\n\nLưu lại mã này để theo dõi đơn hàng.`,
+        [{ text: "OK", onPress: () => router.replace("/(shop)/(tabs)/home" as any) }]
+      );
     } catch (error: any) {
       console.error("Lỗi đặt hàng:", error.message);
       setErrorMessage(error.message || "Đã có lỗi xảy ra");
@@ -607,27 +777,35 @@ export default function CheckoutScreen() {
                 <Text style={webStyles.headerTitle}>Thanh toán</Text>
               </View>
 
-              {/* Address section */}
-              <View style={webStyles.addressCard}>
-                <View style={webStyles.addressCardHeader}>
-                  <Text style={webStyles.addressCardTitle}>Địa chỉ giao hàng</Text>
-                  <TouchableOpacity onPress={() => setShowAddressModal(true)}>
-                    <Text style={webStyles.changeAddressBtn}>Thay đổi</Text>
-                  </TouchableOpacity>
-                </View>
-                {loading ? (
-                  <ActivityIndicator size="small" color="#2563EB" />
-                ) : userAddress ? (
-                  <View>
-                    <Text style={webStyles.receiverName}>{userAddress.receiver_name} | {userAddress.phone_number}</Text>
-                    <Text style={webStyles.addressText}>
-                      {userAddress.street_address}, {userAddress.ward_commune ? userAddress.ward_commune + ", " : ""}{userAddress.district}, {userAddress.province_city}
-                    </Text>
+              {/* Guest banner */}
+              {isGuest && <GuestBanner />}
+
+              {isGuest ? (
+                /* ── Guest: inline customer form (no address selector) ── */
+                <GuestCustomerForm isWeb />
+              ) : (
+                /* ── Authenticated: address selector ── */
+                <View style={webStyles.addressCard}>
+                  <View style={webStyles.addressCardHeader}>
+                    <Text style={webStyles.addressCardTitle}>Địa chỉ giao hàng</Text>
+                    <TouchableOpacity onPress={() => setShowAddressModal(true)}>
+                      <Text style={webStyles.changeAddressBtn}>Thay đổi</Text>
+                    </TouchableOpacity>
                   </View>
-                ) : (
-                  <Text style={webStyles.noAddress}>Chưa có địa chỉ giao hàng.</Text>
-                )}
-              </View>
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#2563EB" />
+                  ) : userAddress ? (
+                    <View>
+                      <Text style={webStyles.receiverName}>{userAddress.receiver_name} | {userAddress.phone_number}</Text>
+                      <Text style={webStyles.addressText}>
+                        {userAddress.street_address}, {userAddress.ward_commune ? userAddress.ward_commune + ", " : ""}{userAddress.district}, {userAddress.province_city}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={webStyles.noAddress}>Chưa có địa chỉ giao hàng.</Text>
+                  )}
+                </View>
+              )}
 
               {/* Shipping options */}
               <View style={webStyles.sectionBlock}>
@@ -666,8 +844,8 @@ export default function CheckoutScreen() {
 
                 {loading ? (
                   <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "center", marginVertical: 20 }} />
-                ) : cartItems.length > 0 ? (
-                  cartItems.map((item) => (
+                ) : activeCart.length > 0 ? (
+                  activeCart.map((item) => (
                     <View key={item.id} style={webStyles.summaryItem}>
                       <View style={webStyles.summaryItemImgWrap}>
                         <Image source={{ uri: item.image }} style={webStyles.summaryItemImg} />
@@ -719,25 +897,27 @@ export default function CheckoutScreen() {
                   <Text style={webStyles.totalValue}>{finalTotal.toLocaleString("vi-VN")}₫</Text>
                 </View>
 
-                {/* Voucher */}
-                <TouchableOpacity
-                  style={webStyles.voucherRow}
-                  onPress={() => setShowVouchers(true)}
-                  activeOpacity={0.8}
-                >
-                  <Gift size={20} color={COLORS.primary} />
-                  <Text style={webStyles.voucherText}>
-                    {selectedVoucher ? "Đã áp dụng mã giảm giá" : "Chọn mã giảm giá"}
-                  </Text>
-                  <ChevronRight size={18} color={COLORS.textSecondary} />
-                </TouchableOpacity>
+                {/* Voucher — authenticated only */}
+                {!isGuest && (
+                  <TouchableOpacity
+                    style={webStyles.voucherRow}
+                    onPress={() => setShowVouchers(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Gift size={20} color={COLORS.primary} />
+                    <Text style={webStyles.voucherText}>
+                      {selectedVoucher ? "Đã áp dụng mã giảm giá" : "Chọn mã giảm giá"}
+                    </Text>
+                    <ChevronRight size={18} color={COLORS.textSecondary} />
+                  </TouchableOpacity>
+                )}
 
                 {/* Pay button */}
                 <TouchableOpacity
-                  style={[webStyles.payButton, (loading || cartItems.length === 0) && { backgroundColor: C.sub }]}
+                  style={[webStyles.payButton, (loading || activeCart.length === 0) && { backgroundColor: C.sub }]}
                   activeOpacity={0.9}
                   onPress={handlePlaceOrder}
-                  disabled={loading || cartItems.length === 0 || paymentStatus === "processing"}
+                  disabled={loading || activeCart.length === 0 || paymentStatus === "processing"}
                 >
                   <Text style={webStyles.payButtonText}>
                     {paymentStatus === "processing" ? "Đang xử lý..." : "Thanh toán"}
@@ -757,30 +937,38 @@ export default function CheckoutScreen() {
             <Text style={styles.headerTitle}>Thanh toán</Text>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {/* Address block */}
-            <View style={styles.addressBlock}>
-              <View style={styles.addressBlockHeader}>
-                <Text style={styles.addressBlockTitle}>Địa chỉ giao hàng</Text>
-                <TouchableOpacity onPress={() => setShowAddressModal(true)} style={styles.changeAddressBtn}>
-                  <Text style={styles.changeAddressBtnText}>Thay đổi</Text>
-                </TouchableOpacity>
-              </View>
-              {loading ? (
-                <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "flex-start" }} />
-              ) : userAddress ? (
-                <View>
-                  <View style={styles.addressNameRow}>
-                    <Text style={styles.addressName}>{userAddress.receiver_name}</Text>
-                    <Text style={styles.addressPhone}>| {userAddress.phone_number}</Text>
-                  </View>
-                  <Text style={styles.addressDetail}>
-                    {userAddress.street_address}, {userAddress.ward_commune ? `${userAddress.ward_commune}, ` : ''}{userAddress.district}, {userAddress.province_city}
-                  </Text>
+            {/* Guest banner */}
+            {isGuest && <GuestBanner />}
+
+            {isGuest ? (
+              /* ── Guest: inline customer form ── */
+              <GuestCustomerForm />
+            ) : (
+              /* ── Authenticated: address selector ── */
+              <View style={styles.addressBlock}>
+                <View style={styles.addressBlockHeader}>
+                  <Text style={styles.addressBlockTitle}>Địa chỉ giao hàng</Text>
+                  <TouchableOpacity onPress={() => setShowAddressModal(true)} style={styles.changeAddressBtn}>
+                    <Text style={styles.changeAddressBtnText}>Thay đổi</Text>
+                  </TouchableOpacity>
                 </View>
-              ) : (
-                <Text style={styles.noAddressText}>Hiện không có thông tin địa chỉ giao hàng.</Text>
-              )}
-            </View>
+                {loading ? (
+                  <ActivityIndicator size="small" color="#2563EB" style={{ alignSelf: "flex-start" }} />
+                ) : userAddress ? (
+                  <View>
+                    <View style={styles.addressNameRow}>
+                      <Text style={styles.addressName}>{userAddress.receiver_name}</Text>
+                      <Text style={styles.addressPhone}>| {userAddress.phone_number}</Text>
+                    </View>
+                    <Text style={styles.addressDetail}>
+                      {userAddress.street_address}, {userAddress.ward_commune ? `${userAddress.ward_commune}, ` : ''}{userAddress.district}, {userAddress.province_city}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.noAddressText}>Hiện không có thông tin địa chỉ giao hàng.</Text>
+                )}
+              </View>
+            )}
 
             {/* Cart items */}
             <View style={styles.section}>
@@ -788,14 +976,14 @@ export default function CheckoutScreen() {
                 <View style={styles.titleWithBadge}>
                   <Text style={styles.sectionHeaderTitleText}>Giỏ hàng</Text>
                   <View style={styles.badgeCountGray}>
-                    <Text style={styles.badgeCountTextGray}>{cartItems.length}</Text>
+                    <Text style={styles.badgeCountTextGray}>{activeCart.length}</Text>
                   </View>
                 </View>
               </View>
               {loading ? (
                 <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
-              ) : cartItems.length > 0 ? (
-                cartItems.map((item) => (
+              ) : activeCart.length > 0 ? (
+                activeCart.map((item) => (
                   <View key={item.id} style={styles.itemRow}>
                     <View style={styles.imageContainer}>
                       <Image source={{ uri: item.image }} style={styles.itemImage} />
@@ -851,31 +1039,33 @@ export default function CheckoutScreen() {
               )}
             </View>
 
-            {/* Voucher selector */}
-            <View style={styles.section}>
-              <TouchableOpacity
-                style={styles.voucherSelectRow}
-                onPress={() => setShowVouchers(true)}
-                activeOpacity={0.8}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-                  <View style={styles.voucherIconContainer}>
-                    <Gift size={20} color={COLORS.primary} />
+            {/* Voucher selector — authenticated users only */}
+            {!isGuest && (
+              <View style={styles.section}>
+                <TouchableOpacity
+                  style={styles.voucherSelectRow}
+                  onPress={() => setShowVouchers(true)}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                    <View style={styles.voucherIconContainer}>
+                      <Gift size={20} color={COLORS.primary} />
+                    </View>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.voucherSelectTitle}>
+                        {selectedVoucher ? "Mã giảm giá đã chọn" : "Mã giảm giá của bạn"}
+                      </Text>
+                      <Text style={styles.voucherSelectSubtitle}>
+                        {selectedVoucher
+                          ? (selectedVoucher.type === "percentage" ? `Đã áp dụng giảm ${selectedVoucher.discount}%` : `Đã áp dụng giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`)
+                          : "Chọn hoặc nhập mã"}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={styles.voucherSelectTitle}>
-                      {selectedVoucher ? "Mã giảm giá đã chọn" : "Mã giảm giá của bạn"}
-                    </Text>
-                    <Text style={styles.voucherSelectSubtitle}>
-                      {selectedVoucher
-                        ? (selectedVoucher.type === "percentage" ? `Đã áp dụng giảm ${selectedVoucher.discount}%` : `Đã áp dụng giảm ${selectedVoucher.discount.toLocaleString("vi-VN")}₫`)
-                        : "Chọn hoặc nhập mã"}
-                    </Text>
-                  </View>
-                </View>
-                <ChevronRight size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
+                  <ChevronRight size={20} color={COLORS.textSecondary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Shipping */}
             <View style={styles.section}>
@@ -916,10 +1106,10 @@ export default function CheckoutScreen() {
               <Text style={styles.totalValue}>{finalTotal.toLocaleString("vi-VN")}₫</Text>
             </View>
             <TouchableOpacity
-              style={[styles.payButton, (loading || cartItems.length === 0) && { backgroundColor: C.sub }]}
+              style={[styles.payButton, (loading || activeCart.length === 0) && { backgroundColor: C.sub }]}
               activeOpacity={0.9}
               onPress={handlePlaceOrder}
-              disabled={loading || cartItems.length === 0 || paymentStatus === "processing"}
+              disabled={loading || activeCart.length === 0 || paymentStatus === "processing"}
             >
               <Text style={styles.payButtonText}>
                 {paymentStatus === "processing" ? "Đang xử lý..." : "Thanh toán"}
@@ -1197,6 +1387,17 @@ const styles = StyleSheet.create({
   codTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 4 },
   codSubtitle: { fontSize: 13, color: "#64748B", lineHeight: 18 },
   codCheckMark: { marginLeft: 8 },
+  guestBanner: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFF7ED", borderWidth: 1, borderColor: "#FED7AA", borderRadius: 12, padding: 14, marginBottom: 20, gap: 12 },
+  guestBannerIconWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#FFEDD5", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  guestBannerTitle: { fontSize: 15, fontWeight: "700", color: "#9A3412", marginBottom: 2 },
+  guestBannerText: { fontSize: 13, color: "#9A3412", lineHeight: 18 },
+  guestBannerBtn: { backgroundColor: "#EA580C", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, flexShrink: 0 },
+  guestBannerBtnText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
+  guestFormSection: { marginBottom: 20 },
+  guestFormTitle: { fontSize: 18, fontWeight: "bold", color: COLORS.secondary, marginBottom: 16 },
+  guestFormLabel: { fontSize: 14, fontWeight: "600", color: COLORS.secondary, marginBottom: 8 },
+  guestInput: { backgroundColor: "#FAFAFA", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: "#111827", marginBottom: 14 },
+  guestAddressInput: { minHeight: 80, paddingTop: 12 },
   footer: { position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: COLORS.background, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 34, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, borderTopColor: "#F5F5F5" },
   totalContainer: { flexDirection: "row", alignItems: "baseline" },
   totalLabel: { fontSize: 20, fontWeight: "800", color: COLORS.secondary },
@@ -1301,4 +1502,6 @@ const webStyles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: "#D1D5DB", alignItems: "center", justifyContent: "center" },
   radioSelected: { borderColor: "#2563EB" },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#2563EB" },
+  guestFormSection: { marginBottom: 24 },
+  guestInput: { backgroundColor: "#FAFAFA", borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: "#111827", marginBottom: 14 },
 });
