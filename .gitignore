@@ -49,3 +49,6 @@ app-example
 # Supabase
 supabase/.temp/
 supabase/.branch/
+
+# Generated embeddings
+generate_embeddings.js
