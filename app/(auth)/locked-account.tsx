@@ -3,8 +3,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
-  ScrollView,
+  Alert,
   StatusBar,
   StyleSheet,
   Text,
@@ -34,7 +33,7 @@ export default function LockedAccountScreen() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("lock_reason, locked_at")
+        .select("is_locked, lock_reason, locked_at")
         .eq("id", user.id)
         .single();
 
