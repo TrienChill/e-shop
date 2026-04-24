@@ -11,6 +11,7 @@ import {
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -28,12 +29,14 @@ import {
 import { supabase } from "@/src/lib/supabase"; // <-- Đảm bảo import supabase đúng đường dẫn của bạn
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { addToGuestCart } from "@/src/services/guestCart";
 
 import { PopularCard } from "@/src/components/card/PopularCard";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import WebHeader from "@/src/components/web/WebHeader";
 import {
   calculateDiscountedPrice,
+  COLOR_TRANSLATIONS,
   getPopularProducts,
 } from "@/src/services/product";
 
@@ -406,11 +409,29 @@ export default function ProductDetailScreen() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
       if (!user) {
-        alert("Vui lòng đăng nhập để thực hiện thao tác này!");
+        // ── Guest: lưu vào AsyncStorage ──────────────────────────────────────────
+        const guestItem = {
+          product_id: String(product.id),
+          name: product.name,
+          price: product.price,
+          originalPrice: product.price,
+          hasDiscount: false,
+          quantity: selectedQty,
+          image: product.images?.[0]?.url || "",
+          color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",
+          size: selectedSize || "",
+          rawColor: selectedColor || "",
+          rawSize: selectedSize || "",
+        };
+        await addToGuestCart(guestItem);
+        Alert.alert("Đã thêm vào giỏ hàng", "Giỏ hàng sẽ được lưu trên thiết bị này.");
+        setModalVisible(false);
         return;
       }
 
+      // ── Authenticated: lưu vào DB ───────────────────────────────────────────────
       // 2. Tìm sản phẩm cùng loại trong giỏ (khớp ID, Size và Color)
       const { data: existingItem, error: fetchError } = await supabase
         .from("cart_items")
