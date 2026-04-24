@@ -1,7 +1,7 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { ChevronLeft, MoveRight } from "lucide-react-native";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ChevronLeft, MoveRight } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +17,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
-import { useLocalSearchParams } from "expo-router";
 
 // Bảng màu hệ thống
 const COLOR = {
@@ -28,58 +27,8 @@ const COLOR = {
   red: "#FF4D4D",
   dark: "#1A1A1A",
   grayBadge: "#F0F0F0",
+  success: "#10B981", // Xanh lá cho trạng thái hoàn thành
 };
-
-const TIMELINE_DATA = [
-  {
-    id: 1,
-    title: "Đã đóng gói",
-    time: "19 Tháng 4, 12:31",
-    description:
-      "Kiện hàng của bạn đã được đóng gói và sẽ được bàn giao cho đối tác vận chuyển của chúng tôi.",
-    isCompleted: true,
-  },
-  {
-    id: 2,
-    title: "Đang trên đường đến kho vận chuyển",
-    time: "19 Tháng 4, 16:20",
-    description:
-      "Đơn hàng đang được vận chuyển đến kho tổng để phân loại và điều phối.",
-    isCompleted: true,
-  },
-  {
-    id: 3,
-    title: "Đã đến kho vận chuyển",
-    time: "19 Tháng 4, 19:07",
-    description:
-      "Kiện hàng đã nhập kho và đang chờ xử lý để giao cho đơn vị vận chuyển địa phương.",
-    isCompleted: true,
-  },
-  {
-    id: 4,
-    title: "Đã xuất kho",
-    time: "20 Tháng 4, 06:15",
-    description:
-      "Kiện hàng đã rời khỏi kho và đang trên đường tới khu vực của bạn.",
-    isCompleted: true,
-  },
-  {
-    id: 5,
-    title: "Đang giao hàng",
-    time: "22 Tháng 4, 11:10",
-    description: "Shipper đang mang kiện hàng đến địa chỉ của bạn.",
-    isCompleted: true,
-  },
-  {
-    id: 6,
-    title: "Giao hàng không thành công",
-    time: "22 Tháng 4, 12:50",
-    description:
-      "Nỗ lực giao kiện hàng của bạn đã không thành công. Vui lòng kiểm tra lại thông tin.",
-    isError: true,
-    isCompleted: false,
-  },
-];
 
 export default function TrackOrderScreen() {
   const router = useRouter();
@@ -90,23 +39,26 @@ export default function TrackOrderScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'orders',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "orders",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
-  // Ánh xạ trạng thái từ database sang tiếng Việt
+  // 1. Ánh xạ ĐẦY ĐỦ 9 trạng thái từ Database sang Tiếng Việt
   const statusMap: Record<string, string> = {
     pending: "Chờ xác nhận",
     processing: "Đang lấy hàng",
     shipping: "Đang giao hàng",
     completed: "Đã giao thành công",
     cancelled: "Đã hủy",
+    return_requested: "Yêu cầu trả hàng",
+    returning: "Đang trả hàng về",
+    returned: "Kho đã nhận hàng trả",
+    refunded: "Đã hoàn tiền",
   };
 
   const fetchOrderDetails = async () => {
     try {
       if (!orderId) return;
-
       setLoading(true);
       const { data, error } = await supabase
         .from("orders")
@@ -125,7 +77,174 @@ export default function TrackOrderScreen() {
 
   useEffect(() => {
     fetchOrderDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId, refreshTrigger]);
+
+  // 2. HÀM TẠO TIMELINE ĐỘNG DỰA TRÊN TRẠNG THÁI HIỆN TẠI
+  const generateTimeline = () => {
+    if (!order) return [];
+
+    const status = order.status;
+    const formatDate = (dateString: string) => {
+      if (!dateString) return "";
+      const d = new Date(dateString);
+      return `${d.getDate()} Thg ${d.getMonth() + 1}, ${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
+    };
+
+    const createdTime = formatDate(order.created_at);
+    const updatedTime = formatDate(order.updated_at);
+
+    // Bước mặc định đầu tiên
+    let timeline = [
+      {
+        id: 1,
+        title: "Đơn hàng đã đặt",
+        time: createdTime,
+        description: "Đơn hàng của bạn đã được hệ thống ghi nhận.",
+        isCompleted: true,
+        isError: false,
+      },
+    ];
+
+    // Luồng: Hủy đơn
+    if (status === "cancelled") {
+      timeline.push({
+        id: 2,
+        title: "Đơn hàng đã hủy",
+        time: updatedTime,
+        description:
+          "Đơn hàng đã bị hủy. Tiền sẽ được hoàn lại nếu bạn đã thanh toán trước.",
+        isCompleted: false,
+        isError: true,
+      });
+      return timeline.reverse(); // Đảo ngược để sự kiện mới nhất lên đầu
+    }
+
+    // Luồng: Bình thường (Đang xử lý -> Giao hàng -> Hoàn thành)
+    const normalFlow = [
+      "processing",
+      "shipping",
+      "completed",
+      "return_requested",
+      "returning",
+      "returned",
+      "refunded",
+    ];
+    if (normalFlow.includes(status)) {
+      timeline.push({
+        id: 2,
+        title: "Đang xử lý & Đóng gói",
+        time: status === "processing" ? updatedTime : "",
+        description:
+          "Kiện hàng của bạn đang được đóng gói và giao cho đối tác vận chuyển.",
+        isCompleted: true,
+        isError: false,
+      });
+    }
+
+    if (
+      [
+        "shipping",
+        "completed",
+        "return_requested",
+        "returning",
+        "returned",
+        "refunded",
+      ].includes(status)
+    ) {
+      timeline.push({
+        id: 3,
+        title: "Đang giao hàng",
+        time: status === "shipping" ? updatedTime : "",
+        description: "Shipper đang mang kiện hàng đến địa chỉ của bạn.",
+        isCompleted: true,
+        isError: false,
+      });
+    }
+
+    if (
+      [
+        "completed",
+        "return_requested",
+        "returning",
+        "returned",
+        "refunded",
+      ].includes(status)
+    ) {
+      timeline.push({
+        id: 4,
+        title: "Giao hàng thành công",
+        time: status === "completed" ? updatedTime : "",
+        description: "Kiện hàng đã được giao thành công đến bạn.",
+        isCompleted: true,
+        isError: false,
+      });
+    }
+
+    // Luồng: Trả hàng / Hoàn tiền
+    if (
+      ["return_requested", "returning", "returned", "refunded"].includes(status)
+    ) {
+      timeline.push({
+        id: 5,
+        title: "Yêu cầu trả hàng",
+        time: status === "return_requested" ? updatedTime : "",
+        description: "Hệ thống đã ghi nhận yêu cầu trả hàng của bạn.",
+        isCompleted: true,
+        isError: true,
+      });
+    }
+    if (["returning", "returned", "refunded"].includes(status)) {
+      timeline.push({
+        id: 6,
+        title: "Đang hoàn trả",
+        time: status === "returning" ? updatedTime : "",
+        description: "Kiện hàng đang được vận chuyển về lại kho của cửa hàng.",
+        isCompleted: true,
+        isError: true,
+      });
+    }
+    if (["returned", "refunded"].includes(status)) {
+      timeline.push({
+        id: 7,
+        title: "Đã nhận hàng hoàn",
+        time: status === "returned" ? updatedTime : "",
+        description: "Kho đã nhận được kiện hàng hoàn trả và đang kiểm tra.",
+        isCompleted: true,
+        isError: true,
+      });
+    }
+    if (status === "refunded") {
+      timeline.push({
+        id: 8,
+        title: "Hoàn tiền thành công",
+        time: updatedTime,
+        description: "Tiền đã được hoàn trả thành công về tài khoản của bạn.",
+        isCompleted: true,
+        isError: false,
+      });
+    }
+
+    // Đảo ngược mảng để sự kiện mới nhất (cuối cùng) nằm ở TRET CÙNG của màn hình
+    return timeline.reverse();
+  };
+
+  const currentTimeline = generateTimeline();
+
+  // 3. TÍNH TOÁN PERCENTAGE CHO THANH PROGRESS BAR
+  const getProgressPercentage = () => {
+    if (!order) return 0;
+    const s = order.status;
+    if (s === "pending") return 10;
+    if (s === "processing") return 50;
+    if (s === "shipping") return 75;
+    if (s === "completed") return 100;
+    if (["return_requested", "returning", "returned", "refunded"].includes(s))
+      return 100; // Đã giao thì mới trả được
+    return 0; // cancelled
+  };
+
+  const progress = getProgressPercentage();
 
   return (
     <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
@@ -152,25 +271,57 @@ export default function TrackOrderScreen() {
       />
 
       <View style={styles.headerContent}>
-        {/* Thanh tiến trình (Progress Bar) */}
+        {/* 4. THANH PROGRESS BAR ĐỘNG */}
         <View style={styles.progressSection}>
-          <LinearGradient
-            colors={[COLOR.blue, "#C084FC", COLOR.red]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.progressBar}
-          >
-            <View style={[styles.progressDot, { left: 0 }]} />
-            <View style={[styles.progressDot, { left: "50%" }]} />
-            <View style={[styles.progressDot, { left: "100%" }]} />
-          </LinearGradient>
+          <View style={styles.progressBarBackground}>
+            <LinearGradient
+              colors={[COLOR.blue, progress >= 100 ? COLOR.success : "#C084FC"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.progressBarFill, { width: `${progress}%` }]}
+            />
+            {/* 3 Dấu chấm xác định mốc (Dots) */}
+            <View
+              style={[
+                styles.progressDot,
+                {
+                  left: 0,
+                  backgroundColor: progress >= 10 ? COLOR.blue : "#E5E7EB",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.progressDot,
+                {
+                  left: "50%",
+                  backgroundColor: progress >= 50 ? COLOR.blue : "#E5E7EB",
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.progressDot,
+                {
+                  left: "100%",
+                  backgroundColor:
+                    progress >= 100
+                      ? order?.status === "completed"
+                        ? COLOR.blue
+                        : COLOR.success
+                      : "#E5E7EB",
+                },
+              ]}
+            />
+          </View>
+
           <View style={styles.progressLabels}>
-            <Text style={styles.progressLabel}>Đã đóng gói</Text>
+            <Text style={styles.progressLabel}>Xác nhận</Text>
             <Text style={[styles.progressLabel, { textAlign: "center" }]}>
-              Đang giao
+              Đóng gói
             </Text>
             <Text style={[styles.progressLabel, { textAlign: "right" }]}>
-              Thành công
+              Giao hàng
             </Text>
           </View>
         </View>
@@ -179,22 +330,17 @@ export default function TrackOrderScreen() {
         <View style={styles.trackingNumberCard}>
           <View>
             <Text style={styles.trackingLabel}>Trạng thái hiện tại</Text>
-            <Text style={styles.trackingValue}>
+            <Text
+              style={[
+                styles.trackingValue,
+                order?.status === "cancelled" && { color: COLOR.red },
+              ]}
+            >
               {loading
                 ? "Đang tải..."
                 : statusMap[order?.status] || "Không xác định"}
             </Text>
           </View>
-          <TouchableOpacity
-            style={styles.copyButton}
-            onPress={fetchOrderDetails}
-          >
-            <View style={styles.copyIcon}>
-              <View style={styles.copyLine} />
-              <View style={[styles.copyLine, { marginTop: 4 }]} />
-              <View style={[styles.copyLine, { marginTop: 4 }]} />
-            </View>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -208,34 +354,59 @@ export default function TrackOrderScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Danh sách mốc thời gian (Timeline) */}
+          {/* 5. VẼ DANH SÁCH TIMELINE */}
           <View style={styles.timelineContainer}>
-            {TIMELINE_DATA.map((item, index) => (
+            {currentTimeline.map((item, index) => (
               <View key={item.id} style={styles.timelineItem}>
-                {/* Line connector */}
-                {index !== TIMELINE_DATA.length - 1 && (
-                  <View style={styles.timelineLine} />
+                {/* Line connector (Không hiển thị cho item cuối cùng) */}
+                {index !== currentTimeline.length - 1 && (
+                  <View
+                    style={[
+                      styles.timelineLine,
+                      item.isError && { backgroundColor: COLOR.red },
+                    ]}
+                  />
                 )}
 
                 <View style={styles.timelineContent}>
                   <View style={styles.timelineHeader}>
                     <TouchableOpacity
-                      onPress={() => item.isError && setShowErrorModal(true)}
+                      onPress={() =>
+                        item.isError && order?.status === "cancelled"
+                          ? setShowErrorModal(true)
+                          : null
+                      }
                       activeOpacity={item.isError ? 0.7 : 1}
                       style={styles.titleContainer}
                     >
+                      <View
+                        style={[
+                          styles.dotIndicator,
+                          item.isError && { backgroundColor: COLOR.red },
+                          index === 0 && {
+                            width: 14,
+                            height: 14,
+                            borderRadius: 7,
+                            marginLeft: -3,
+                          },
+                        ]}
+                      />
                       <Text
                         style={[
                           styles.statusTitle,
                           item.isError && styles.errorText,
+                          index === 0 && {
+                            fontWeight: "bold",
+                            color: COLOR.dark,
+                          },
                         ]}
                       >
                         {item.title}
                       </Text>
-                      {item.isError && (
+                      {item.isError && order?.status === "cancelled" && (
                         <MoveRight
                           size={18}
-                          color={COLOR.blue}
+                          color={COLOR.red}
                           style={{ marginLeft: 8 }}
                         />
                       )}
@@ -252,11 +423,13 @@ export default function TrackOrderScreen() {
                           item.isError && styles.whiteText,
                         ]}
                       >
-                        {item.time}
+                        {item.time || "--:--"}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.statusDescription}>{item.description}</Text>
+                  <Text style={styles.statusDescription}>
+                    {item.description}
+                  </Text>
                 </View>
               </View>
             ))}
@@ -278,23 +451,21 @@ export default function TrackOrderScreen() {
         >
           <View style={styles.bottomSheet}>
             <View style={styles.sheetIndicator} />
-            <Text style={styles.sheetTitle}>Giao hàng không thành công</Text>
-
+            <Text style={styles.sheetTitle}>Đơn hàng đã bị hủy</Text>
             <View style={styles.sheetContent}>
-              <Text style={styles.questionText}>Tôi nên làm gì?</Text>
+              <Text style={styles.questionText}>Tôi nên làm gì tiếp theo?</Text>
               <Text style={styles.instructionText}>
-                Đừng lo lắng, chúng tôi sẽ sớm liên hệ với bạn để sắp xếp thời
-                gian giao hàng phù hợp hơn. Bạn cũng có thể liên hệ với chúng
-                tôi qua số điện thoại{" "}
-                <Text style={styles.phoneHighlight}>+84 000 000 000</Text> hoặc
-                chat với bộ phận chăm sóc khách hàng của chúng tôi.
+                Đơn hàng này đã bị hủy. Nếu bạn đã thanh toán trước qua thẻ/ví
+                điện tử, số tiền sẽ được hoàn lại vào tài khoản của bạn trong
+                vòng 3-5 ngày làm việc. Bạn có thể liên hệ tổng đài{" "}
+                <Text style={styles.phoneHighlight}>+84 000 000 000</Text> để
+                biết thêm chi tiết.
               </Text>
-
               <TouchableOpacity
                 style={styles.chatButton}
                 onPress={() => setShowErrorModal(false)}
               >
-                <Text style={styles.chatButtonText}>Chat Ngay</Text>
+                <Text style={styles.chatButtonText}>Đã hiểu</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -343,6 +514,16 @@ const styles = StyleSheet.create({
   },
   progressSection: {
     marginBottom: 24,
+  },
+  progressBarBackground: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 4,
   },
   progressBar: {
     height: 8,
@@ -447,6 +628,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flex: 1,
     marginRight: 10,
+  },
+  dotIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#E5E7EB",
+    marginRight: 10,
+    borderWidth: 2,
+    borderColor: "#E5E7EB",
   },
   statusTitle: {
     fontSize: 18,
