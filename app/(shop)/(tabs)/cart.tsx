@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft } from "lucide-react-native";
@@ -20,19 +20,19 @@ export default function CartScreen() {
   const router = useRouter();
   const [cartCount, setCartCount] = useState(0);
 
-  useEffect(() => {
-    const fetchCartCount = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("cart_items").select("quantity").eq("user_id", user.id);
-      const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
-      setCartCount(total);
-    };
+  const fetchCartCount = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from("cart_items").select("quantity").eq("user_id", user.id);
+    const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+    setCartCount(total);
+  }, []);
 
+  useEffect(() => {
     fetchCartCount();
 
     const channel = supabase
-      .channel("cart_items_count")
+      .channel(`cart_items_count-${Date.now()}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "cart_items" },
@@ -43,7 +43,7 @@ export default function CartScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [fetchCartCount]);
 
   return (
     <SafeAreaView style={styles.safe}>

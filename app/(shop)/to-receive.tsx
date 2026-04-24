@@ -214,6 +214,8 @@ export default function ToReceiveScreen() {
             "returned",
             "refunded",
           ]);
+        } else if (statusFilter === "history") {
+          // "history" là alias từ my-activity/profile, coi như "all"
         } else {
           query = query.eq("status", statusFilter);
         }
