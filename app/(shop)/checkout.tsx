@@ -5,7 +5,6 @@ import PriceDisplay from "@/src/components/common/PriceDisplay";
 import VoucherCollection from "@/src/components/common/VoucherCollection";
 import WebHeader from "@/src/components/web/WebHeader";
 import { supabase } from "@/src/lib/supabase";
-import { clearGuestCart, getGuestCart } from "@/src/services/guestCart";
 import {
   calculateDiscountedPrice,
   COLOR_TRANSLATIONS,
@@ -72,40 +71,7 @@ const C = {
   error: "#EF4444",
 };
 
-// ── Helper: fetch product image URL for guest cart items ───────────────────────
-const fetchProductImageUrl = async (productId: string): Promise<string> => {
-  try {
-    const { data, error } = await supabase
-      .from("product_images")
-      .select("url, variant_id, image_type")
-      .eq("product_id", productId)
-      .neq("image_type", "description")
-      .order("display_order", { ascending: true })
-      .limit(1)
-      .maybeSingle();
 
-    if (error || !data) {
-      const { data: product } = await supabase
-        .from("products")
-        .select("images")
-        .eq("id", productId)
-        .maybeSingle();
-      if (product?.images?.[0]) {
-        const firstImage = product.images[0];
-        return firstImage.startsWith("http")
-          ? firstImage
-          : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${firstImage}`;
-      }
-      return "https://via.placeholder.com/200";
-    }
-
-    const url = data.url;
-    if (url.startsWith("http")) return url;
-    return `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${url}`;
-  } catch {
-    return "https://via.placeholder.com/200";
-  }
-};
 
 // ── Guest checkout components (định nghĩa bên ngoài để tránh re-mount TextInput) ──
 
@@ -266,7 +232,6 @@ export default function CheckoutScreen() {
 
   // ── Guest checkout state ──────────────────────────────────────────────────────
   const [isGuest, setIsGuest] = useState(false);
-  const [guestCartItems, setGuestCartItems] = useState<any[]>([]);
 
   // Guest customer form fields
   const [customerName, setCustomerName] = useState("");
@@ -285,7 +250,7 @@ export default function CheckoutScreen() {
   } | null>(null);
 
   // ── Active cart source (guest vs authenticated) ───────────────────────────────
-  const activeCart = isGuest ? guestCartItems : cartItems;
+  const activeCart = cartItems;
   const productsTotal = activeCart.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
@@ -476,10 +441,16 @@ export default function CheckoutScreen() {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (user) {
-          // ── Authenticated user ────────────────────────────────────────────────
-          setIsGuest(false);
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
+        const isAnon = user.is_anonymous ?? false;
+        setIsGuest(isAnon);
+
+        if (!isAnon) {
+          // ── Authenticated user ────────────────────────────────────────────────
           const { data: addresses } = await supabase
             .from("user_addresses")
             .select(
@@ -514,35 +485,6 @@ export default function CheckoutScreen() {
             setCustomerPhone("");
             setCustomerEmail(user.email || "");
           }
-
-          const { data: cartData } = await supabase
-            .from("cart_items")
-            .select(
-              `
-              id,
-              product_id,
-              quantity,
-              color,
-              size,
-              products (
-                name,
-                price,
-                images,
-                variants,
-                product_discounts (
-                  id, discount_type, discount_value, is_active, start_date, end_date
-                ),
-                product_images (
-                  id, url, display_order, is_thumbnail, image_type, variant_id
-                ),
-                product_variants (
-                  id, color, size, price, stock, sku
-                )
-              )
-            `,
-            )
-            .eq("user_id", user.id)
-            .eq("is_selected", true);
 
           const { data: rawUserVoucherData, error: voucherErr } = await supabase
             .from("user_vouchers")
@@ -592,28 +534,8 @@ export default function CheckoutScreen() {
               };
             });
             setDbVouchers(formattedVouchers);
-          }
-
-          if (cartData) {
-            const formattedItems = cartData.map((item: any) => {
-              const p = item.products;
-              const withDiscount = calculateDiscountedPrice(p);
-              return {
-                id: item.id,
-                product_id: item.product_id,
-                name: p.name,
-                price: withDiscount.finalPrice,
-                originalPrice: withDiscount.originalPrice,
-                hasDiscount: withDiscount.hasDiscount,
-                quantity: item.quantity,
-                image: getProductImageByColor(p, item.color),
-                color: COLOR_TRANSLATIONS[item.color] || item.color,
-                size: item.size,
-                rawColor: item.color,
-                rawSize: item.size,
-              };
-            });
-            setCartItems(formattedItems);
+          } else {
+            setDbVouchers([]);
           }
 
           const { data: profileData } = await supabase
@@ -634,35 +556,73 @@ export default function CheckoutScreen() {
 
           if (profileData?.membership_levels) {
             setUserMembership(profileData.membership_levels);
+          } else {
+            setUserMembership(null);
           }
         } else {
           // ── Guest user ────────────────────────────────────────────────────────
-          setIsGuest(true);
           setAllAddresses([]);
           setUserAddress(null);
-          setCartItems([]);
           setDbVouchers([]);
           setUserMembership(null);
           setSelectedVoucher(null);
           setCustomerDistrictId(null);
           setCustomerWardCode(null);
           setDynamicShippingFee(0);
+        }
 
-          const rawGuestItems = await getGuestCart();
-          // Fetch missing images for guest cart items
-          const guestItems = await Promise.all(
-            rawGuestItems.map(async (item) => {
-              let imageUrl = item.image;
-              if (!imageUrl && item.product_id) {
-                imageUrl = await fetchProductImageUrl(item.product_id);
-              }
-              return {
-                ...item,
-                image: imageUrl || "https://via.placeholder.com/200",
-              };
-            })
-          );
-          setGuestCartItems(guestItems);
+        // ── Fetch Cart (cho cả Guest và User) ─────────────────────────────────
+        const { data: cartData } = await supabase
+          .from("cart_items")
+          .select(
+            `
+            id,
+            product_id,
+            quantity,
+            color,
+            size,
+            products (
+              name,
+              price,
+              images,
+              variants,
+              product_discounts (
+                id, discount_type, discount_value, is_active, start_date, end_date
+              ),
+              product_images (
+                id, url, display_order, is_thumbnail, image_type, variant_id
+              ),
+              product_variants (
+                id, color, size, price, stock, sku
+              )
+            )
+          `,
+          )
+          .eq("user_id", user.id)
+          .eq("is_selected", true);
+
+        if (cartData) {
+          const formattedItems = cartData.map((item: any) => {
+            const p = item.products;
+            const withDiscount = calculateDiscountedPrice(p);
+            return {
+              id: item.id,
+              product_id: item.product_id,
+              name: p.name,
+              price: withDiscount.finalPrice,
+              originalPrice: withDiscount.originalPrice,
+              hasDiscount: withDiscount.hasDiscount,
+              quantity: item.quantity,
+              image: getProductImageByColor(p, item.color) || "https://via.placeholder.com/200",
+              color: COLOR_TRANSLATIONS[item.color] || item.color,
+              size: item.size,
+              rawColor: item.color,
+              rawSize: item.size,
+            };
+          });
+          setCartItems(formattedItems);
+        } else {
+          setCartItems([]);
         }
       } catch (err) {
         console.error("Lỗi fetch checkout:", err);
@@ -689,7 +649,7 @@ export default function CheckoutScreen() {
         );
         return;
       }
-      if (guestCartItems.length === 0) {
+      if (activeCart.length === 0) {
         setPaymentStatus("idle");
         Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm vào giỏ hàng.");
         return;
@@ -873,16 +833,12 @@ export default function CheckoutScreen() {
         }
       }
 
-      if (isGuest) {
-        // Clear guest cart from AsyncStorage
-        await clearGuestCart();
-        setGuestCartItems([]);
-      } else {
-        // Delete selected cart items from DB
+      // ── Cleanup Cart for BOTH Guest & Authenticated ───────────────────────────
+      if (user) {
         const { error: deleteCartError } = await supabase
           .from("cart_items")
           .delete()
-          .eq("user_id", user!.id)
+          .eq("user_id", user.id)
           .eq("is_selected", true);
 
         if (deleteCartError) throw deleteCartError;

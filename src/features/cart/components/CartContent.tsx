@@ -1,7 +1,7 @@
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { addToGuestCart, getGuestCart, removeFromGuestCart, updateGuestCartQuantity } from "@/src/services/guestCart";
+
 import {
   Check,
   X as CloseIcon,
@@ -268,7 +268,6 @@ const EmptyCartState = () => (
 export default function CartContent() {
   const router = useRouter();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [guestCartItems, setGuestCartItems] = useState<CartItem[]>([]);
   const [popularItems, setPopularItems] = useState<PopularProductItem[]>([]);
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
@@ -304,16 +303,6 @@ export default function CartContent() {
 
     const newQty = item.quantity + 1;
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      await updateGuestCartQuantity(id, newQty);
-      setGuestCartItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
-      );
-      return;
-    }
-
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
@@ -326,16 +315,6 @@ export default function CartContent() {
 
     const newQty = item.quantity - 1;
 
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      await updateGuestCartQuantity(id, newQty);
-      setGuestCartItems((prev) =>
-        prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
-      );
-      return;
-    }
-
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
@@ -343,14 +322,6 @@ export default function CartContent() {
   };
 
   const deleteItem = async (id: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      await removeFromGuestCart(id);
-      setGuestCartItems((prev) => prev.filter((i) => i.id !== id));
-      return;
-    }
-
     setCartItems((prev) => prev.filter((i) => i.id !== id));
     await supabase.from("cart_items").delete().eq("id", id);
   };
@@ -400,42 +371,7 @@ export default function CartContent() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Guest: save to AsyncStorage
-        const guestItem = {
-          product_id: String(selectingProduct.id),
-          name: selectingProduct.name,
-          price: selectingProduct.price,
-          originalPrice: selectingProduct.price,
-          hasDiscount: false,
-          quantity: 1,
-          image: selectingProduct.product_images?.[0]?.url
-            ? selectingProduct.product_images[0].url.startsWith("http")
-              ? selectingProduct.product_images[0].url
-              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${selectingProduct.product_images[0].url}`
-            : "https://via.placeholder.com/400",
-          color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",
-          size: selectedSize || "",
-          rawColor: selectedColor || "",
-          rawSize: selectedSize || "",
-        };
-        await addToGuestCart(guestItem);
-        setSelectionModalVisible(false);
-        Alert.alert("Đã thêm vào giỏ hàng", "Giỏ hàng sẽ được lưu trên thiết bị này.");
-        // Reload guest cart để hiển thị
-        const rawGuest = await getGuestCart();
-        setGuestCartItems(rawGuest.map((item) => ({
-          id: item.id,
-          product_id: item.product_id,
-          name: item.name,
-          size: item.size || "M",
-          color: item.color,
-          price: item.price,
-          originalPrice: item.originalPrice,
-          finalPrice: item.hasDiscount ? item.originalPrice : item.price,
-          hasDiscount: item.hasDiscount,
-          image: item.image || "https://via.placeholder.com/200",
-          quantity: item.quantity,
-        })));
+        alert("Bạn chưa đăng nhập.");
         return;
       }
 
@@ -492,8 +428,7 @@ export default function CartContent() {
 
   const isAllSelected =
     cartItems.length > 0 &&
-    selectedIds.size === cartItems.length &&
-    guestCartItems.length === 0;
+    selectedIds.size === cartItems.length;
 
   const toggleSelectAll = async () => {
     if (isAllSelected) {
@@ -507,24 +442,16 @@ export default function CartContent() {
     }
   };
 
-  // Ghép guest cart + user cart để tính toán
-  const allCartItems = [...guestCartItems, ...cartItems];
-  // Guest items luôn được coi là "selected" (không có checkbox)
-  const allSelectedIds = new Set([
-    ...guestCartItems.map((i) => i.id),
-    ...selectedIds,
-  ]);
-
   // Tính tổng theo giá đã giảm (chỉ tính sản phẩm được tích chọn)
-  const total = allCartItems
-    .filter((i) => allSelectedIds.has(i.id))
+  const total = cartItems
+    .filter((i) => selectedIds.has(i.id))
     .reduce((s, i) => s + i.finalPrice * i.quantity, 0);
   // Tổng giá gốc – dùng để tính mức tiết kiệm
-  const subtotal = allCartItems
-    .filter((i) => allSelectedIds.has(i.id))
+  const subtotal = cartItems
+    .filter((i) => selectedIds.has(i.id))
     .reduce((s, i) => s + i.originalPrice * i.quantity, 0);
   const savings = subtotal - total;
-  const isEmpty = allCartItems.length === 0;
+  const isEmpty = cartItems.length === 0;
 
 
 
@@ -534,43 +461,14 @@ export default function CartContent() {
   const fetchCartItems = async (isSilent = false) => {
     try {
       if (!isSilent && cartItems.length === 0) setLoadingCart(true);
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
-      // ── Guest: đọc từ AsyncStorage ─────────────────────────────────────────
       if (!user) {
-        const rawGuest = await getGuestCart();
-
-        // Fetch missing images for guest cart items
-        const guestItems: CartItem[] = await Promise.all(
-          rawGuest.map(async (item) => {
-            // If image is missing, fetch it from the database
-            let imageUrl = item.image;
-            if (!imageUrl && item.product_id) {
-              imageUrl = await fetchProductImageUrl(item.product_id);
-            }
-            return {
-              id: item.id,
-              product_id: item.product_id,
-              name: item.name,
-              size: item.size || "M",
-              color: item.color,
-              price: item.price,
-              originalPrice: item.originalPrice,
-              finalPrice: item.hasDiscount ? item.originalPrice : item.price,
-              hasDiscount: item.hasDiscount,
-              image: imageUrl || "https://via.placeholder.com/200",
-              quantity: item.quantity,
-            };
-          })
-        );
-        setGuestCartItems(guestItems);
         setLoadingCart(false);
         return;
       }
 
-      // ── Authenticated: đọc từ DB ────────────────────────────────────────────
+      // ── Đọc từ DB ────────────────────────────────────────────
       const { data, error } = await supabase
         .from("cart_items")
         .select(
@@ -619,7 +517,7 @@ export default function CartContent() {
           originalPrice: withDiscount.originalPrice,
           finalPrice: withDiscount.finalPrice,
           hasDiscount: withDiscount.hasDiscount,
-          image: getProductImageByColor(productInfo, selectedColor),
+          image: getProductImageByColor(productInfo, selectedColor) || "https://via.placeholder.com/200",
           quantity: item.quantity,
         };
       });
@@ -781,18 +679,6 @@ export default function CartContent() {
               />
             ))}
 
-            {/* ── Guest Cart Items (không có checkbox) ── */}
-            {guestCartItems.map((item) => (
-              <CartItemRow
-                key={item.id}
-                item={item}
-                onIncrease={increase}
-                onDecrease={decrease}
-                isSelected={true}
-                onToggleSelect={() => {}}
-                onDelete={deleteItem}
-              />
-            ))}
           </View>
         )}
 
