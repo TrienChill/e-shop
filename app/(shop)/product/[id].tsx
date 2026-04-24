@@ -151,7 +151,8 @@ export default function ProductDetailScreen() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [averageRating, setAverageRating] = useState(0);
 
-  const [popularProducts, setPopularProducts] = useState<any[]>([]);
+  const [categoryProducts, setCategoryProducts] = useState<any[]>([]);
+  const [categoryName, setCategoryName] = useState<string>("Sản phẩm cùng danh mục");
 
   // Thêm một state nhỏ để đánh dấu ScrollView đã "lên hình"
   const [isScrollReady, setIsScrollReady] = useState(false);
@@ -671,12 +672,42 @@ export default function ProductDetailScreen() {
   }, [id, refreshTrigger]);
 
   useEffect(() => {
-    const fetchPopular = async () => {
-      const data = await getPopularProducts(id as string); // Truyền ID để tránh gợi ý trùng sản phẩm đang xem
-      setPopularProducts(data);
+    const fetchCategoryProducts = async () => {
+      if (!product?.category_id) return;
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`
+            id, name, price,
+            product_images ( id, url, display_order, is_thumbnail, image_type, variant_id ),
+            product_discounts ( id, discount_type, discount_value, is_active, start_date, end_date )
+          `)
+          .eq("is_active", true)
+          .eq("category_id", product.category_id)
+          .neq("id", product.id)
+          .limit(8);
+
+        if (error) throw error;
+
+        const { data: catData } = await supabase
+          .from("categories")
+          .select("name, name_vi")
+          .eq("id", product.category_id)
+          .single();
+        if (catData) {
+          setCategoryName(catData.name_vi || catData.name || "Sản phẩm cùng danh mục");
+        }
+
+        if (data) {
+          const processed = data.map(calculateDiscountedPrice);
+          setCategoryProducts(processed);
+        }
+      } catch (err) {
+        console.error("Lỗi fetch sản phẩm cùng danh mục:", err);
+      }
     };
-    fetchPopular();
-  }, [id, refreshTrigger]);
+    fetchCategoryProducts();
+  }, [product?.category_id, product?.id]);
 
   // ── Responsive guard (must be called before any conditional return) ──
   const { width: WINDOW_WIDTH } = useWindowDimensions();
@@ -1076,17 +1107,25 @@ export default function ProductDetailScreen() {
 
               <View style={styles.divider} />
 
-              {/* Popular products */}
+              {/* Sản phẩm cùng danh mục */}
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Sản phẩm phổ biến</Text>
+                  <Text style={styles.sectionTitle}>{categoryName}</Text>
+                  <TouchableOpacity
+                    style={styles.seeAllBtn}
+                    activeOpacity={0.7}
+                    onPress={() => router.push({ pathname: "/(shop)/categories" as any, params: { categoryId: product.category_id } } as any)}
+                  >
+                    <Text style={styles.seeAllText}>Xem tất cả</Text>
+                    <ChevronRight size={14} color="#3B82F6" />
+                  </TouchableOpacity>
                 </View>
                 <View style={[styles.popularGrid, { flexDirection: "row", flexWrap: "wrap", gap: 16 }]}>
-                  {popularProducts.slice(0, 4).map((item) => (
+                  {categoryProducts.slice(0, 4).map((item) => (
                     <PopularCard
                       key={item.id}
                       style={{ width: 240 }}
-                      item={{ ...item, image: item.images?.[0] || "https://via.placeholder.com/300", badge: item.stock < 5 ? "Sắp hết" : "Hot", badgeColor: item.stock < 5 ? "#FBBF24" : "#EF4444" }}
+                      item={{ ...item, image: item.product_images?.[0]?.url ? buildImageUrl(item.product_images[0].url) : "https://via.placeholder.com/300", badge: item.hasDiscount ? "Sale" : "Hot", badgeColor: item.hasDiscount ? "#EF4444" : "#3B82F6" }}
                     />
                   ))}
                 </View>
@@ -1456,14 +1495,14 @@ export default function ProductDetailScreen() {
         {/* Đường kẻ chia */}
         <View style={styles.divider} />
 
-        {/* ══════════════ 7. Sản phẩm phổ biến ══════════════ */}
+        {/* ══════════════ 7. Sản phẩm cùng danh mục ══════════════ */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Sản phẩm phổ biến</Text>
+            <Text style={styles.sectionTitle}>{categoryName}</Text>
             <TouchableOpacity
               style={styles.seeAllBtn}
               activeOpacity={0.7}
-              onPress={() => router.push("/product/popular-products" as any)} // Điều hướng đến trang tìm kiếm chung, có thể lọc theo sản phẩm phổ biến ở đó
+              onPress={() => router.push({ pathname: "/(shop)/categories" as any, params: { categoryId: product.category_id } } as any)}
             >
               <Text style={styles.seeAllText}>Xem tất cả</Text>
               <ChevronRight size={14} color="#3B82F6" />
@@ -1471,22 +1510,21 @@ export default function ProductDetailScreen() {
           </View>
 
           <View style={styles.popularGrid}>
-            {popularProducts.length > 0 ? (
-              popularProducts.map((item) => (
+            {categoryProducts.length > 0 ? (
+              categoryProducts.map((item) => (
                 <PopularCard
                   key={item.id}
                   style={{ width: CARD_WIDTH }}
                   item={{
                     ...item,
                     image:
-                      item.images?.[0] || "https://via.placeholder.com/300",
-                    badge: item.stock < 5 ? "Sắp hết" : "Hot",
-                    badgeColor: item.stock < 5 ? "#FBBF24" : "#EF4444",
+                      item.product_images?.[0]?.url ? buildImageUrl(item.product_images[0].url) : "https://via.placeholder.com/300",
+                    badge: item.hasDiscount ? "Sale" : "Hot",
+                    badgeColor: item.hasDiscount ? "#EF4444" : "#3B82F6",
                   }}
                 />
               ))
             ) : (
-              // Hiển thị skeleton hoặc placeholder khi đang load
               <Text style={{ color: "#9CA3AF", padding: 10 }}>
                 Đang tải gợi ý...
               </Text>
