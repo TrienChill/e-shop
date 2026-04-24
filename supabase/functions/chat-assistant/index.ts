@@ -9,7 +9,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
-const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY')
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
 
@@ -70,10 +69,6 @@ serve(async (req: any) => {
       throw new Error('Missing GEMINI_API_KEY environment variable')
     }
 
-    if (!GROQ_API_KEY) {
-      throw new Error('Missing GROQ_API_KEY environment variable')
-    }
-
     // 1. Fetch products context from Supabase (fallback context)
     const supabase = createClient(
       SUPABASE_URL ?? '',
@@ -130,7 +125,7 @@ serve(async (req: any) => {
         const context = fallbackProducts.map((p: any) =>
           `- ${p.name} (ID: ${p.id}): Giá ${p.price} VNĐ. Mô tả: ${p.description || 'Không có'}.`
         ).join('\n')
-        await generateAndRespond(supabase, message, history, context, GROQ_API_KEY)
+        await generateAndRespond(supabase, message, history, context, GEMINI_API_KEY)
         return
       }
       throw new Error('Không thể tìm kiếm sản phẩm')
@@ -157,8 +152,8 @@ serve(async (req: any) => {
         : 'Không có sản phẩm nào.'
     }
 
-    // --- RAG Step 4 & 5: Generate response using Groq Chat API ---
-    const reply = await generateAndRespond(supabase, message, history, productsContext, GROQ_API_KEY)
+    // --- RAG Step 4 & 5: Generate response using Gemini Chat API ---
+    const reply = await generateAndRespond(supabase, message, history, productsContext, GEMINI_API_KEY)
 
     return new Response(
       JSON.stringify({ reply }),
@@ -173,7 +168,7 @@ serve(async (req: any) => {
   }
 })
 
-// Helper function to generate chat response via Groq
+// Helper function to generate chat response via Gemini
 async function generateAndRespond(
   supabase: any,
   message: string,
@@ -194,30 +189,34 @@ QUY TẮC QUAN TRỌNG:
 4. Cung cấp thông tin giá cả rõ ràng (thêm 'VNĐ' vào sau giá).
 5. Nếu danh sách sản phẩm trống, hãy thông báo cho khách hàng biết cửa hàng hiện chưa có sản phẩm nào.`
 
-  // Convert history to Groq/OpenAI format
-  const groqMessages: Array<{ role: string; content: string }> = [
-    { role: 'system', content: systemPrompt },
-    ...history.map((msg: any) => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content
-    })),
-    { role: 'user', content: message }
+  // Convert history to Gemini format
+  const geminiHistory = history.map((msg: any) => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }))
+
+  const contents = [
+    ...geminiHistory,
+    { role: 'user', parts: [{ text: message }] }
   ]
 
-  // Call Groq Chat API
+  // Call Gemini Chat API
   const response = await fetchWithRetry(
-    'https://api.groq.com/openai/v1/chat/completions',
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: groqMessages,
-        temperature: 0.7,
-        max_completion_tokens: 8192,
+        system_instruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: contents,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+        }
       })
     }
   )
@@ -225,9 +224,9 @@ QUY TẮC QUAN TRỌNG:
   const data = await response.json()
 
   if (!response.ok) {
-    console.error('Groq API Error:', data)
-    throw new Error(data.error?.message || 'Failed to call Groq API')
+    console.error('Gemini API Error:', data)
+    throw new Error(data.error?.message || 'Failed to call Gemini API')
   }
 
-  return data.choices?.[0]?.message?.content || 'Xin lỗi, tôi không thể trả lời lúc này.'
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Xin lỗi, tôi không thể trả lời lúc này.'
 }
