@@ -1,28 +1,28 @@
 import { CommonHeader } from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
-import { router, useFocusEffect } from "expo-router";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { router, useFocusEffect } from "expo-router";
 import {
+  BarChart,
   ChevronLeft,
   ChevronRight,
   PackageX,
   PieChart,
   Settings,
-  BarChart,
-  X
+  X,
 } from "lucide-react-native";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  Modal,
-  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, G } from "react-native-svg";
@@ -65,11 +65,17 @@ export default function MyActivityScreen() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   // Time filter state
-  type FilterType = "last7" | "last30" | "month" | "quarter" | "year" | "custom";
+  type FilterType =
+    | "last7"
+    | "last30"
+    | "month"
+    | "quarter"
+    | "year"
+    | "custom";
   const [filterType, setFilterType] = useState<FilterType>("month");
   const [customStartDate, setCustomStartDate] = useState<Date>(new Date());
   const [customEndDate, setCustomEndDate] = useState<Date>(new Date());
-  
+
   // Modal state
   const [isFilterModalVisible, setFilterModalVisible] = useState(false);
   const [tempFilterType, setTempFilterType] = useState<FilterType>("month");
@@ -86,31 +92,37 @@ export default function MyActivityScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'profiles',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "profiles",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'orders',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "orders",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'order_items',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "order_items",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   const displayTimeRange = useMemo(() => {
     switch (filterType) {
-      case "last7": return "7 ngày gần nhất";
-      case "last30": return "30 ngày gần nhất";
-      case "month": return `Tháng ${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`;
-      case "quarter": return `Quý ${Math.floor(currentDate.getMonth() / 3) + 1}/${currentDate.getFullYear()}`;
-      case "year": return `Năm ${currentDate.getFullYear()}`;
+      case "last7":
+        return "7 ngày gần nhất";
+      case "last30":
+        return "30 ngày gần nhất";
+      case "month":
+        return `Tháng ${currentDate.getMonth() + 1}/${currentDate.getFullYear()}`;
+      case "quarter":
+        return `Quý ${Math.floor(currentDate.getMonth() / 3) + 1}/${currentDate.getFullYear()}`;
+      case "year":
+        return `Năm ${currentDate.getFullYear()}`;
       case "custom": {
-        const start = customStartDate.toLocaleDateString('vi-VN');
-        const end = customEndDate.toLocaleDateString('vi-VN');
+        const start = customStartDate.toLocaleDateString("vi-VN");
+        const end = customEndDate.toLocaleDateString("vi-VN");
         return `${start} - ${end}`;
       }
-      default: return "";
+      default:
+        return "";
     }
   }, [filterType, currentDate, customStartDate, customEndDate]);
 
@@ -135,21 +147,38 @@ export default function MyActivityScreen() {
 
       // 1. Xác định khung thời gian
       const now = new Date();
-      let firstDay: number = 0, lastDay: number = 0;
+      let firstDay: number = 0,
+        lastDay: number = 0;
 
       switch (filterType) {
         case "last7":
-          firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+          firstDay = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() - 7,
+          ).getTime();
           lastDay = now.getTime();
           break;
         case "last30":
-          firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).getTime();
+          firstDay = new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() - 30,
+          ).getTime();
           lastDay = now.getTime();
           break;
         case "quarter": {
           const quarterFloorMonth = Math.floor(currentDate.getMonth() / 3) * 3;
-          firstDay = new Date(currentDate.getFullYear(), quarterFloorMonth, 1).getTime();
-          lastDay = new Date(currentDate.getFullYear(), quarterFloorMonth + 3, 1).getTime();
+          firstDay = new Date(
+            currentDate.getFullYear(),
+            quarterFloorMonth,
+            1,
+          ).getTime();
+          lastDay = new Date(
+            currentDate.getFullYear(),
+            quarterFloorMonth + 3,
+            1,
+          ).getTime();
           break;
         }
         case "year":
@@ -157,13 +186,29 @@ export default function MyActivityScreen() {
           lastDay = new Date(currentDate.getFullYear() + 1, 0, 1).getTime();
           break;
         case "custom":
-          firstDay = new Date(customStartDate.getFullYear(), customStartDate.getMonth(), customStartDate.getDate()).getTime();
-          lastDay = new Date(customEndDate.getFullYear(), customEndDate.getMonth(), customEndDate.getDate() + 1).getTime();
+          firstDay = new Date(
+            customStartDate.getFullYear(),
+            customStartDate.getMonth(),
+            customStartDate.getDate(),
+          ).getTime();
+          lastDay = new Date(
+            customEndDate.getFullYear(),
+            customEndDate.getMonth(),
+            customEndDate.getDate() + 1,
+          ).getTime();
           break;
         case "month":
         default:
-          firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getTime();
-          lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1).getTime();
+          firstDay = new Date(
+            currentDate.getFullYear(),
+            currentDate.getMonth(),
+            1,
+          ).getTime();
+          lastDay = new Date(
+            currentDate.getFullYear(),
+            currentDate.getMonth() + 1,
+            1,
+          ).getTime();
           break;
       }
 
@@ -176,7 +221,9 @@ export default function MyActivityScreen() {
       // 2. Fetch toàn bộ orders của user để tự filter
       const { data: orders, error: ordersError } = await supabase
         .from("orders")
-        .select("id, status, created_at, processing_at, shipping_at, completed_at, time_finished")
+        .select(
+          "id, status, created_at, processing_at, shipping_at, completed_at, time_finished",
+        )
         .eq("user_id", user.id);
 
       if (ordersError) throw ordersError;
@@ -188,11 +235,17 @@ export default function MyActivityScreen() {
 
       orders.forEach((o: any) => {
         // - "Đã đặt": trạng thái pending/processing và đơn được TẠO trong thời gian
-        const isPendingProc = ["pending", "processing"].includes(o.status) && isDateInRange(o.created_at);
+        const isPendingProc =
+          ["pending", "processing"].includes(o.status) &&
+          isDateInRange(o.created_at);
         // - "Chờ nhận": trạng thái shipping và BẮT ĐẦU GIAO trong thời gian (nếu ko có shipping_at thì lấy created_at)
-        const isShipping = o.status === "shipping" && isDateInRange(o.shipping_at || o.created_at);
+        const isShipping =
+          o.status === "shipping" &&
+          isDateInRange(o.shipping_at || o.created_at);
         // - "Đã nhận/Chi phí": trạng thái completed và ĐÃ HOÀN THÀNH trong thời gian
-        const isCompleted = o.status === "completed" && isDateInRange(o.completed_at || o.time_finished);
+        const isCompleted =
+          o.status === "completed" &&
+          isDateInRange(o.completed_at || o.time_finished);
 
         if (isPendingProc) total++;
         if (isShipping) pendingCount++;
@@ -223,14 +276,16 @@ export default function MyActivityScreen() {
       // Tính tổng chi tiêu TẤT CẢ đơn hàng completed (all-time, không filter thời gian)
       // → Trigger DB đã tự động cập nhật total_spending, chỉ tính để hiển thị (nếu cần)
       const totalSpendingAllTime = allItems
-        .filter((item: any) => item.orders?.status === 'completed')
+        .filter((item: any) => item.orders?.status === "completed")
         .reduce((sum: number, item: any) => {
-          return sum + ((item.price_at_purchase || 0) * (item.quantity || 0));
+          return sum + (item.price_at_purchase || 0) * (item.quantity || 0);
         }, 0);
 
       // (Debug) Kiểm tra tổng chi tiêu trong session này
       if (__DEV__) {
-        console.log(`📊 Tổng chi tiêu all-time (completed orders): ${totalSpendingAllTime.toLocaleString('vi-VN')}₫`);
+        console.log(
+          `📊 Tổng chi tiêu all-time (completed orders): ${totalSpendingAllTime.toLocaleString("vi-VN")}₫`,
+        );
       }
 
       // 3. Fetch toàn bộ order items của user (CHO HIỂN THỊ - với filter thời gian)
@@ -316,28 +371,40 @@ export default function MyActivityScreen() {
 
   const handlePrevTime = () => {
     if (filterType === "month") {
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
+      );
     } else if (filterType === "quarter") {
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 3, 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 3, 1),
+      );
     } else if (filterType === "year") {
-      setCurrentDate((prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), 1),
+      );
     }
   };
 
   const handleNextTime = () => {
     if (filterType === "month") {
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
+      );
     } else if (filterType === "quarter") {
-      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 3, 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 3, 1),
+      );
     } else if (filterType === "year") {
-      setCurrentDate((prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), 1));
+      setCurrentDate(
+        (prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), 1),
+      );
     }
   };
 
   const canNavigate = ["month", "quarter", "year"].includes(filterType);
 
   const parseDate = (text: string) => {
-    const [d, m, y] = text.split('/');
+    const [d, m, y] = text.split("/");
     if (d && m && y) {
       return new Date(Number(y), Number(m) - 1, Number(d));
     }
@@ -346,9 +413,9 @@ export default function MyActivityScreen() {
 
   const applyFilter = () => {
     setFilterType(tempFilterType);
-    if (tempFilterType === 'custom') {
-       if (customStartText) setCustomStartDate(parseDate(customStartText));
-       if (customEndText) setCustomEndDate(parseDate(customEndText));
+    if (tempFilterType === "custom") {
+      if (customStartText) setCustomStartDate(parseDate(customStartText));
+      if (customEndText) setCustomEndDate(parseDate(customEndText));
     }
     setFilterModalVisible(false);
   };
@@ -381,12 +448,12 @@ export default function MyActivityScreen() {
 
   const maxCategoryAmount = useMemo(() => {
     if (categoriesData.length === 0) return 0;
-    return Math.max(...categoriesData.map(c => c.amount));
+    return Math.max(...categoriesData.map((c) => c.amount));
   }, [categoriesData]);
 
   const getAvatarUrl = (path: string | null) => {
     if (!path)
-      return "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop";
+      return "https://tuanluupiano.com/wp-content/uploads/2026/01/avatar-facebook-mac-dinh-6.jpg";
     if (path.startsWith("http")) return path;
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     return `${supabaseUrl}/storage/v1/object/public/avatars/${path}`;
@@ -422,9 +489,11 @@ export default function MyActivityScreen() {
         )}
         renderRight={() => (
           <>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
-              onPress={() => setChartType(prev => prev === "pie" ? "bar" : "pie")}
+              onPress={() =>
+                setChartType((prev) => (prev === "pie" ? "bar" : "pie"))
+              }
             >
               {chartType === "pie" ? (
                 <BarChart size={22} color={COLORS.dark} />
@@ -432,7 +501,7 @@ export default function MyActivityScreen() {
                 <PieChart size={22} color={COLORS.dark} />
               )}
             </TouchableOpacity>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.iconButton}
               onPress={() => {
                 setTempFilterType(filterType);
@@ -458,7 +527,10 @@ export default function MyActivityScreen() {
         <View style={styles.chartSection}>
           <View style={{ width: 44 }}>
             {canNavigate && (
-              <TouchableOpacity style={styles.arrowNav} onPress={handlePrevTime}>
+              <TouchableOpacity
+                style={styles.arrowNav}
+                onPress={handlePrevTime}
+              >
                 <ChevronLeft size={28} color={COLORS.blue} />
               </TouchableOpacity>
             )}
@@ -468,7 +540,13 @@ export default function MyActivityScreen() {
             {loading ? (
               <View style={styles.chartCenterContent}>
                 <ActivityIndicator size="large" color={COLORS.blue} />
-                <Text style={{ marginTop: 8, color: COLORS.blue, fontWeight: "500" }}>
+                <Text
+                  style={{
+                    marginTop: 8,
+                    color: COLORS.blue,
+                    fontWeight: "500",
+                  }}
+                >
                   Đang tải...
                 </Text>
               </View>
@@ -480,7 +558,10 @@ export default function MyActivityScreen() {
                     height={CHART_SIZE}
                     viewBox={`0 0 ${CHART_SIZE} ${CHART_SIZE}`}
                   >
-                    <G rotation="-90" origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}>
+                    <G
+                      rotation="-90"
+                      origin={`${CHART_SIZE / 2}, ${CHART_SIZE / 2}`}
+                    >
                       {chartData.map((segment) => (
                         <Circle
                           key={segment.id}
@@ -515,29 +596,67 @@ export default function MyActivityScreen() {
                   </View>
                 </>
               ) : (
-                <View style={{ width: CHART_SIZE, height: CHART_SIZE, justifyContent: "flex-end", alignItems: "center", paddingTop: 10 }}>
+                <View
+                  style={{
+                    width: CHART_SIZE,
+                    height: CHART_SIZE,
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    paddingTop: 10,
+                  }}
+                >
                   <Text style={[styles.totalLabel, { marginBottom: 4 }]}>
                     {selectedCategory ? "Chi phí" : "Tổng cộng"}
                   </Text>
-                  <Text style={[styles.totalValue, { color: COLORS.dark, marginBottom: 20 }]}>
+                  <Text
+                    style={[
+                      styles.totalValue,
+                      { color: COLORS.dark, marginBottom: 20 },
+                    ]}
+                  >
                     {displayAmount?.toLocaleString("vi-VN")}
                     <Text style={{ fontSize: 16 }}> ₫</Text>
                   </Text>
-                  <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 12, height: 130, width: "100%" }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-end",
+                      justifyContent: "center",
+                      gap: 12,
+                      height: 130,
+                      width: "100%",
+                    }}
+                  >
                     {categoriesData.map((cat) => {
-                      const heightPercent = maxCategoryAmount > 0 ? (cat.amount / maxCategoryAmount) * 100 : 0;
+                      const heightPercent =
+                        maxCategoryAmount > 0
+                          ? (cat.amount / maxCategoryAmount) * 100
+                          : 0;
                       return (
                         <TouchableOpacity
                           key={cat.id}
                           style={{
-                            width: Math.min(32, (CHART_SIZE - 40 - (categoriesData.length - 1) * 12) / (categoriesData.length || 1)),
+                            width: Math.min(
+                              32,
+                              (CHART_SIZE -
+                                40 -
+                                (categoriesData.length - 1) * 12) /
+                                (categoriesData.length || 1),
+                            ),
                             height: `${heightPercent}%`,
                             backgroundColor: cat.color,
                             borderTopLeftRadius: 6,
                             borderTopRightRadius: 6,
-                            opacity: selectedCategory && selectedCategory !== cat.id ? 0.3 : 1
+                            opacity:
+                              selectedCategory && selectedCategory !== cat.id
+                                ? 0.3
+                                : 1,
                           }}
-                          onPress={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                          onPress={() =>
+                            setSelectedCategory(
+                              selectedCategory === cat.id ? null : cat.id,
+                            )
+                          }
                         />
                       );
                     })}
@@ -547,7 +666,14 @@ export default function MyActivityScreen() {
             ) : (
               <View style={styles.chartCenterContent}>
                 <PieChart size={64} color="#888888" opacity={0.6} />
-                <Text style={{ marginTop: 12, color: "#888888", fontWeight: "500", fontSize: 16 }}>
+                <Text
+                  style={{
+                    marginTop: 12,
+                    color: "#888888",
+                    fontWeight: "500",
+                    fontSize: 16,
+                  }}
+                >
                   Chưa có chi tiêu
                 </Text>
               </View>
@@ -556,7 +682,10 @@ export default function MyActivityScreen() {
 
           <View style={{ width: 44 }}>
             {canNavigate && (
-              <TouchableOpacity style={styles.arrowNav} onPress={handleNextTime}>
+              <TouchableOpacity
+                style={styles.arrowNav}
+                onPress={handleNextTime}
+              >
                 <ChevronRight size={28} color={COLORS.blue} />
               </TouchableOpacity>
             )}
@@ -673,7 +802,9 @@ export default function MyActivityScreen() {
           ) : (
             <View style={styles.emptyProductsView}>
               <PackageX size={48} color="#888888" opacity={0.6} />
-              <Text style={styles.emptyTextFixed}>Bạn chưa mua sản phẩm nào.</Text>
+              <Text style={styles.emptyTextFixed}>
+                Bạn chưa mua sản phẩm nào.
+              </Text>
             </View>
           )}
         </View>
@@ -705,39 +836,51 @@ export default function MyActivityScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Thời gian</Text>
-              <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={{ padding: 4 }}>
+              <TouchableOpacity
+                onPress={() => setFilterModalVisible(false)}
+                style={{ padding: 4 }}
+              >
                 <X size={24} color={COLORS.dark} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={styles.filterOptionsGrid}>
               {[
-                { id: 'last7', label: '7 ngày gần nhất' },
-                { id: 'last30', label: '30 ngày gần nhất' },
-                { id: 'month', label: 'Theo Tháng' },
-                { id: 'quarter', label: 'Theo Quý' },
-                { id: 'year', label: 'Theo Năm' },
-                { id: 'custom', label: 'Tùy chỉnh thời gian' },
+                { id: "last7", label: "7 ngày gần nhất" },
+                { id: "last30", label: "30 ngày gần nhất" },
+                { id: "month", label: "Theo Tháng" },
+                { id: "quarter", label: "Theo Quý" },
+                { id: "year", label: "Theo Năm" },
+                { id: "custom", label: "Tùy chỉnh thời gian" },
               ].map((item: any) => (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.filterOptionBtn, tempFilterType === item.id && styles.filterOptionBtnActive]}
+                  style={[
+                    styles.filterOptionBtn,
+                    tempFilterType === item.id && styles.filterOptionBtnActive,
+                  ]}
                   onPress={() => setTempFilterType(item.id)}
                 >
-                  <Text style={[styles.filterOptionText, tempFilterType === item.id && styles.filterOptionTextActive]}>
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      tempFilterType === item.id &&
+                        styles.filterOptionTextActive,
+                    ]}
+                  >
                     {item.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {tempFilterType === 'custom' && (
+            {tempFilterType === "custom" && (
               <View style={styles.customDateContainer}>
                 <View style={styles.dateInputWrapper}>
                   <Text style={styles.dateInputLabel}>Từ ngày</Text>
-                  <TextInput 
-                    style={styles.dateInput} 
-                    placeholder="DD/MM/YYYY" 
+                  <TextInput
+                    style={styles.dateInput}
+                    placeholder="DD/MM/YYYY"
                     value={customStartText}
                     onChangeText={setCustomStartText}
                     keyboardType="numeric"
@@ -745,9 +888,9 @@ export default function MyActivityScreen() {
                 </View>
                 <View style={styles.dateInputWrapper}>
                   <Text style={styles.dateInputLabel}>Đến ngày</Text>
-                  <TextInput 
-                    style={styles.dateInput} 
-                    placeholder="DD/MM/YYYY" 
+                  <TextInput
+                    style={styles.dateInput}
+                    placeholder="DD/MM/YYYY"
                     value={customEndText}
                     onChangeText={setCustomEndText}
                     keyboardType="numeric"
@@ -756,7 +899,10 @@ export default function MyActivityScreen() {
               </View>
             )}
 
-            <TouchableOpacity style={styles.applyFilterBtn} onPress={applyFilter}>
+            <TouchableOpacity
+              style={styles.applyFilterBtn}
+              onPress={applyFilter}
+            >
               <Text style={styles.applyFilterText}>Áp dụng</Text>
             </TouchableOpacity>
           </View>
