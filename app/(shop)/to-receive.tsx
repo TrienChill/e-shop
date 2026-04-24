@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   Filter,
   PackageX,
-  RotateCcw,
   X
 } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
@@ -25,7 +24,6 @@ import {
   Image,
   LayoutAnimation,
   Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -72,6 +70,7 @@ export default function ToReceiveScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [isGuest, setIsGuest] = useState(false);
 
   // --- REALTIME HOOKS ---
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -94,7 +93,13 @@ export default function ToReceiveScreen() {
       const {
         data: { user: currentUser },
       } = await supabase.auth.getUser();
-      setUser(currentUser);
+      if (currentUser) {
+        setUser(currentUser);
+        setIsGuest(false);
+      } else {
+        setIsGuest(true);
+        setLoading(false);
+      }
     };
     getUser();
   }, []);
@@ -134,32 +139,29 @@ export default function ToReceiveScreen() {
 
   const STATUS_OPTIONS = [
     { key: "all", label: "Tất cả" },
-    { key: "pending", label: "Chờ xác nhận" }, // Đổi nhãn cho giống Shopee
+    { key: "pending", label: "Chờ xác nhận" },
     { key: "processing", label: "Chờ lấy hàng" },
-    { key: "shipping", label: "Chờ giao hàng" },
-    { key: "history", label: "Lịch sử mua hàng (Đã giao/Hủy)" }, // Thêm option mới
+    { key: "shipping", label: "Đang giao" },
+    { key: "completed", label: "Đã giao" },
+    { key: "cancelled", label: "Đã hủy" },
+    { key: "returns", label: "Trả hàng/Hoàn tiền" },
   ];
 
   const fetchOrders = async (statusFilter = selectedStatus) => {
     try {
       setLoading(true);
 
-      if (!user) {
+      if (!user && !isGuest) {
         setLoading(false);
-        return;
+        return [];
       }
 
       // [WORKAROUND RLS] Lấy danh sách order_item_id mà user đã đánh giá
-      const { data: userReviews } = await supabase
-        .from("reviews")
-        .select("order_item_id")
-        .eq("user_id", user.id);
-      
-      const reviewedItemIds = new Set(
-        userReviews?.map((r) => r.order_item_id) || []
-      );
+      const { data: userReviews } = user
+        ? await supabase.from("reviews").select("order_item_id").eq("user_id", user.id)
+        : { data: null };
 
-      // Trong file app/(shop)/to-receive.tsx, tìm đến hàm fetchOrders
+      const reviewedItemIds = new Set(userReviews?.map((r: any) => r.order_item_id) || []);
 
       let query = supabase
         .from("orders")
@@ -169,6 +171,9 @@ export default function ToReceiveScreen() {
     status,
     total_amount,
     created_at,
+    receiver_name,
+    shipping_address,
+    shipping_method_id,
     order_items (
       id,
       order_id,
@@ -184,14 +189,28 @@ export default function ToReceiveScreen() {
       )
     )
   `,
-        )
-        .eq("user_id", user.id);
+        );
 
-      // Sửa logic lọc để xử lý trường hợp "history" (Lịch sử mua hàng)
-      if (statusFilter === "history") {
-        query = query.in("status", ["completed", "cancelled"]); // Lấy cả đã giao và đã hủy
-      } else if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter); // Lọc theo pending, processing, shipping
+      if (user) {
+        query = query.eq("user_id", user.id);
+      } else {
+        // Guest: lấy orders có user_id = NULL (guest orders)
+        query = query.is("user_id", null);
+      }
+
+      // Lọc theo Tab đã chọn
+      if (statusFilter !== "all") {
+        if (statusFilter === "returns") {
+          // Gộp 4 trạng thái return vào Tab "Trả hàng/Hoàn tiền"
+          query = query.in("status", [
+            "return_requested",
+            "returning",
+            "returned",
+            "refunded",
+          ]);
+        } else {
+          query = query.eq("status", statusFilter);
+        }
       }
 
       const { data, error } = await query.order("created_at", {
@@ -201,7 +220,6 @@ export default function ToReceiveScreen() {
       if (error) throw error;
 
       const formattedOrders: OrderItem[] = data.map((order: any) => {
-        // Thêm kiểm tra: nếu order_items không tồn tại, dùng mảng rỗng
         const itemsList = order.order_items || [];
 
         const itemsCount = itemsList.reduce(
@@ -211,7 +229,6 @@ export default function ToReceiveScreen() {
         const processedItems = itemsList.map((item: any) => {
           return {
             ...item,
-            // Fallback an toàn: Nếu DB is_reviewed = true hoặc item có trong bảng reviews
             is_reviewed: item.is_reviewed || reviewedItemIds.has(item.id),
             image: getProductImageByColor(item.products, item.selected_variant?.color),
           };
@@ -228,6 +245,10 @@ export default function ToReceiveScreen() {
           shipping: "Đang giao",
           completed: "Đã giao",
           cancelled: "Đã hủy",
+          return_requested: "Yêu cầu trả hàng",
+          returning: "Đang hoàn hàng",
+          returned: "Đã trả hàng",
+          refunded: "Đã hoàn tiền",
         };
 
         return {
@@ -243,7 +264,6 @@ export default function ToReceiveScreen() {
         };
       });
 
-      // Sắp xếp theo ưu tiên: Đã giao -> Đang giao -> Đang đóng gói -> Đang xử lý -> Đã hủy (hoặc ngược lại)
       const multiplier = isAscending ? 1 : -1;
       formattedOrders.sort((a, b) => {
         const priorityA = STATUS_PRIORITY[a.rawStatus] || 99;
@@ -252,7 +272,7 @@ export default function ToReceiveScreen() {
       });
 
       setOrders(formattedOrders);
-      return formattedOrders; 
+      return formattedOrders;
     } catch (error) {
       console.error("Lỗi lấy danh sách đơn hàng:", error);
       return [];
@@ -263,11 +283,11 @@ export default function ToReceiveScreen() {
   };
 
   useEffect(() => {
-    if (user) {
+    if (user || isGuest) {
       fetchOrders(selectedStatus);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStatus, isAscending, user, refreshTrigger]);
+  }, [selectedStatus, isAscending, user, isGuest, refreshTrigger]);
 
   const toggleSort = () => {
     setIsAscending(!isAscending);
@@ -490,7 +510,7 @@ export default function ToReceiveScreen() {
 
             {/* Nút hành động nhanh bên dưới */}
             <View style={styles.actionRow}>
-              {isDelivered ? (
+              {isDelivered && !isGuest ? (
                 <>
                   <TouchableOpacity
                     style={styles.returnButton}
