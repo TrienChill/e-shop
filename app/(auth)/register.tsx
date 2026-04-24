@@ -128,27 +128,33 @@ const App = () => {
     }
 
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
+    
+    // Using updateUser to upgrade the current anonymous account instead of signUp()
+    // This preserves the current user's UUID and all associated data like carts and orders.
+    const { data, error } = await supabase.auth.updateUser({
       email: formData.email,
       password: formData.password,
-      options: {
-        data: {
-          full_name: formData.fullName,
-        },
+      data: {
+        full_name: formData.fullName,
       },
     });
     setLoading(false);
 
     if (error) {
       Alert.alert('Registration Error', error.message);
-    } else if (data.session) {
-      // Nếu tắt xác thực email, Supabase trả về session ngay -> Đăng nhập thành công
-      // Chuyển hướng về trang chủ (hoặc trang profile)
-      router.replace('/(shop)/(tabs)/profile'); 
     } else {
-      // Nếu vẫn bật xác thực email, session sẽ là null
-      Alert.alert('Success', 'Account created successfully! Please check your email for verification.', [
-        { text: 'OK', onPress: () => router.push('/login') }
+      Alert.alert('Thành công', 'Nâng cấp tài khoản thành công! Chào mừng bạn đến với E-Shop.', [
+        { 
+          text: 'OK', 
+          onPress: () => {
+             // Go back if possible, otherwise go to profile
+             if (router.canGoBack()) {
+               router.back();
+             } else {
+               router.replace('/(shop)/(tabs)/profile');
+             }
+          } 
+        }
       ]);
     }
   };

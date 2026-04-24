@@ -5,6 +5,7 @@ import { supabase } from "@/src/lib/supabase";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
+import { useAuth } from "@/src/auth/AuthContext";
 import {
   ArrowRight,
   Bell,
@@ -50,6 +51,9 @@ const COLOR = {
 // const RECENTLY_VIEWED = [...];
 
 export default function ProfileScreen() {
+  const { session } = useAuth();
+  const isAnonymous = session?.user?.is_anonymous;
+
   const [profile, setProfile] = useState<any>(null);
   const [recentViews, setRecentViews] = useState<any[]>([]);
 
@@ -236,6 +240,22 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        {isAnonymous && (
+          <TouchableOpacity 
+            style={styles.upgradeBanner} 
+            activeOpacity={0.9}
+            onPress={() => router.push('/(auth)/register')}
+          >
+            <View style={styles.upgradeBannerContent}>
+              <Text style={styles.upgradeBannerTitle}>Đăng ký tài khoản ngay!</Text>
+              <Text style={styles.upgradeBannerDesc}>Lưu giỏ hàng và theo dõi đơn hàng dễ dàng hơn.</Text>
+            </View>
+            <View style={styles.upgradeBannerIcon}>
+              <ArrowRight size={20} color={COLOR.white} />
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Khung Thông báo (Announcement Card) */}
         <TouchableOpacity style={styles.announcementCard} activeOpacity={0.9}>
@@ -425,6 +445,48 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     fontSize: 14,
+  },
+  upgradeBanner: {
+    backgroundColor: COLOR.blue,
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: COLOR.blue,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  upgradeBannerContent: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  upgradeBannerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: COLOR.white,
+    marginBottom: 4,
+  },
+  upgradeBannerDesc: {
+    fontSize: 13,
+    color: "rgba(255, 255, 255, 0.8)",
+    lineHeight: 18,
+  },
+  upgradeBannerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   announcementCard: {
     backgroundColor: "#F7F8FA",

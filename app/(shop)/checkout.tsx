@@ -82,16 +82,16 @@ const GuestBanner = React.memo(
         <Info size={20} color="#9A3412" />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={styles.guestBannerTitle}>Đặt hàng với tư cách Khách</Text>
+        <Text style={styles.guestBannerTitle}>Đăng ký tài khoản ngay!</Text>
         <Text style={styles.guestBannerText}>
-          Đăng nhập để tích điểm, theo dõi đơn hàng dễ dàng và nhiều ưu đãi hơn.
+          Lưu giỏ hàng và theo dõi đơn hàng dễ dàng hơn.
         </Text>
       </View>
       <TouchableOpacity
         style={styles.guestBannerBtn}
-        onPress={() => router.push("/login?redirect=/checkout")}
+        onPress={() => router.push("/(auth)/register")}
       >
-        <Text style={styles.guestBannerBtnText}>Đăng nhập</Text>
+        <Text style={styles.guestBannerBtnText}>Đăng ký</Text>
       </TouchableOpacity>
     </View>
   ),
