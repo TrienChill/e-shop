@@ -370,7 +370,11 @@ export default function CartContent() {
           originalPrice: selectingProduct.price,
           hasDiscount: false,
           quantity: 1,
-          image: selectingProduct.images?.[0] || "",
+          image: selectingProduct.product_images?.[0]?.url
+            ? selectingProduct.product_images[0].url.startsWith("http")
+              ? selectingProduct.product_images[0].url
+              : `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/product-images/${selectingProduct.product_images[0].url}`
+            : "https://via.placeholder.com/400",
           color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",
           size: selectedSize || "",
           rawColor: selectedColor || "",

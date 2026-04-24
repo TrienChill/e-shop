@@ -43,6 +43,13 @@ import {
 const BASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const BUCKET_NAME = "product-images"; // Tên bucket chứa ảnh của bạn
 
+// Helper: build full image URL từ Supabase Storage
+const buildImageUrl = (imagePath: string | undefined): string => {
+  if (!imagePath) return "https://via.placeholder.com/400";
+  if (imagePath.startsWith("http")) return imagePath;
+  return `${BASE_URL}/storage/v1/object/public/${BUCKET_NAME}/${imagePath}`;
+};
+
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MOBILE_IMAGE_HEIGHT = SCREEN_HEIGHT * 0.42;
 const CARD_WIDTH = (SCREEN_WIDTH - 46) / 2; // Adjusted for gap
@@ -419,7 +426,7 @@ export default function ProductDetailScreen() {
           originalPrice: product.price,
           hasDiscount: false,
           quantity: selectedQty,
-          image: product.images?.[0]?.url || "",
+          image: productImages[activeIndex] || buildImageUrl(product.product_images?.[0]?.url),
           color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",
           size: selectedSize || "",
           rawColor: selectedColor || "",
