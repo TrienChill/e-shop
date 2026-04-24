@@ -153,16 +153,7 @@ const GuestCustomerForm = React.memo(({
         autoCapitalize="none"
       />
 
-      {/* Số nhà / Đường */}
-      <Text style={styles.guestFormLabel}>Số nhà, tên đường *</Text>
-      <TextInput
-        style={[inputStyle, styles.guestAddressInput]}
-        placeholder="VD: 123 Nguyễn Trãi, Phường 5"
-        placeholderTextColor="#9CA3AF"
-        value={customerAddress}
-        onChangeText={setCustomerAddress}
-        textAlignVertical="top"
-      />
+      {/* Số nhà / Đường — đã được tích hợp trong AddressSelector bên ngoài */}
     </View>
   );
 });
