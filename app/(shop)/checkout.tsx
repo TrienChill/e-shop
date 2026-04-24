@@ -580,11 +580,6 @@ export default function CheckoutScreen() {
         Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ Tên, Số điện thoại và Địa chỉ giao hàng.");
         return;
       }
-      if (customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim())) {
-        setPaymentStatus("idle");
-        Alert.alert("Email không hợp lệ", "Vui lòng nhập đúng định dạng email.");
-        return;
-      }
       if (guestCartItems.length === 0) {
         setPaymentStatus("idle");
         Alert.alert("Giỏ hàng trống", "Vui lòng thêm sản phẩm vào giỏ hàng.");
@@ -626,9 +621,8 @@ export default function CheckoutScreen() {
         // Guest: use direct form fields
         orderPayload = {
           ...orderPayload,
-          customer_name: customerName.trim(),
-          customer_phone: customerPhone.trim(),
-          customer_email: customerEmail.trim() || null,
+          receiver_name: customerName.trim(),
+          phone_contact: customerPhone.trim(),
           shipping_address: customerAddress.trim(),
         };
       } else {
