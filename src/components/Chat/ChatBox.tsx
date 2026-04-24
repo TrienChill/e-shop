@@ -33,7 +33,9 @@ export const ChatBox = ({ visible, onClose }: ChatBoxProps) => {
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSlowLoading, setIsSlowLoading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -48,9 +50,26 @@ export const ChatBox = ({ visible, onClose }: ChatBoxProps) => {
     setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
+    setIsSlowLoading(false);
+
+    // Show "thinking" message after 5 seconds
+    slowTimerRef.current = setTimeout(() => {
+      setIsSlowLoading(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: 'slow-indicator',
+          role: 'assistant',
+          content: 'A.I đang suy nghĩ, bạn đợi xíu nhé...',
+          createdAt: new Date(),
+        },
+      ]);
+    }, 5000);
 
     try {
       const reply = await sendMessageToAI(userMessage.content, messages);
+      // Remove slow loading indicator if it was shown
+      setMessages((prev) => prev.filter((m) => m.id !== 'slow-indicator'));
       const aiMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
@@ -59,6 +78,8 @@ export const ChatBox = ({ visible, onClose }: ChatBoxProps) => {
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (error) {
+      // Remove slow loading indicator if it was shown
+      setMessages((prev) => prev.filter((m) => m.id !== 'slow-indicator'));
       const errorMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
@@ -68,6 +89,11 @@ export const ChatBox = ({ visible, onClose }: ChatBoxProps) => {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setIsSlowLoading(false);
+      if (slowTimerRef.current) {
+        clearTimeout(slowTimerRef.current);
+        slowTimerRef.current = null;
+      }
     }
   };
 
@@ -96,7 +122,7 @@ export const ChatBox = ({ visible, onClose }: ChatBoxProps) => {
         data={messages}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <MessageBubble message={item.content} isOwnMessage={item.role === 'user'} />
+          <MessageBubble message={item.content} isOwnMessage={item.role === 'user'} isSlowLoading={item.id === 'slow-indicator'} />
         )}
         contentContainerStyle={styles.listContent}
       />
