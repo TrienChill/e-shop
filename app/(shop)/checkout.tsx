@@ -71,6 +71,103 @@ const C = {
   error: "#EF4444",
 };
 
+// ── Guest checkout components (định nghĩa bên ngoài để tránh re-mount TextInput) ──
+
+const GuestBanner = React.memo(({ router }: { router: ReturnType<typeof useRouter> }) => (
+  <View style={styles.guestBanner}>
+    <View style={styles.guestBannerIconWrap}>
+      <Info size={20} color="#9A3412" />
+    </View>
+    <View style={{ flex: 1 }}>
+      <Text style={styles.guestBannerTitle}>Đặt hàng với tư cách Khách</Text>
+      <Text style={styles.guestBannerText}>
+        Đăng nhập để tích điểm, theo dõi đơn hàng dễ dàng và nhiều ưu đãi hơn.
+      </Text>
+    </View>
+    <TouchableOpacity
+      style={styles.guestBannerBtn}
+      onPress={() => router.push("/login?redirect=/checkout")}
+    >
+      <Text style={styles.guestBannerBtnText}>Đăng nhập</Text>
+    </TouchableOpacity>
+  </View>
+));
+GuestBanner.displayName = "GuestBanner";
+
+interface GuestCustomerFormProps {
+  customerName: string;
+  setCustomerName: (v: string) => void;
+  customerPhone: string;
+  setCustomerPhone: (v: string) => void;
+  customerEmail: string;
+  setCustomerEmail: (v: string) => void;
+  customerAddress: string;
+  setCustomerAddress: (v: string) => void;
+  isWeb?: boolean;
+  webStyles?: typeof webStyles;
+}
+
+const GuestCustomerForm = React.memo(({
+  customerName, setCustomerName,
+  customerPhone, setCustomerPhone,
+  customerEmail, setCustomerEmail,
+  customerAddress, setCustomerAddress,
+  isWeb, webStyles: ws,
+}: GuestCustomerFormProps) => {
+  const inputStyle = isWeb && ws ? ws.guestInput : styles.guestInput;
+  const sectionStyle = isWeb && ws ? ws.guestFormSection : styles.guestFormSection;
+
+  return (
+    <View style={sectionStyle}>
+      <Text style={styles.guestFormTitle}>Thông tin người nhận</Text>
+
+      <Text style={styles.guestFormLabel}>Họ và tên *</Text>
+      <TextInput
+        style={inputStyle}
+        placeholder="Nhập họ và tên người nhận"
+        placeholderTextColor="#9CA3AF"
+        value={customerName}
+        onChangeText={setCustomerName}
+        autoCapitalize="words"
+      />
+
+      <Text style={styles.guestFormLabel}>Số điện thoại *</Text>
+      <TextInput
+        style={inputStyle}
+        placeholder="Nhập số điện thoại"
+        placeholderTextColor="#9CA3AF"
+        value={customerPhone}
+        onChangeText={setCustomerPhone}
+        keyboardType="phone-pad"
+      />
+
+      <Text style={styles.guestFormLabel}>Email (không bắt buộc)</Text>
+      <TextInput
+        style={inputStyle}
+        placeholder="Nhập email để nhận thông tin đơn hàng"
+        placeholderTextColor="#9CA3AF"
+        value={customerEmail}
+        onChangeText={setCustomerEmail}
+        keyboardType="email-address"
+        autoCapitalize="none"
+      />
+
+      <Text style={styles.guestFormLabel}>Địa chỉ giao hàng *</Text>
+      <TextInput
+        style={[inputStyle, styles.guestAddressInput]}
+        placeholder="Nhập địa chỉ giao hàng đầy đủ (số nhà, đường, quận, thành phố)"
+        placeholderTextColor="#9CA3AF"
+        value={customerAddress}
+        onChangeText={setCustomerAddress}
+        multiline
+        numberOfLines={3}
+        textAlignVertical="top"
+      />
+    </View>
+  );
+});
+GuestCustomerForm.displayName = "GuestCustomerForm";
+
 export default function CheckoutScreen() {
   const router = useRouter();
 
@@ -169,81 +266,6 @@ export default function CheckoutScreen() {
       ghnWardCode: addr.ghn_ward_code ? String(addr.ghn_ward_code) : null,
     });
     setEditModalVisible(true);
-  };
-
-  // ── Guest checkout components ───────────────────────────────────────────────────
-  const GuestBanner = () => (
-    <View style={styles.guestBanner}>
-      <View style={styles.guestBannerIconWrap}>
-        <Info size={20} color="#9A3412" />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.guestBannerTitle}>Đặt hàng với tư cách Khách</Text>
-        <Text style={styles.guestBannerText}>
-          Đăng nhập để tích điểm, theo dõi đơn hàng dễ dàng và nhiều ưu đãi hơn.
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.guestBannerBtn}
-        onPress={() => router.push("/login?redirect=/checkout")}
-      >
-        <Text style={styles.guestBannerBtnText}>Đăng nhập</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const GuestCustomerForm = ({ isWeb }: { isWeb?: boolean }) => {
-    const inputStyle = isWeb ? webStyles.guestInput : styles.guestInput;
-    const sectionStyle = isWeb ? webStyles.guestFormSection : styles.guestFormSection;
-
-    return (
-      <View style={sectionStyle}>
-        <Text style={styles.guestFormTitle}>Thông tin người nhận</Text>
-
-        <Text style={styles.guestFormLabel}>Họ và tên *</Text>
-        <TextInput
-          style={inputStyle}
-          placeholder="Nhập họ và tên người nhận"
-          placeholderTextColor="#9CA3AF"
-          value={customerName}
-          onChangeText={setCustomerName}
-          autoCapitalize="words"
-        />
-
-        <Text style={styles.guestFormLabel}>Số điện thoại *</Text>
-        <TextInput
-          style={inputStyle}
-          placeholder="Nhập số điện thoại"
-          placeholderTextColor="#9CA3AF"
-          value={customerPhone}
-          onChangeText={setCustomerPhone}
-          keyboardType="phone-pad"
-        />
-
-        <Text style={styles.guestFormLabel}>Email (không bắt buộc)</Text>
-        <TextInput
-          style={inputStyle}
-          placeholder="Nhập email để nhận thông tin đơn hàng"
-          placeholderTextColor="#9CA3AF"
-          value={customerEmail}
-          onChangeText={setCustomerEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
-
-        <Text style={styles.guestFormLabel}>Địa chỉ giao hàng *</Text>
-        <TextInput
-          style={[inputStyle, styles.guestAddressInput]}
-          placeholder="Nhập địa chỉ giao hàng đầy đủ (số nhà, đường, quận, thành phố)"
-          placeholderTextColor="#9CA3AF"
-          value={customerAddress}
-          onChangeText={setCustomerAddress}
-          multiline
-          numberOfLines={3}
-          textAlignVertical="top"
-        />
-      </View>
-    );
   };
 
   const reloadAddresses = async () => {
@@ -778,11 +800,18 @@ export default function CheckoutScreen() {
               </View>
 
               {/* Guest banner */}
-              {isGuest && <GuestBanner />}
+              {isGuest && <GuestBanner router={router} />}
 
               {isGuest ? (
                 /* ── Guest: inline customer form (no address selector) ── */
-                <GuestCustomerForm isWeb />
+                <GuestCustomerForm
+                  customerName={customerName} setCustomerName={setCustomerName}
+                  customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
+                  customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
+                  customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
+                  isWeb
+                  webStyles={webStyles}
+                />
               ) : (
                 /* ── Authenticated: address selector ── */
                 <View style={webStyles.addressCard}>
@@ -848,7 +877,7 @@ export default function CheckoutScreen() {
                   activeCart.map((item) => (
                     <View key={item.id} style={webStyles.summaryItem}>
                       <View style={webStyles.summaryItemImgWrap}>
-                        <Image source={{ uri: item.image }} style={webStyles.summaryItemImg} />
+                        <Image source={{ uri: item.image || "https://via.placeholder.com/200" }} style={webStyles.summaryItemImg} />
                         <View style={webStyles.summaryItemQtyBadge}>
                           <Text style={webStyles.summaryItemQty}>{item.quantity}</Text>
                         </View>
@@ -938,11 +967,16 @@ export default function CheckoutScreen() {
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {/* Guest banner */}
-            {isGuest && <GuestBanner />}
+            {isGuest && <GuestBanner router={router} />}
 
             {isGuest ? (
               /* ── Guest: inline customer form ── */
-              <GuestCustomerForm />
+              <GuestCustomerForm
+                customerName={customerName} setCustomerName={setCustomerName}
+                customerPhone={customerPhone} setCustomerPhone={setCustomerPhone}
+                customerEmail={customerEmail} setCustomerEmail={setCustomerEmail}
+                customerAddress={customerAddress} setCustomerAddress={setCustomerAddress}
+              />
             ) : (
               /* ── Authenticated: address selector ── */
               <View style={styles.addressBlock}>
@@ -986,7 +1020,7 @@ export default function CheckoutScreen() {
                 activeCart.map((item) => (
                   <View key={item.id} style={styles.itemRow}>
                     <View style={styles.imageContainer}>
-                      <Image source={{ uri: item.image }} style={styles.itemImage} />
+                      <Image source={{ uri: item.image || "https://via.placeholder.com/200" }} style={styles.itemImage} />
                       <View style={styles.itemQuantityBadge}>
                         <Text style={styles.itemQuantityText}>{item.quantity}</Text>
                       </View>

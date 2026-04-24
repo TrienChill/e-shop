@@ -75,7 +75,7 @@ export function PopularCard({ item, style }: PopularCardProps) {
         activeOpacity={0.9}
       >
         <View style={styles.popularImageWrapper}>
-          <Image source={{ uri: item.image }} style={styles.popularImage} />
+          <Image source={{ uri: item.image || "https://via.placeholder.com/200" }} style={styles.popularImage} />
 
           {/* Badge */}
           {item.badge && (

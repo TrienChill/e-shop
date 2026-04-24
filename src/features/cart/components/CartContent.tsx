@@ -95,7 +95,7 @@ const CartItemRow = ({
     {/* Image */}
     <View style={styles.cartImageWrap}>
       <Image
-        source={{ uri: item.image }}
+        source={{ uri: item.image || "https://via.placeholder.com/200" }}
         style={styles.cartImage}
         resizeMode="cover"
       />
