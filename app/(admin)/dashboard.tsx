@@ -99,9 +99,23 @@ const FilterButton = ({ label, isActive, onPress }: any) => (
   </TouchableOpacity>
 );
 
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Chờ xử lý",
+  processing: "Đang chuẩn bị",
+  shipping: "Đang giao",
+  completed: "Hoàn thành",
+  cancelled: "Đã hủy",
+  refunded: "Đã hoàn tiền",
+  return_requested: "Yêu cầu hoàn trả",
+  returning: "Đang hoàn trả",
+  returned: "Đã hoàn trả",
+};
+
 export default function AdminDashboardHome() {
   const { width } = useWindowDimensions();
   const [chartWidth, setChartWidth] = useState(300);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const subChartRef = useRef<View>(null);
 
   // States for real data
   const [summaryData, setSummaryData] = useState<any>({
@@ -122,7 +136,14 @@ export default function AdminDashboardHome() {
 
   const [filterType, setFilterType] = useState<"7" | "30" | "month" | "quarter" | "year">("7");
 
+  // Sub-chart States
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [subChartData, setSubChartData] = useState<any[]>([]);
+  const [subChartFilter, setSubChartFilter] = useState<"7" | "30" | "month">("7");
+  const [isSubChartLoading, setIsSubChartLoading] = useState(false);
+
   const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const filteredSubChartTotal = subChartData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
 
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
@@ -170,8 +191,60 @@ export default function AdminDashboardHome() {
       days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     }
 
+    // Do not show isolated chart spinner if it's already doing a full refresh pull
     fetchRevenueData(days, !isRefreshing);
   }, [filterType]);
+
+  // Fetch Sub-chart when filter or status changes
+  useEffect(() => {
+    if (selectedStatus) {
+      let days = 7;
+      const now = new Date();
+      if (subChartFilter === "30") days = 30;
+      else if (subChartFilter === "month") days = now.getDate();
+
+      fetchSubChartData(selectedStatus, days);
+    }
+  }, [selectedStatus, subChartFilter]);
+
+  const handleSliceClick = (statusKey: string) => {
+    setSelectedStatus(statusKey);
+    // Add a small delay to allow React to render the Sub-chart view before measuring
+    setTimeout(() => {
+      subChartRef.current?.measureLayout(
+        scrollViewRef.current?.getInnerViewNode() as any,
+        (x, y) => {
+          scrollViewRef.current?.scrollTo({ y: y - 20, animated: true });
+        },
+        () => console.warn("Lỗi cuộn sub-chart")
+      );
+    }, 400);
+  };
+
+  const fetchSubChartData = async (status: string, days: number) => {
+    setIsSubChartLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("get_order_count_by_status_and_days", {
+        p_status: status,
+        p_days: days,
+      });
+
+      if (error) {
+        console.warn("Lỗi fetch subchart:", error);
+      }
+      if (data && Array.isArray(data)) {
+        const mappedData = data.map((r: any) => ({
+          value: Number(r.order_count) || 0,
+          label: r.date_str, // RPC already returns "DD/MM"
+        }));
+        setSubChartData(mappedData);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubChartLoading(false);
+    }
+  };
 
   const loadOtherData = async (showSkeleton = false) => {
     if (showSkeleton) setIsLoading(true);
@@ -248,8 +321,9 @@ export default function AdminDashboardHome() {
           return {
             value: val,
             color: statusColors[s.status] || "#9CA3AF",
-            text: statusLabels[s.status] || s.status,
-            label: statusLabels[s.status] || s.status,
+            text: STATUS_LABELS[s.status] || s.status,
+            label: STATUS_LABELS[s.status] || s.status,
+            onPress: () => handleSliceClick(s.status),
             percentage:
               totalCount > 0
                 ? Math.round((val / totalCount) * 100) + "%"
@@ -359,6 +433,7 @@ export default function AdminDashboardHome() {
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       style={styles.root}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.rootContent}
@@ -623,6 +698,125 @@ export default function AdminDashboardHome() {
           </View>
         </View>
       </View>
+
+      {/* Sub-chart (Drill-down) */}
+      {selectedStatus && (
+        <View ref={subChartRef} style={{ marginBottom: 24 }}>
+          <View style={[styles.whiteCard, { width: "100%" }]}>
+            <View style={styles.chartHeaderContainer}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.cardTitle, { marginBottom: 0 }]}>
+                    Chi tiết: {STATUS_LABELS[selectedStatus] || selectedStatus}
+                  </Text>
+                  {isSubChartLoading && (
+                    <ActivityIndicator size="small" color="#F59E0B" style={{ marginLeft: 12 }} />
+                  )}
+                </View>
+                <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>
+                  Tổng đơn hàng: <Text style={{ color: '#F59E0B', fontWeight: '700' }}>{filteredSubChartTotal}</Text>
+                </Text>
+              </View>
+
+              <View style={styles.filterGroup}>
+                <Filter size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
+                <FilterButton
+                  label="7 Ngày"
+                  isActive={subChartFilter === "7"}
+                  onPress={() => setSubChartFilter("7")}
+                />
+                <FilterButton
+                  label="30 Ngày"
+                  isActive={subChartFilter === "30"}
+                  onPress={() => setSubChartFilter("30")}
+                />
+                <FilterButton
+                  label="Tháng này"
+                  isActive={subChartFilter === "month"}
+                  onPress={() => setSubChartFilter("month")}
+                />
+              </View>
+            </View>
+
+            <View style={[styles.chartWrapper, { height: 240 }]}>
+              {isSubChartLoading && subChartData.length === 0 ? (
+                <Shimmer width="100%" height={240} />
+              ) : subChartData.length > 0 ? (
+                <LineChart
+                  areaChart
+                  curved
+                  data={subChartData}
+                  width={chartWidth}
+                  height={240}
+                  spacing={subChartData.length > 15 ? 50 : (chartWidth - 40) / Math.max(subChartData.length - 1, 1)}
+                  initialSpacing={20}
+                  color="#F59E0B"
+                  thickness={4}
+                  startFillColor="rgba(245, 158, 11, 0.4)"
+                  endFillColor="rgba(245, 158, 11, 0.05)"
+                  startOpacity={0.8}
+                  endOpacity={0.1}
+                  gradientDirection="vertical"
+                  dataPointsColor="#D97706"
+                  dataPointsRadius={5}
+                  dataPointsWidth={10}
+                  focusEnabled
+                  showStripOnFocus
+                  showTextOnFocus
+                  pointerConfig={{
+                    pointerStripUptoDataPoint: true,
+                    pointerStripColor: '#F59E0B',
+                    pointerStripWidth: 2,
+                    strokeDashArray: [5, 5],
+                    pointerColor: '#F59E0B',
+                    radius: 6,
+                    pointerLabelComponent: (items: any) => {
+                      return (
+                        <View style={{
+                          backgroundColor: '#1F2937',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          width: 80,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }}>
+                          <Text style={{ color: '#9CA3AF', fontSize: 10, marginBottom: 2 }}>{items[0].label}</Text>
+                          <Text style={{ color: 'white', fontWeight: '800', fontSize: 12 }}>
+                            {items[0].value} đơn
+                          </Text>
+                        </View>
+                      );
+                    },
+                  }}
+                  rulesType="solid"
+                  rulesColor="#F3F4F6"
+                  noOfSections={5}
+                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11, fontWeight: '600' }}
+                  xAxisLabelTextStyle={{ color: "#6B7280", fontSize: 10, fontWeight: '500' }}
+                  yAxisLabelPrefix=""
+                  yAxisThickness={0}
+                  xAxisThickness={1}
+                  xAxisColor="#F3F4F6"
+                  isAnimated
+                  animationDuration={1200}
+                />
+              ) : (
+                <View style={[styles.chartWrapper, { height: 240 }]}>
+                  <Text style={{ color: "#9CA3AF" }}>
+                    Không có đơn hàng nào
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Khu vực 3: Danh sách nổi bật */}
       <View style={styles.listSection}>
