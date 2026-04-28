@@ -24,7 +24,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { LineChart, PieChart } from "react-native-gifted-charts";
+import Echarts from "react-native-echarts-pro";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
@@ -323,7 +323,7 @@ export default function AdminDashboardHome() {
             color: statusColors[s.status] || "#9CA3AF",
             text: STATUS_LABELS[s.status] || s.status,
             label: STATUS_LABELS[s.status] || s.status,
-            onPress: () => handleSliceClick(s.status),
+            statusKey: s.status,
             percentage:
               totalCount > 0
                 ? Math.round((val / totalCount) * 100) + "%"
@@ -413,22 +413,163 @@ export default function AdminDashboardHome() {
         </View>
       );
     }
+
+    const pieOption = {
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} ({d}%)',
+        backgroundColor: '#1F2937',
+        textStyle: { color: 'white', fontSize: 12 }
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: ['50%', '80%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 6,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: { show: false, position: 'center' },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 14,
+              fontWeight: 'bold',
+              formatter: '{b}\n{d}%',
+              color: '#111827'
+            }
+          },
+          labelLine: { show: false },
+          data: statusData.map((item: any) => ({
+            value: item.value,
+            name: item.label,
+            itemStyle: { color: item.color },
+            statusKey: item.statusKey
+          }))
+        }
+      ]
+    };
+
     return (
-      <PieChart
-        data={statusData}
-        donut
-        radius={90}
-        innerRadius={60}
-        centerLabelComponent={() => {
-          return (
-            <View style={styles.pieCenter}>
-              <Text style={styles.pieCenterText}>Tổng</Text>
-              <Text style={styles.pieCenterValue}>100%</Text>
-            </View>
-          );
-        }}
-      />
+      <View style={{ width: 220, height: 220, alignSelf: 'center' }}>
+        <Echarts
+          option={pieOption}
+          height={220}
+          onPress={(e: any) => {
+            const statusKey = e?.data?.statusKey;
+            if (statusKey) {
+              handleSliceClick(statusKey);
+            }
+          }}
+        />
+        {/* Fake Center Text since ECharts dynamic center label is complex */}
+        <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', pointerEvents: 'none' }]}>
+          <Text style={styles.pieCenterText}>Tổng</Text>
+          <Text style={styles.pieCenterValue}>100%</Text>
+        </View>
+      </View>
     );
+  };
+
+  const revenueOption = {
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1F2937',
+      textStyle: { color: 'white' },
+      formatter: `function (params) {
+        let p = params[0];
+        let val = Number(p.value).toLocaleString('vi-VN') + ' đ';
+        return '<div style="font-size:10px;color:#9CA3AF;margin-bottom:2px">' + p.name + '</div><div style="font-weight:800;font-size:12px">' + val + '</div>';
+      }`
+    },
+    grid: { left: '2%', right: '2%', bottom: '2%', top: '10%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: revenueData.map(item => item.label),
+      axisLine: { lineStyle: { color: '#F3F4F6' } },
+      axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: '500' }
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'solid', color: '#F3F4F6' } },
+      axisLabel: {
+        color: '#9CA3AF',
+        fontSize: 11,
+        fontWeight: '600',
+        formatter: `function (value) {
+          if (value >= 1000000000) return (value / 1000000000).toFixed(1) + "B";
+          if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
+          if (value >= 1000) return (value / 1000).toFixed(0) + "k";
+          return value.toString();
+        }`
+      }
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        data: revenueData.map(item => item.value),
+        itemStyle: { color: '#4F46E5' },
+        lineStyle: { width: 4, color: '#6366F1' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
+              { offset: 1, color: 'rgba(99, 102, 241, 0.05)' }
+            ]
+          }
+        }
+      }
+    ]
+  };
+
+  const subChartOption = {
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#1F2937',
+      textStyle: { color: 'white' },
+      formatter: `function (params) {
+        let p = params[0];
+        return '<div style="font-size:10px;color:#9CA3AF;margin-bottom:2px">' + p.name + '</div><div style="font-weight:800;font-size:12px">' + p.value + ' đơn</div>';
+      }`
+    },
+    grid: { left: '2%', right: '2%', bottom: '2%', top: '10%', containLabel: true },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: subChartData.map(item => item.label),
+      axisLine: { lineStyle: { color: '#F3F4F6' } },
+      axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: '500' }
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { type: 'solid', color: '#F3F4F6' } },
+      axisLabel: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' }
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        data: subChartData.map(item => item.value),
+        itemStyle: { color: '#D97706' },
+        lineStyle: { width: 4, color: '#F59E0B' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 158, 11, 0.4)' },
+              { offset: 1, color: 'rgba(245, 158, 11, 0.05)' }
+            ]
+          }
+        }
+      }
+    ]
   };
 
   return (
@@ -587,77 +728,7 @@ export default function AdminDashboardHome() {
               {isLoading && revenueData.length === 0 ? (
                 <Shimmer width="100%" height={240} />
               ) : revenueData.length > 0 ? (
-                <LineChart
-                  areaChart
-                  curved
-                  data={revenueData}
-                  width={chartWidth}
-                  height={240}
-                  spacing={revenueData.length > 15 ? 50 : (chartWidth - 40) / Math.max(revenueData.length - 1, 1)}
-                  initialSpacing={20}
-                  color="#6366F1"
-                  thickness={4}
-                  startFillColor="rgba(99, 102, 241, 0.4)"
-                  endFillColor="rgba(99, 102, 241, 0.05)"
-                  startOpacity={0.8}
-                  endOpacity={0.1}
-                  gradientDirection="vertical"
-                  dataPointsColor="#4F46E5"
-                  dataPointsRadius={5}
-                  dataPointsWidth={10}
-                  focusEnabled
-                  showStripOnFocus
-                  showTextOnFocus
-                  pointerConfig={{
-                    pointerStripUptoDataPoint: true,
-                    pointerStripColor: '#6366F1',
-                    pointerStripWidth: 2,
-                    strokeDashArray: [5, 5],
-                    pointerColor: '#6366F1',
-                    radius: 6,
-                    pointerLabelComponent: (items: any) => {
-                      return (
-                        <View style={{
-                          backgroundColor: '#1F2937',
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 8,
-                          width: 120,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 4,
-                          elevation: 5,
-                        }}>
-                          <Text style={{ color: '#9CA3AF', fontSize: 10, marginBottom: 2 }}>{items[0].label}</Text>
-                          <Text style={{ color: 'white', fontWeight: '800', fontSize: 12 }}>
-                            {formatCurrency(items[0].value)}
-                          </Text>
-                        </View>
-                      );
-                    },
-                  }}
-                  rulesType="solid"
-                  rulesColor="#F3F4F6"
-                  noOfSections={5}
-                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11, fontWeight: '600' }}
-                  xAxisLabelTextStyle={{ color: "#6B7280", fontSize: 10, fontWeight: '500' }}
-                  yAxisLabelPrefix=""
-                  yAxisThickness={0}
-                  xAxisThickness={1}
-                  xAxisColor="#F3F4F6"
-                  formatYLabel={(label) => {
-                    const val = parseInt(label);
-                    if (val >= 1000000000) return (val / 1000000000).toFixed(1) + "B";
-                    if (val >= 1000000) return (val / 1000000).toFixed(1) + "M";
-                    if (val >= 1000) return (val / 1000).toFixed(0) + "k";
-                    return val.toString();
-                  }}
-                  isAnimated
-                  animationDuration={1200}
-                />
+                <Echarts option={revenueOption} height={240} />
               ) : (
                 <View style={[styles.chartWrapper, { height: 220 }]}>
                   <Text style={{ color: "#9CA3AF" }}>
@@ -742,70 +813,7 @@ export default function AdminDashboardHome() {
               {isSubChartLoading && subChartData.length === 0 ? (
                 <Shimmer width="100%" height={240} />
               ) : subChartData.length > 0 ? (
-                <LineChart
-                  areaChart
-                  curved
-                  data={subChartData}
-                  width={chartWidth}
-                  height={240}
-                  spacing={subChartData.length > 15 ? 50 : (chartWidth - 40) / Math.max(subChartData.length - 1, 1)}
-                  initialSpacing={20}
-                  color="#F59E0B"
-                  thickness={4}
-                  startFillColor="rgba(245, 158, 11, 0.4)"
-                  endFillColor="rgba(245, 158, 11, 0.05)"
-                  startOpacity={0.8}
-                  endOpacity={0.1}
-                  gradientDirection="vertical"
-                  dataPointsColor="#D97706"
-                  dataPointsRadius={5}
-                  dataPointsWidth={10}
-                  focusEnabled
-                  showStripOnFocus
-                  showTextOnFocus
-                  pointerConfig={{
-                    pointerStripUptoDataPoint: true,
-                    pointerStripColor: '#F59E0B',
-                    pointerStripWidth: 2,
-                    strokeDashArray: [5, 5],
-                    pointerColor: '#F59E0B',
-                    radius: 6,
-                    pointerLabelComponent: (items: any) => {
-                      return (
-                        <View style={{
-                          backgroundColor: '#1F2937',
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 8,
-                          width: 80,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 4 },
-                          shadowOpacity: 0.3,
-                          shadowRadius: 4,
-                          elevation: 5,
-                        }}>
-                          <Text style={{ color: '#9CA3AF', fontSize: 10, marginBottom: 2 }}>{items[0].label}</Text>
-                          <Text style={{ color: 'white', fontWeight: '800', fontSize: 12 }}>
-                            {items[0].value} đơn
-                          </Text>
-                        </View>
-                      );
-                    },
-                  }}
-                  rulesType="solid"
-                  rulesColor="#F3F4F6"
-                  noOfSections={5}
-                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11, fontWeight: '600' }}
-                  xAxisLabelTextStyle={{ color: "#6B7280", fontSize: 10, fontWeight: '500' }}
-                  yAxisLabelPrefix=""
-                  yAxisThickness={0}
-                  xAxisThickness={1}
-                  xAxisColor="#F3F4F6"
-                  isAnimated
-                  animationDuration={1200}
-                />
+                <Echarts option={subChartOption} height={240} />
               ) : (
                 <View style={[styles.chartWrapper, { height: 240 }]}>
                   <Text style={{ color: "#9CA3AF" }}>
