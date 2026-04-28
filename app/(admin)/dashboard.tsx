@@ -9,6 +9,8 @@ import {
   Image,
   useWindowDimensions,
   Animated,
+  RefreshControl,
+  ActivityIndicator,
 } from "react-native";
 import { LineChart, PieChart } from "react-native-gifted-charts";
 import {
@@ -19,6 +21,8 @@ import {
   Bell,
   MoreVertical,
   AlertCircle,
+  RefreshCw,
+  Filter,
 } from "lucide-react-native";
 import { supabase } from "@/src/lib/supabase";
 
@@ -84,6 +88,17 @@ const KPICard = ({ title, value, icon: Icon, color, iconBg, isLoading }: any) =>
   </View>
 );
 
+const FilterButton = ({ label, isActive, onPress }: any) => (
+  <TouchableOpacity
+    style={[styles.filterButton, isActive && styles.filterButtonActive]}
+    onPress={onPress}
+  >
+    <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+      {label}
+    </Text>
+  </TouchableOpacity>
+);
+
 export default function AdminDashboardHome() {
   const { width } = useWindowDimensions();
   const [chartWidth, setChartWidth] = useState(300);
@@ -98,9 +113,14 @@ export default function AdminDashboardHome() {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
-  
+
+  // Loading & Filtering States
   const [isLoading, setIsLoading] = useState(true);
+  const [isChartLoading, setIsChartLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const [filterType, setFilterType] = useState<"7" | "30" | "month">("7");
 
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
@@ -123,29 +143,38 @@ export default function AdminDashboardHome() {
     return "100%";
   };
 
+  // Initial Fetch
   useEffect(() => {
-    loadDashboardData();
+    loadOtherData(true);
   }, []);
 
-  const loadDashboardData = async () => {
+  // Fetch Revenue when filter changes
+  useEffect(() => {
+    let days = 7;
+    if (filterType === "30") days = 30;
+    if (filterType === "month") days = new Date().getDate();
+
+    // Do not show isolated chart spinner if it's already doing a full refresh pull
+    fetchRevenueData(days, !isRefreshing);
+  }, [filterType]);
+
+  const loadOtherData = async (showSkeleton = false) => {
+    if (showSkeleton) setIsLoading(true);
     try {
-      setIsLoading(true);
       setErrorMsg("");
 
       const [
         { data: summary, error: err1 },
-        { data: revenue, error: err2 },
-        { data: status, error: err3 },
-        { data: products, error: err4 },
+        { data: status, error: err2 },
+        { data: products, error: err3 },
       ] = await Promise.all([
         supabase.rpc("get_dashboard_summary"),
-        supabase.rpc("get_revenue_last_7_days"),
         supabase.rpc("get_order_status_distribution"),
         supabase.rpc("get_top_selling_products", { limit_num: 5 }),
       ]);
 
-      if (err1 || err2 || err3 || err4) {
-        console.warn("Lỗi fetch RPC:", err1 || err2 || err3 || err4);
+      if (err1 || err2 || err3) {
+        console.warn("Lỗi fetch RPC khác:", err1 || err2 || err3);
         setErrorMsg("Không thể tải một số dữ liệu từ máy chủ.");
       }
 
@@ -160,21 +189,7 @@ export default function AdminDashboardHome() {
         });
       }
 
-      // 2. Map Revenue
-      if (revenue && Array.isArray(revenue)) {
-        const mappedRevenue = revenue.map((r: any) => {
-          // Format date from YYYY-MM-DD to DD/MM
-          const parts = r.date_str ? r.date_str.split("-") : [];
-          const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
-          return {
-            value: Number(r.daily_revenue) || 0,
-            label,
-          };
-        });
-        setRevenueData(mappedRevenue);
-      }
-
-      // 3. Map Status (with Vietnamese labels and colors)
+      // 2. Map Status
       if (status && Array.isArray(status)) {
         const statusColors: any = {
           pending: "#F59E0B", // Yellow
@@ -189,7 +204,10 @@ export default function AdminDashboardHome() {
           cancelled: "Đã hủy",
         };
 
-        const totalCount = status.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
+        const totalCount = status.reduce(
+          (acc, curr) => acc + (Number(curr.count) || 0),
+          0
+        );
 
         const mappedStatus = status.map((s: any) => {
           const val = Number(s.count) || 0;
@@ -197,14 +215,17 @@ export default function AdminDashboardHome() {
             value: val,
             color: statusColors[s.status] || "#9CA3AF",
             text: statusLabels[s.status] || s.status,
-            label: statusLabels[s.status] || s.status, // Keep label for legend mapping
-            percentage: totalCount > 0 ? Math.round((val / totalCount) * 100) + "%" : "0%",
+            label: statusLabels[s.status] || s.status,
+            percentage:
+              totalCount > 0
+                ? Math.round((val / totalCount) * 100) + "%"
+                : "0%",
           };
         });
         setStatusData(mappedStatus);
       }
 
-      // 4. Map Products
+      // 3. Map Products
       if (products && Array.isArray(products)) {
         setTopProducts(products);
       }
@@ -212,11 +233,51 @@ export default function AdminDashboardHome() {
       console.error(err);
       setErrorMsg("Lỗi kết nối. Vui lòng thử lại sau.");
     } finally {
-      setIsLoading(false);
+      if (showSkeleton) setIsLoading(false);
     }
   };
 
-  // Helper to render Pie Chart gracefully when no data
+  const fetchRevenueData = async (days: number, showSpinner = false) => {
+    if (showSpinner) setIsChartLoading(true);
+    try {
+      const { data: revenue, error } = await supabase.rpc("get_revenue_by_days", {
+        p_days: days,
+      });
+      if (error) {
+        console.warn("Lỗi fetch revenue:", error);
+      }
+      if (revenue && Array.isArray(revenue)) {
+        const mappedRevenue = revenue.map((r: any) => {
+          // Format date from YYYY-MM-DD to DD/MM
+          const parts = r.date_str ? r.date_str.split("-") : [];
+          const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
+          return {
+            value: Number(r.daily_revenue) || 0,
+            label,
+          };
+        });
+        setRevenueData(mappedRevenue);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (showSpinner) setIsChartLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    let days = 7;
+    if (filterType === "30") days = 30;
+    if (filterType === "month") days = new Date().getDate();
+
+    await Promise.all([
+      loadOtherData(false),
+      fetchRevenueData(days, false),
+    ]);
+    setIsRefreshing(false);
+  };
+
   const renderPieChart = () => {
     if (isLoading) {
       return <Shimmer width={180} height={180} borderRadius={90} />;
@@ -251,6 +312,14 @@ export default function AdminDashboardHome() {
       style={styles.root}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.rootContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          colors={["#6366F1"]}
+          tintColor="#6366F1"
+        />
+      }
     >
       {/* Top Bar */}
       <View style={styles.topBar}>
@@ -259,8 +328,8 @@ export default function AdminDashboardHome() {
           <Text style={styles.topBarTitle}>Dashboard Tổng Quan</Text>
         </View>
         <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={loadDashboardData}>
-            <RotateCcw size={20} color="#1F2937" />
+          <TouchableOpacity style={styles.iconButton} onPress={handleRefresh}>
+            <RefreshCw size={20} color="#1F2937" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
             <Bell size={20} color="#1F2937" />
@@ -293,7 +362,7 @@ export default function AdminDashboardHome() {
       <View style={styles.kpiGrid}>
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
-            title="Doanh thu (Tháng này)"
+            title="Doanh thu (Lọc theo biểu đồ)"
             value={formatCurrency(summaryData.revenue)}
             icon={TrendingUp}
             color="#6366F1"
@@ -335,10 +404,39 @@ export default function AdminDashboardHome() {
 
       {/* Khu vực 2: Khu vực Biểu đồ */}
       <View style={styles.chartGrid}>
-        {/* Cột 1: Biểu đồ đường (Doanh thu 7 ngày) */}
+        {/* Cột 1: Biểu đồ đường (Doanh thu) */}
         <View style={[styles.chartCol, { width: getResponsiveChartWidth() }]}>
           <View style={styles.whiteCard}>
-            <Text style={styles.cardTitle}>Doanh thu 7 ngày gần nhất</Text>
+            <View style={styles.chartHeaderContainer}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={[styles.cardTitle, { marginBottom: 0 }]}>
+                  Biểu đồ Doanh thu
+                </Text>
+                {isChartLoading && (
+                  <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 12 }} />
+                )}
+              </View>
+              
+              <View style={styles.filterGroup}>
+                <Filter size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
+                <FilterButton
+                  label="7 Ngày"
+                  isActive={filterType === "7"}
+                  onPress={() => setFilterType("7")}
+                />
+                <FilterButton
+                  label="30 Ngày"
+                  isActive={filterType === "30"}
+                  onPress={() => setFilterType("30")}
+                />
+                <FilterButton
+                  label="Tháng này"
+                  isActive={filterType === "month"}
+                  onPress={() => setFilterType("month")}
+                />
+              </View>
+            </View>
+
             <View
               style={styles.chartWrapper}
               onLayout={(event) => {
@@ -346,18 +444,18 @@ export default function AdminDashboardHome() {
                 setChartWidth(Math.max(width - 60, 200));
               }}
             >
-              {isLoading ? (
+              {isLoading && revenueData.length === 0 ? (
                 <Shimmer width="100%" height={220} />
               ) : revenueData.length > 0 ? (
                 <LineChart
                   data={revenueData}
                   width={chartWidth}
                   height={220}
-                  spacing={chartWidth / revenueData.length}
+                  spacing={chartWidth / Math.max(revenueData.length, 1)}
                   color="#6366F1"
                   thickness={3}
                   dataPointsColor="#6366F1"
-                  dataPointsRadius={5}
+                  dataPointsRadius={4}
                   hideRules
                   yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
                   xAxisLabelTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
@@ -369,7 +467,9 @@ export default function AdminDashboardHome() {
                 />
               ) : (
                 <View style={[styles.chartWrapper, { height: 220 }]}>
-                  <Text style={{ color: "#9CA3AF" }}>Chưa có dữ liệu giao dịch</Text>
+                  <Text style={{ color: "#9CA3AF" }}>
+                    Chưa có dữ liệu giao dịch
+                  </Text>
                 </View>
               )}
             </View>
@@ -382,7 +482,7 @@ export default function AdminDashboardHome() {
             <Text style={styles.cardTitle}>Tỉ lệ trạng thái đơn hàng</Text>
             <View style={styles.pieWrapper}>
               {renderPieChart()}
-              
+
               {/* Legend */}
               {!isLoading && statusData.length > 0 && (
                 <View style={styles.legendContainer}>
@@ -419,10 +519,17 @@ export default function AdminDashboardHome() {
           <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, { flex: 0.5 }]}>#</Text>
             <Text style={[styles.tableHeaderText, { flex: 3 }]}>Sản phẩm</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1.5, textAlign: "right" }]}>
+            <Text
+              style={[
+                styles.tableHeaderText,
+                { flex: 1.5, textAlign: "right" },
+              ]}
+            >
               Giá
             </Text>
-            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: "right" }]}>
+            <Text
+              style={[styles.tableHeaderText, { flex: 1, textAlign: "right" }]}
+            >
               Đã bán
             </Text>
           </View>
@@ -436,12 +543,18 @@ export default function AdminDashboardHome() {
           ) : topProducts.length > 0 ? (
             topProducts.map((product, index) => (
               <View key={product.product_id} style={styles.tableRow}>
-                <Text style={[styles.tableCellText, styles.rankText, { flex: 0.5 }]}>
+                <Text
+                  style={[styles.tableCellText, styles.rankText, { flex: 0.5 }]}
+                >
                   {index + 1}
                 </Text>
                 <View style={[styles.productCell, { flex: 3 }]}>
                   <Image
-                    source={{ uri: product.image_url || "https://via.placeholder.com/60" }}
+                    source={{
+                      uri:
+                        product.image_url ||
+                        "https://via.placeholder.com/60",
+                    }}
                     style={styles.productImage}
                   />
                   <Text style={styles.productName} numberOfLines={1}>
@@ -608,11 +721,45 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 24,
   },
+  chartHeaderContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    marginBottom: 16,
+  },
   cardTitle: {
     color: "#111827",
     fontWeight: "800",
     fontSize: 18,
-    marginBottom: 16,
+  },
+  filterGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F3F4F6",
+    padding: 4,
+    borderRadius: 12,
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  filterButtonActive: {
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  filterTextActive: {
+    color: "#111827",
   },
   chartWrapper: {
     flex: 1,
@@ -642,7 +789,7 @@ const styles = StyleSheet.create({
 
   listSection: { marginTop: 8 },
   seeAllText: { color: "#6366F1", fontWeight: "600", fontSize: 14 },
-  
+
   tableHeader: {
     flexDirection: "row",
     paddingBottom: 12,
@@ -666,7 +813,13 @@ const styles = StyleSheet.create({
   tableCellText: { color: "#111827", fontSize: 14, fontWeight: "500" },
   rankText: { color: "#6B7280", fontWeight: "700" },
   productCell: { flexDirection: "row", alignItems: "center" },
-  productImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12, backgroundColor: "#F3F4F6" },
+  productImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: "#F3F4F6",
+  },
   productName: { color: "#111827", fontSize: 14, fontWeight: "600", flex: 1 },
   priceText: { color: "#4B5563" },
   salesText: { color: "#10B981", fontWeight: "700" },
