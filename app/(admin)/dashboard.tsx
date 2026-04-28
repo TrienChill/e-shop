@@ -163,14 +163,24 @@ export default function AdminDashboardHome() {
     try {
       setErrorMsg("");
 
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
       const [
         { data: summary, error: err1 },
         { data: status, error: err2 },
         { data: products, error: err3 },
+        { count: newOrdersCount },
+        { count: newReturnsCount },
+        { count: newCustomersCount },
       ] = await Promise.all([
         supabase.rpc("get_dashboard_summary"),
         supabase.rpc("get_order_status_distribution"),
         supabase.rpc("get_top_selling_products", { limit_num: 5 }),
+        supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("return_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
       ]);
 
       if (err1 || err2 || err3) {
@@ -180,15 +190,13 @@ export default function AdminDashboardHome() {
 
       // 1. Map Summary
       const sumObj = Array.isArray(summary) ? summary[0] : summary;
-      if (sumObj) {
-        // Fallback robust để hứng mọi dạng key JSON từ RPC
-        setSummaryData({
-          revenue: sumObj.revenue ?? sumObj.total_revenue ?? sumObj.totalAmount ?? 0,
-          new_orders: sumObj.new_orders ?? sumObj.pending_orders ?? sumObj.total_orders ?? 0,
-          new_returns: sumObj.new_returns ?? sumObj.pending_returns ?? sumObj.return_requests ?? 0,
-          new_customers: sumObj.new_customers ?? sumObj.new_users ?? sumObj.total_customers ?? 0,
-        });
-      }
+      
+      setSummaryData({
+        revenue: sumObj?.revenue ?? sumObj?.total_revenue ?? sumObj?.totalAmount ?? 0,
+        new_orders: newOrdersCount ?? 0,
+        new_returns: newReturnsCount ?? 0,
+        new_customers: newCustomersCount ?? 0,
+      });
 
       // 2. Map Status
       if (status && Array.isArray(status)) {
