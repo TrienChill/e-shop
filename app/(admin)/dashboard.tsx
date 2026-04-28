@@ -192,7 +192,7 @@ export default function AdminDashboardHome() {
       ] = await Promise.all([
         supabase.rpc("get_dashboard_summary"),
         supabase.rpc("get_order_status_distribution"),
-        supabase.rpc("get_top_selling_products", { limit_num: 5 }),
+        supabase.rpc("get_top_selling_products"),
         supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("return_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
@@ -260,8 +260,24 @@ export default function AdminDashboardHome() {
       }
 
       // 3. Map Products
-      if (products && Array.isArray(products)) {
-        setTopProducts(products);
+      if (products && Array.isArray(products) && products.length > 0) {
+        // Hàm RPC hiện tại đang không trả về trường 'price', nên ta sẽ gọi phụ thêm để lấy giá
+        const productIds = products.map((p: any) => p.product_id);
+        const { data: priceData } = await supabase
+          .from("products")
+          .select("id, price")
+          .in("id", productIds);
+          
+        const priceMap = new Map(priceData?.map(p => [p.id, p.price]) || []);
+        
+        const enrichedProducts = products.map((p: any) => ({
+          ...p,
+          price: priceMap.get(p.product_id) || 0,
+        }));
+        
+        setTopProducts(enrichedProducts);
+      } else {
+        setTopProducts([]);
       }
     } catch (err) {
       console.error(err);
