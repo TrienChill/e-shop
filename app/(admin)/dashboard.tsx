@@ -120,7 +120,7 @@ export default function AdminDashboardHome() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [filterType, setFilterType] = useState<"7" | "30" | "month">("7");
+  const [filterType, setFilterType] = useState<"7" | "30" | "month" | "quarter" | "year">("7");
 
   const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
 
@@ -153,10 +153,23 @@ export default function AdminDashboardHome() {
   // Fetch Revenue when filter changes
   useEffect(() => {
     let days = 7;
+    const now = new Date();
+    
     if (filterType === "30") days = 30;
-    if (filterType === "month") days = new Date().getDate();
+    else if (filterType === "month") days = now.getDate();
+    else if (filterType === "quarter") {
+      const currentMonth = now.getMonth(); // 0-11
+      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+      const quarterStartDate = new Date(now.getFullYear(), quarterStartMonth, 1);
+      const diffTime = Math.abs(now.getTime() - quarterStartDate.getTime());
+      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    } 
+    else if (filterType === "year") {
+      const yearStartDate = new Date(now.getFullYear(), 0, 1);
+      const diffTime = Math.abs(now.getTime() - yearStartDate.getTime());
+      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
 
-    // Do not show isolated chart spinner if it's already doing a full refresh pull
     fetchRevenueData(days, !isRefreshing);
   }, [filterType]);
 
@@ -429,13 +442,18 @@ export default function AdminDashboardHome() {
         <View style={[styles.chartCol, { width: getResponsiveChartWidth() }]}>
           <View style={styles.whiteCard}>
             <View style={styles.chartHeaderContainer}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                <Text style={[styles.cardTitle, { marginBottom: 0 }]}>
-                  Biểu đồ Doanh thu
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={[styles.cardTitle, { marginBottom: 0 }]}>
+                    Biểu đồ Doanh thu
+                  </Text>
+                  {isChartLoading && (
+                    <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 12 }} />
+                  )}
+                </View>
+                <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>
+                  Tổng lọc: <Text style={{ color: '#6366F1', fontWeight: '700' }}>{formatCurrency(filteredRevenueTotal)}</Text>
                 </Text>
-                {isChartLoading && (
-                  <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 12 }} />
-                )}
               </View>
 
               <View style={styles.filterGroup}>
@@ -455,6 +473,16 @@ export default function AdminDashboardHome() {
                   isActive={filterType === "month"}
                   onPress={() => setFilterType("month")}
                 />
+                <FilterButton
+                  label="Quý này"
+                  isActive={filterType === "quarter"}
+                  onPress={() => setFilterType("quarter")}
+                />
+                <FilterButton
+                  label="Năm nay"
+                  isActive={filterType === "year"}
+                  onPress={() => setFilterType("year")}
+                />
               </View>
             </View>
 
@@ -466,21 +494,69 @@ export default function AdminDashboardHome() {
               }}
             >
               {isLoading && revenueData.length === 0 ? (
-                <Shimmer width="100%" height={220} />
+                <Shimmer width="100%" height={240} />
               ) : revenueData.length > 0 ? (
                 <LineChart
+                  areaChart
+                  curved
                   data={revenueData}
                   width={chartWidth}
-                  height={220}
-                  spacing={chartWidth / Math.max(revenueData.length, 1)}
+                  height={240}
+                  spacing={revenueData.length > 15 ? 50 : (chartWidth - 40) / Math.max(revenueData.length - 1, 1)}
+                  initialSpacing={20}
                   color="#6366F1"
-                  thickness={3}
-                  dataPointsColor="#6366F1"
-                  dataPointsRadius={4}
-                  hideRules
-                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
-                  xAxisLabelTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
-                  yAxisLabelPrefix=" "
+                  thickness={4}
+                  startFillColor="rgba(99, 102, 241, 0.4)"
+                  endFillColor="rgba(99, 102, 241, 0.05)"
+                  startOpacity={0.8}
+                  endOpacity={0.1}
+                  gradientDirection="vertical"
+                  dataPointsColor="#4F46E5"
+                  dataPointsRadius={5}
+                  dataPointsWidth={10}
+                  focusEnabled
+                  showStripOnFocus
+                  showTextOnFocus
+                  pointerConfig={{
+                    pointerStripUptoDataPoint: true,
+                    pointerStripColor: '#6366F1',
+                    pointerStripWidth: 2,
+                    strokeDashArray: [5, 5],
+                    pointerColor: '#6366F1',
+                    radius: 6,
+                    pointerLabelComponent: (items: any) => {
+                      return (
+                        <View style={{
+                          backgroundColor: '#1F2937',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          width: 120,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 4 },
+                          shadowOpacity: 0.3,
+                          shadowRadius: 4,
+                          elevation: 5,
+                        }}>
+                          <Text style={{ color: '#9CA3AF', fontSize: 10, marginBottom: 2 }}>{items[0].label}</Text>
+                          <Text style={{ color: 'white', fontWeight: '800', fontSize: 12 }}>
+                            {formatCurrency(items[0].value)}
+                          </Text>
+                        </View>
+                      );
+                    },
+                  }}
+                  rulesType="solid"
+                  rulesColor="#F3F4F6"
+                  noOfSections={5}
+                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11, fontWeight: '600' }}
+                  xAxisLabelTextStyle={{ color: "#6B7280", fontSize: 10, fontWeight: '500' }}
+                  yAxisLabelPrefix=""
+                  yAxisThickness={0}
+                  xAxisThickness={1}
+                  xAxisColor="#F3F4F6"
                   formatYLabel={(label) => {
                     const val = parseInt(label);
                     if (val >= 1000000000) return (val / 1000000000).toFixed(1) + "B";
@@ -489,6 +565,7 @@ export default function AdminDashboardHome() {
                     return val.toString();
                   }}
                   isAnimated
+                  animationDuration={1200}
                 />
               ) : (
                 <View style={[styles.chartWrapper, { height: 220 }]}>
@@ -730,14 +807,14 @@ const styles = StyleSheet.create({
   whiteCard: {
     backgroundColor: "white",
     padding: 24,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: "#F3F4F6",
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
+    elevation: 4,
     flex: 1,
   },
   cardHeader: {
