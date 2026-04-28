@@ -122,6 +122,8 @@ export default function AdminDashboardHome() {
 
   const [filterType, setFilterType] = useState<"7" | "30" | "month">("7");
 
+  const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
 
@@ -382,11 +384,11 @@ export default function AdminDashboardHome() {
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
             title="Doanh thu (Lọc theo biểu đồ)"
-            value={formatCurrency(summaryData.revenue)}
+            value={formatCurrency(filteredRevenueTotal)}
             icon={TrendingUp}
             color="#6366F1"
             iconBg="#EEF2FF"
-            isLoading={isLoading}
+            isLoading={isLoading || isChartLoading}
           />
         </View>
         <View style={{ width: getResponsiveCardWidth() }}>
@@ -480,7 +482,11 @@ export default function AdminDashboardHome() {
                   xAxisLabelTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
                   yAxisLabelPrefix=" "
                   formatYLabel={(label) => {
-                    return (parseInt(label) / 1000000).toString() + "M";
+                    const val = parseInt(label);
+                    if (val >= 1000000000) return (val / 1000000000).toFixed(1) + "B";
+                    if (val >= 1000000) return (val / 1000000).toFixed(1) + "M";
+                    if (val >= 1000) return (val / 1000).toFixed(0) + "k";
+                    return val.toString();
                   }}
                   isAnimated
                 />
