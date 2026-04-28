@@ -15,6 +15,7 @@ import {
   BarChart3,
   Calendar,
   Download,
+  Package2,
   ShoppingCart,
   TrendingUp,
 } from "lucide-react-native";
@@ -192,6 +193,13 @@ export default function AdminRevenueScreen() {
   const totalOrders = rows.reduce((s, r) => s + r.orders_count, 0);
   const avgDaily = rows.length > 0 ? totalRevenue / rows.length : 0;
 
+  // ── Top products: aggregate by date_str prefix is not available, so we
+  //    show the top-5 days by revenue as a proxy "top days" bar chart.
+  const TOP_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+  const topDays = [...rows]
+    .sort((a, b) => b.daily_revenue - a.daily_revenue)
+    .slice(0, 5);
+
   // ── Change timeRange ──
   const handleRangeChange = useCallback((range: TimeRange) => {
     if (range === "custom") {
@@ -220,35 +228,161 @@ export default function AdminRevenueScreen() {
     handleFilterChange(filter.startDate, filter.endDate);
   }, [filter.startDate, filter.endDate]);
 
-  // ── Chart option ──
+  // ── Chart options ──
   const chartLabels = rows.map((r) => {
     const parts = r.date_str?.split("-") ?? [];
     return parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
   });
   const chartValues = rows.map((r) => r.daily_revenue);
 
+  // 1. Revenue Trend — Smooth Line + Area
   const revenueOption = {
     tooltip: {
       trigger: "axis",
       backgroundColor: "#1F2937",
-      textStyle: { color: "white" },
+      borderColor: "#374151",
+      borderWidth: 1,
+      textStyle: { color: "white", fontSize: 12 },
       formatter: `function(params){
         let p=params[0];
-        let v=Number(p.value).toLocaleString('vi-VN')+' đ';
-        return '<div style="font-size:10px;color:#9CA3AF">' + p.name + '</div><div style="font-weight:800">' + v + '</div>';
+        let v=Number(p.value).toLocaleString('vi-VN')+' ₫';
+        return '<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">' + p.name + '</div>'
+             + '<div style="font-weight:800;font-size:14px;color:#A5B4FC">' + v + '</div>';
       }`,
     },
-    grid: { left: "2%", right: "2%", bottom: "2%", top: "8%", containLabel: true },
+    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
     xAxis: {
       type: "category",
       boundaryGap: false,
       data: chartLabels,
-      axisLine: { lineStyle: { color: "#F3F4F6" } },
-      axisLabel: { color: "#6B7280", fontSize: 10 },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: "#9CA3AF", fontSize: 10, fontWeight: "500" },
     },
     yAxis: {
       type: "value",
-      splitLine: { lineStyle: { type: "solid", color: "#F3F4F6" } },
+      splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } },
+      axisLabel: {
+        color: "#9CA3AF",
+        fontSize: 11,
+        formatter: `function(v){
+          if(v>=1000000000) return (v/1000000000).toFixed(1)+'B';
+          if(v>=1000000) return (v/1000000).toFixed(1)+'M';
+          if(v>=1000) return (v/1000).toFixed(0)+'k';
+          return v;
+        }`,
+      },
+    },
+    series: [
+      {
+        type: "line",
+        smooth: true,
+        data: chartValues,
+        symbol: "circle",
+        symbolSize: 6,
+        itemStyle: { color: "#6366F1", borderWidth: 2, borderColor: "#fff" },
+        lineStyle: { width: 3, color: "#6366F1" },
+        areaStyle: {
+          color: {
+            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(99,102,241,0.2)" },
+              { offset: 1, color: "rgba(99,102,241,0.0)" },
+            ],
+          },
+        },
+        emphasis: {
+          focus: "series",
+          itemStyle: { color: "#4F46E5", borderWidth: 3, borderColor: "#fff", shadowBlur: 8, shadowColor: "rgba(99,102,241,0.4)" },
+        },
+      },
+    ],
+  };
+
+  // 2. Orders Trend — Smooth Line + Area (emerald)
+  const ordersOption = {
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "#1F2937",
+      borderColor: "#374151",
+      borderWidth: 1,
+      textStyle: { color: "white", fontSize: 12 },
+      formatter: `function(params){
+        let p=params[0];
+        return '<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">' + p.name + '</div>'
+             + '<div style="font-weight:800;font-size:14px;color:#6EE7B7">' + p.value + ' đơn</div>';
+      }`,
+    },
+    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: chartLabels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: "#9CA3AF", fontSize: 10, fontWeight: "500" },
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } },
+      axisLabel: { color: "#9CA3AF", fontSize: 11 },
+      minInterval: 1,
+    },
+    series: [
+      {
+        type: "line",
+        smooth: true,
+        data: rows.map((r) => r.orders_count),
+        symbol: "circle",
+        symbolSize: 6,
+        itemStyle: { color: "#10B981", borderWidth: 2, borderColor: "#fff" },
+        lineStyle: { width: 3, color: "#10B981" },
+        areaStyle: {
+          color: {
+            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(16,185,129,0.25)" },
+              { offset: 1, color: "rgba(16,185,129,0.0)" },
+            ],
+          },
+        },
+        emphasis: {
+          focus: "series",
+          itemStyle: { color: "#059669", borderWidth: 3, borderColor: "#fff", shadowBlur: 8, shadowColor: "rgba(16,185,129,0.4)" },
+        },
+      },
+    ],
+  };
+
+  // 3. Top-5 Days by Revenue — Multi-color Bar Chart
+  const topDaysOption = {
+    tooltip: {
+      trigger: "axis",
+      backgroundColor: "#1F2937",
+      borderColor: "#374151",
+      borderWidth: 1,
+      textStyle: { color: "white", fontSize: 12 },
+      formatter: `function(params){
+        let p=params[0];
+        let v=Number(p.value).toLocaleString('vi-VN')+' ₫';
+        return '<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">' + p.name + '</div>'
+             + '<div style="font-weight:800;font-size:14px">' + v + '</div>';
+      }`,
+    },
+    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    xAxis: {
+      type: "category",
+      data: topDays.map((r) => {
+        const p = r.date_str?.split("-") ?? [];
+        return p.length === 3 ? `${p[2]}/${p[1]}` : r.date_str;
+      }),
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { color: "#6B7280", fontSize: 11, fontWeight: "600" },
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } },
       axisLabel: {
         color: "#9CA3AF",
         fontSize: 11,
@@ -263,57 +397,21 @@ export default function AdminRevenueScreen() {
     series: [
       {
         type: "bar",
-        data: chartValues,
-        itemStyle: {
-          color: {
-            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: "#6366F1" },
-              { offset: 1, color: "#818CF8" },
-            ],
+        data: topDays.map((r, i) => ({
+          value: r.daily_revenue,
+          itemStyle: {
+            color: {
+              type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+              colorStops: [
+                { offset: 0, color: TOP_COLORS[i % TOP_COLORS.length] },
+                { offset: 1, color: TOP_COLORS[i % TOP_COLORS.length] + "66" },
+              ],
+            },
+            borderRadius: [6, 6, 0, 0],
           },
-          borderRadius: [6, 6, 0, 0],
-        },
-        emphasis: { itemStyle: { color: "#4F46E5" } },
-      },
-    ],
-  };
-
-  const ordersOption = {
-    tooltip: {
-      trigger: "axis",
-      backgroundColor: "#1F2937",
-      textStyle: { color: "white" },
-    },
-    grid: { left: "2%", right: "2%", bottom: "2%", top: "8%", containLabel: true },
-    xAxis: {
-      type: "category",
-      boundaryGap: false,
-      data: chartLabels,
-      axisLine: { lineStyle: { color: "#F3F4F6" } },
-      axisLabel: { color: "#6B7280", fontSize: 10 },
-    },
-    yAxis: {
-      type: "value",
-      splitLine: { lineStyle: { type: "solid", color: "#F3F4F6" } },
-      axisLabel: { color: "#9CA3AF", fontSize: 11 },
-    },
-    series: [
-      {
-        type: "line",
-        smooth: true,
-        data: rows.map((r) => r.orders_count),
-        itemStyle: { color: "#10B981" },
-        lineStyle: { width: 3, color: "#10B981" },
-        areaStyle: {
-          color: {
-            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: "rgba(16,185,129,0.35)" },
-              { offset: 1, color: "rgba(16,185,129,0.02)" },
-            ],
-          },
-        },
+        })),
+        emphasis: { focus: "series" },
+        barMaxWidth: 56,
       },
     ],
   };
@@ -440,36 +538,65 @@ export default function AdminRevenueScreen() {
         </View>
       </View>
 
-      {/* ── Revenue Chart ── */}
+      {/* ── Revenue Trend Chart ── */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Biểu đồ Doanh thu theo ngày</Text>
+          <View>
+            <Text style={styles.cardTitle}>Xu hướng Doanh thu</Text>
+            <Text style={styles.cardSubtitle}>Biểu đồ đường theo từng ngày</Text>
+          </View>
           {loading && <ActivityIndicator size="small" color="#6366F1" />}
         </View>
         {loading && rows.length === 0 ? (
-          <Shimmer width="100%" height={240} />
+          <Shimmer width="100%" height={260} />
         ) : rows.length > 0 ? (
-          <Echarts option={revenueOption} height={240} />
+          <Echarts option={revenueOption} height={260} />
         ) : (
           <View style={styles.emptyChart}>
-            <Text style={styles.emptyText}>Chưa có dữ liệu doanh thu</Text>
+            <BarChart3 size={32} color="#E5E7EB" />
+            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
           </View>
         )}
       </View>
 
-      {/* ── Orders Chart ── */}
+      {/* ── Orders Trend Chart ── */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>Biểu đồ Số đơn hàng theo ngày</Text>
+          <View>
+            <Text style={styles.cardTitle}>Xu hướng Đơn hàng</Text>
+            <Text style={styles.cardSubtitle}>Số đơn hàng hoàn thành theo ngày</Text>
+          </View>
           {loading && <ActivityIndicator size="small" color="#10B981" />}
         </View>
         {loading && rows.length === 0 ? (
-          <Shimmer width="100%" height={200} />
+          <Shimmer width="100%" height={220} />
         ) : rows.length > 0 ? (
-          <Echarts option={ordersOption} height={200} />
+          <Echarts option={ordersOption} height={220} />
         ) : (
           <View style={styles.emptyChart}>
-            <Text style={styles.emptyText}>Chưa có dữ liệu đơn hàng</Text>
+            <ShoppingCart size={32} color="#E5E7EB" />
+            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
+          </View>
+        )}
+      </View>
+
+      {/* ── Top-5 Days Bar Chart ── */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View>
+            <Text style={styles.cardTitle}>Top 5 Ngày Doanh thu Cao Nhất</Text>
+            <Text style={styles.cardSubtitle}>So sánh các ngày đỉnh trong khoảng lọc</Text>
+          </View>
+          {loading && <ActivityIndicator size="small" color="#F59E0B" />}
+        </View>
+        {loading && rows.length === 0 ? (
+          <Shimmer width="100%" height={220} />
+        ) : topDays.length > 0 ? (
+          <Echarts option={topDaysOption} height={220} />
+        ) : (
+          <View style={styles.emptyChart}>
+            <Package2 size={32} color="#E5E7EB" />
+            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
           </View>
         )}
       </View>
@@ -668,8 +795,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
-  emptyChart: { height: 160, alignItems: "center", justifyContent: "center" },
-  emptyText: { color: "#9CA3AF", fontSize: 14 },
+  cardSubtitle: { fontSize: 12, color: "#9CA3AF", fontWeight: "500", marginTop: 2 },
+  emptyChart: { height: 160, alignItems: "center", justifyContent: "center", gap: 10 },
+  emptyText: { color: "#9CA3AF", fontSize: 14, textAlign: "center" },
 
   // Table
   tableHeader: {
