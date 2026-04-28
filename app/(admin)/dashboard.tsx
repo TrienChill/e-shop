@@ -1,30 +1,30 @@
-import React, { useState, useEffect, useRef } from "react";
+import { supabase } from "@/src/lib/supabase";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Platform,
-  TouchableOpacity,
-  Image,
-  useWindowDimensions,
-  Animated,
-  RefreshControl,
+  AlertCircle,
+  Bell,
+  Filter,
+  MoreVertical,
+  RefreshCw,
+  RotateCcw,
+  ShoppingBag,
+  TrendingUp,
+  Users,
+} from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
   ActivityIndicator,
+  Animated,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
 } from "react-native";
 import { LineChart, PieChart } from "react-native-gifted-charts";
-import {
-  TrendingUp,
-  ShoppingBag,
-  RotateCcw,
-  Users,
-  Bell,
-  MoreVertical,
-  AlertCircle,
-  RefreshCw,
-  Filter,
-} from "lucide-react-native";
-import { supabase } from "@/src/lib/supabase";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
@@ -106,7 +106,7 @@ export default function AdminDashboardHome() {
   // States for real data
   const [summaryData, setSummaryData] = useState<any>({
     revenue: 0,
-    new_orders: 0,
+    new_orders: 3,
     new_returns: 0,
     new_customers: 0,
   });
@@ -181,11 +181,12 @@ export default function AdminDashboardHome() {
       // 1. Map Summary
       const sumObj = Array.isArray(summary) ? summary[0] : summary;
       if (sumObj) {
+        // Fallback robust để hứng mọi dạng key JSON từ RPC
         setSummaryData({
-          revenue: sumObj.revenue || 0,
-          new_orders: sumObj.new_orders || 0,
-          new_returns: sumObj.new_returns || 0,
-          new_customers: sumObj.new_customers || 0,
+          revenue: sumObj.revenue ?? sumObj.total_revenue ?? sumObj.totalAmount ?? 0,
+          new_orders: sumObj.new_orders ?? sumObj.pending_orders ?? sumObj.total_orders ?? 0,
+          new_returns: sumObj.new_returns ?? sumObj.pending_returns ?? sumObj.return_requests ?? 0,
+          new_customers: sumObj.new_customers ?? sumObj.new_users ?? sumObj.total_customers ?? 0,
         });
       }
 
@@ -193,15 +194,25 @@ export default function AdminDashboardHome() {
       if (status && Array.isArray(status)) {
         const statusColors: any = {
           pending: "#F59E0B", // Yellow
+          processing: "#8B5CF6", // Purple
           shipping: "#3B82F6", // Blue
           completed: "#10B981", // Green
           cancelled: "#EF4444", // Red
+          refunded: "#64748B", // Gray
+          return_requested: "#F43F5E", // Rose
+          returning: "#EC4899", // Pink
+          returned: "#14B8A6", // Teal
         };
         const statusLabels: any = {
           pending: "Chờ xử lý",
+          processing: "Đang chuẩn bị",
           shipping: "Đang giao",
           completed: "Hoàn thành",
           cancelled: "Đã hủy",
+          refunded: "Đã hoàn tiền",
+          return_requested: "Yêu cầu hoàn trả",
+          returning: "Đang hoàn trả",
+          returned: "Đã hoàn trả",
         };
 
         const totalCount = status.reduce(
@@ -416,7 +427,7 @@ export default function AdminDashboardHome() {
                   <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 12 }} />
                 )}
               </View>
-              
+
               <View style={styles.filterGroup}>
                 <Filter size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
                 <FilterButton
@@ -577,7 +588,7 @@ export default function AdminDashboardHome() {
                     { flex: 1, textAlign: "right" },
                   ]}
                 >
-                  {product.total_sales}
+                  {product.total_sold ?? product.total_sales ?? 0}
                 </Text>
               </View>
             ))

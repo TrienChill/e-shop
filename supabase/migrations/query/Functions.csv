@@ -1,15 +1,159 @@
 function_name,schema_name,return_type,argument_types
+approve_return,public,boolean,"p_return_id bigint, p_admin_id uuid, p_admin_notes text DEFAULT NULL::text"
+array_to_halfvec,public,halfvec,"double precision[], integer, boolean"
+array_to_halfvec,public,halfvec,"integer[], integer, boolean"
+array_to_halfvec,public,halfvec,"real[], integer, boolean"
+array_to_halfvec,public,halfvec,"numeric[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"integer[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"numeric[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"double precision[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"real[], integer, boolean"
+array_to_vector,public,vector,"integer[], integer, boolean"
+array_to_vector,public,vector,"double precision[], integer, boolean"
+array_to_vector,public,vector,"real[], integer, boolean"
+array_to_vector,public,vector,"numeric[], integer, boolean"
+avg,public,halfvec,halfvec
+avg,public,vector,vector
+binary_quantize,public,bit,vector
+binary_quantize,public,bit,halfvec
 buy_product,public,void,"variant_id uuid, quantity_to_buy integer"
+cancel_return,public,boolean,"p_return_id bigint, p_user_id uuid"
+check_user_lock_status,public,json,p_email text
 collect_voucher,public,boolean,p_voucher_id uuid
+complete_return,public,boolean,"p_return_id bigint, p_admin_id uuid DEFAULT NULL::uuid"
+cosine_distance,public,double precision,"sparsevec, sparsevec"
+cosine_distance,public,double precision,"halfvec, halfvec"
+cosine_distance,public,double precision,"vector, vector"
+create_return_request,public,bigint,"p_order_id bigint, p_user_id uuid, p_request_type character varying DEFAULT 'return'::character varying, p_reason_category return_reason_type DEFAULT 'other'::return_reason_type, p_reason text DEFAULT ''::text, p_description text DEFAULT NULL::text, p_evidence_images text[] DEFAULT '{}'::text[], p_refund_method character varying DEFAULT 'original'::character varying, p_bank_account_name text DEFAULT NULL::text, p_bank_account_number text DEFAULT NULL::text, p_bank_name text DEFAULT NULL::text, p_items jsonb DEFAULT '[]'::jsonb"
+get_banner_campaign_stats,public,"TABLE(banner_id uuid, banner_title text, slot integer, sold_quantity bigint, revenue numeric)",
+get_dashboard_summary,public,json,
+get_membership_stats,public,"TABLE(level_id uuid, level_name text, member_count bigint, total_spending_sum numeric)",
 get_most_popular_products,public,SETOF products,
+get_order_status_distribution,public,"TABLE(status text, count bigint)",
+get_revenue_by_days,public,"TABLE(date_str text, daily_revenue numeric)",p_days integer DEFAULT 7
+get_revenue_last_7_days,public,"TABLE(date_str text, daily_revenue numeric)",
 get_revenue_summary,public,"TABLE(total_revenue numeric, orders_count bigint)","p_from timestamp with time zone, p_to timestamp with time zone"
+get_top_selling_products,public,"TABLE(product_id bigint, name text, image_url text, total_sold bigint)",limit_num integer DEFAULT 5
+get_user_next_tier,public,"TABLE(next_level_id uuid, next_level_name text, min_spending_required numeric, current_spending numeric, spending_remaining numeric, progress_percentage numeric)",p_user_id uuid
+halfvec,public,halfvec,"halfvec, integer, boolean"
+halfvec_accum,public,double precision[],"double precision[], halfvec"
+halfvec_add,public,halfvec,"halfvec, halfvec"
+halfvec_avg,public,halfvec,double precision[]
+halfvec_cmp,public,integer,"halfvec, halfvec"
+halfvec_combine,public,double precision[],"double precision[], double precision[]"
+halfvec_concat,public,halfvec,"halfvec, halfvec"
+halfvec_eq,public,boolean,"halfvec, halfvec"
+halfvec_ge,public,boolean,"halfvec, halfvec"
+halfvec_gt,public,boolean,"halfvec, halfvec"
+halfvec_in,public,halfvec,"cstring, oid, integer"
+halfvec_l2_squared_distance,public,double precision,"halfvec, halfvec"
+halfvec_le,public,boolean,"halfvec, halfvec"
+halfvec_lt,public,boolean,"halfvec, halfvec"
+halfvec_mul,public,halfvec,"halfvec, halfvec"
+halfvec_ne,public,boolean,"halfvec, halfvec"
+halfvec_negative_inner_product,public,double precision,"halfvec, halfvec"
+halfvec_out,public,cstring,halfvec
+halfvec_recv,public,halfvec,"internal, oid, integer"
+halfvec_send,public,bytea,halfvec
+halfvec_spherical_distance,public,double precision,"halfvec, halfvec"
+halfvec_sub,public,halfvec,"halfvec, halfvec"
+halfvec_to_float4,public,real[],"halfvec, integer, boolean"
+halfvec_to_sparsevec,public,sparsevec,"halfvec, integer, boolean"
+halfvec_to_vector,public,vector,"halfvec, integer, boolean"
+halfvec_typmod_in,public,integer,cstring[]
+hamming_distance,public,double precision,"bit, bit"
 handle_default_address,public,trigger,
 handle_new_user,public,trigger,
+hnsw_bit_support,public,internal,internal
+hnsw_halfvec_support,public,internal,internal
+hnsw_sparsevec_support,public,internal,internal
+hnswhandler,public,index_am_handler,internal
 immutable_unaccent,public,text,text
+inner_product,public,double precision,"sparsevec, sparsevec"
+inner_product,public,double precision,"vector, vector"
+inner_product,public,double precision,"halfvec, halfvec"
+is_admin,public,boolean,
+ivfflat_bit_support,public,internal,internal
+ivfflat_halfvec_support,public,internal,internal
+ivfflathandler,public,index_am_handler,internal
+jaccard_distance,public,double precision,"bit, bit"
+l1_distance,public,double precision,"vector, vector"
+l1_distance,public,double precision,"halfvec, halfvec"
+l1_distance,public,double precision,"sparsevec, sparsevec"
+l2_distance,public,double precision,"halfvec, halfvec"
+l2_distance,public,double precision,"sparsevec, sparsevec"
+l2_distance,public,double precision,"vector, vector"
+l2_norm,public,double precision,halfvec
+l2_norm,public,double precision,sparsevec
+l2_normalize,public,vector,vector
+l2_normalize,public,halfvec,halfvec
+l2_normalize,public,sparsevec,sparsevec
+lock_user_account,public,void,"p_user_id uuid, p_reason text"
+log_account_lock_change,public,trigger,
+mark_shipping_back,public,boolean,"p_return_id bigint, p_admin_id uuid"
+match_products,public,"TABLE(id bigint, name text, price numeric, description text, similarity double precision)","query_embedding vector, match_threshold double precision, match_count integer"
 process_checkout,public,bigint,"p_user_id uuid, p_shipping_address text, p_phone_contact text, p_total_amount numeric, p_platform_discount numeric, p_platform_voucher_id uuid, p_shop_discounts jsonb"
+process_refund,public,boolean,"p_return_id bigint, p_admin_id uuid"
+recalculate_all_membership_levels,public,void,
+reject_return,public,boolean,"p_return_id bigint, p_admin_id uuid, p_rejection_reason text"
 rls_auto_enable,public,event_trigger,
-unaccent,public,text,text
+set_profiles_id_trigger,public,trigger,
+sparsevec,public,sparsevec,"sparsevec, integer, boolean"
+sparsevec_cmp,public,integer,"sparsevec, sparsevec"
+sparsevec_eq,public,boolean,"sparsevec, sparsevec"
+sparsevec_ge,public,boolean,"sparsevec, sparsevec"
+sparsevec_gt,public,boolean,"sparsevec, sparsevec"
+sparsevec_in,public,sparsevec,"cstring, oid, integer"
+sparsevec_l2_squared_distance,public,double precision,"sparsevec, sparsevec"
+sparsevec_le,public,boolean,"sparsevec, sparsevec"
+sparsevec_lt,public,boolean,"sparsevec, sparsevec"
+sparsevec_ne,public,boolean,"sparsevec, sparsevec"
+sparsevec_negative_inner_product,public,double precision,"sparsevec, sparsevec"
+sparsevec_out,public,cstring,sparsevec
+sparsevec_recv,public,sparsevec,"internal, oid, integer"
+sparsevec_send,public,bytea,sparsevec
+sparsevec_to_halfvec,public,halfvec,"sparsevec, integer, boolean"
+sparsevec_to_vector,public,vector,"sparsevec, integer, boolean"
+sparsevec_typmod_in,public,integer,cstring[]
+subvector,public,vector,"vector, integer, integer"
+subvector,public,halfvec,"halfvec, integer, integer"
+sum,public,halfvec,halfvec
+sum,public,vector,vector
 unaccent,public,text,"regdictionary, text"
+unaccent,public,text,text
 unaccent_init,public,internal,internal
 unaccent_lexize,public,internal,"internal, internal, internal, internal"
+unlock_user_account,public,void,p_user_id uuid
+update_membership_level,public,trigger,
 update_order_timestamps,public,trigger,
+update_user_total_spending,public,trigger,
+validate_membership_tiers,public,"TABLE(is_valid boolean, error_message text)",
+vector,public,vector,"vector, integer, boolean"
+vector_accum,public,double precision[],"double precision[], vector"
+vector_add,public,vector,"vector, vector"
+vector_avg,public,vector,double precision[]
+vector_cmp,public,integer,"vector, vector"
+vector_combine,public,double precision[],"double precision[], double precision[]"
+vector_concat,public,vector,"vector, vector"
+vector_dims,public,integer,vector
+vector_dims,public,integer,halfvec
+vector_eq,public,boolean,"vector, vector"
+vector_ge,public,boolean,"vector, vector"
+vector_gt,public,boolean,"vector, vector"
+vector_in,public,vector,"cstring, oid, integer"
+vector_l2_squared_distance,public,double precision,"vector, vector"
+vector_le,public,boolean,"vector, vector"
+vector_lt,public,boolean,"vector, vector"
+vector_mul,public,vector,"vector, vector"
+vector_ne,public,boolean,"vector, vector"
+vector_negative_inner_product,public,double precision,"vector, vector"
+vector_norm,public,double precision,vector
+vector_out,public,cstring,vector
+vector_recv,public,vector,"internal, oid, integer"
+vector_send,public,bytea,vector
+vector_spherical_distance,public,double precision,"vector, vector"
+vector_sub,public,vector,"vector, vector"
+vector_to_float4,public,real[],"vector, integer, boolean"
+vector_to_halfvec,public,halfvec,"vector, integer, boolean"
+vector_to_sparsevec,public,sparsevec,"vector, integer, boolean"
+vector_typmod_in,public,integer,cstring[]

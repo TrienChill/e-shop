@@ -1,68 +1,139 @@
 schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
-public,user_vouchers,admin_all_user_vouchers,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
-   FROM profiles
-  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
-public,user_vouchers,user_insert_own_vouchers,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,user_vouchers,user_view_own_vouchers,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
-public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
-public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
-public,profiles,Users can update own profile,PERMISSIVE,{public},UPDATE,(auth.uid() = id),null
-public,conversations,Users view own conversation,PERMISSIVE,{public},SELECT,"((auth.uid() = user_id) OR (auth.uid() IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
-public,order_items,Users can insert order items,PERMISSIVE,{public},INSERT,null,true
-public,order_items,Users can update their own order items,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
-   FROM orders
-  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))","(EXISTS ( SELECT 1
-   FROM orders
-  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))"
-public,order_items,Users can view own order items,PERMISSIVE,{public},SELECT,"((auth.uid() IN ( SELECT orders.user_id
-   FROM orders
-  WHERE (orders.id = order_items.order_id))) OR (auth.uid() IN ( SELECT profiles.id
-   FROM profiles
-  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
-public,products,Enable public read access for products,PERMISSIVE,{public},SELECT,true,null
-public,products,Products are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
 public,products,Staff/Admin can insert products,PERMISSIVE,{public},INSERT,null,"(auth.uid() IN ( SELECT profiles.id
    FROM profiles
   WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))"
 public,products,Staff/Admin can update products,PERMISSIVE,{public},UPDATE,"(auth.uid() IN ( SELECT profiles.id
    FROM profiles
   WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))",null
-public,orders,Users can create orders,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,orders,Users can view own orders,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,conversations,Users view own conversation,PERMISSIVE,{public},SELECT,"((auth.uid() = user_id) OR (auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,profiles,Admins can update all profiles,PERMISSIVE,{authenticated},UPDATE,is_admin(),null
+public,vouchers,Everyone can view active vouchers,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,cart_items,Users can insert own cart items,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,cart_items,Users can delete own cart items,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,cart_items,Users can update own cart items,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,wishlist,Users can view their own wishlist items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,wishlist,Users can insert into their own wishlist,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,wishlist,Users can delete from their own wishlist,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,posts,Published posts are publicly readable,PERMISSIVE,{public},SELECT,(is_published = true),null
+public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
+public,products,Enable public read access for products,PERMISSIVE,{public},SELECT,true,null
+public,user_addresses,Users can view own addresses,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,user_addresses,Users can insert own addresses,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,user_addresses,Users can update own addresses,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
+public,user_addresses,Users can delete own addresses,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,shipping_methods,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,order_items,Users can update their own order items,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))","(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))"
+public,reviews,Users can insert their own reviews,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,reviews,Users can update their own reviews,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,reviews,Users can view all reviews,PERMISSIVE,{public},SELECT,true,null
+public,reviews,Users can delete their own reviews,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể thêm lịch sử của chính h,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+public,product_view_history,Người dùng chỉ có thể cập nhật lịch sử của c,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể xem lịch sử của chính h,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
+public,product_view_history,Người dùng chỉ có thể xóa lịch sử của chính h,PERMISSIVE,{authenticated},DELETE,(auth.uid() = user_id),null
+public,product_discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,user_vouchers,user_view_own_vouchers,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,user_vouchers,user_insert_own_vouchers,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,user_vouchers,admin_all_user_vouchers,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
+public,product_variants,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
 public,orders,staff_admin_view_all_orders,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
    FROM profiles p
   WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
-public,vouchers,Everyone can view active vouchers,PERMISSIVE,{public},SELECT,(is_active = true),null
 public,vouchers,admin_manage_vouchers,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
    FROM profiles p
   WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))","(EXISTS ( SELECT 1
    FROM profiles p
   WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))"
-public,cart_items,Users can delete own cart items,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,cart_items,Users can insert own cart items,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,cart_items,Users can update own cart items,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
+public,orders,staff_admin_update_orders,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,product_variants,staff_admin_manage_variants,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,product_images,staff_admin_manage_images,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,categories,admin_manage_categories,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))"
+public,products,Staff/Admin can delete products,PERMISSIVE,{public},DELETE,"(auth.uid() IN ( SELECT profiles.id
+   FROM profiles
+  WHERE (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))",null
+public,product_images,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,reviews,Admins can update all reviews,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
+public,reviews,Admins can delete all reviews,PERMISSIVE,{public},DELETE,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
+public,order_vouchers,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,user_vouchers,user_update_own_vouchers,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
+public,vouchers,user_update_vouchers_usage,PERMISSIVE,{public},UPDATE,(is_active = true),(is_active = true)
+public,product_images,Public read product_images,PERMISSIVE,{public},SELECT,true,null
+public,return_requests,Users own returns,PERMISSIVE,{public},ALL,"((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))))",null
+public,return_items,Users own return items,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM return_requests rr
+  WHERE ((rr.id = return_items.return_request_id) AND ((rr.user_id = auth.uid()) OR (EXISTS ( SELECT 1
+           FROM profiles
+          WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))))))",null
+public,return_items,Admins insert ri,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,product_discounts,admin_all_product_discounts,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))"
 public,cart_items,Users can view own cart items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
-public,posts,Published posts are publicly readable,PERMISSIVE,{public},SELECT,(is_published = true),null
-public,reviews,Public reviews are viewable by everyone.,PERMISSIVE,{public},SELECT,true,null
-public,reviews,Users can delete their own reviews,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,reviews,Users can insert their own reviews,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,reviews,Users can insert their own reviews.,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,reviews,Users can update their own reviews,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),null
-public,reviews,Users can view all reviews,PERMISSIVE,{public},SELECT,true,null
-public,wishlist,Users can delete from their own wishlist,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,wishlist,Users can insert into their own wishlist,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,wishlist,Users can view their own wishlist items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
-public,banners,Banners are publicly readable,PERMISSIVE,{public},SELECT,(is_active = true),null
-public,shipping_methods,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
-public,user_addresses,Users can delete own addresses,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,user_addresses,Users can insert own addresses,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
-public,user_addresses,Users can update own addresses,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
-public,user_addresses,Users can view own addresses,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
-public,product_variants,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
-public,product_view_history,Người dùng chỉ có thể cập nhật lịch sử của c,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = user_id),null
-public,product_view_history,Người dùng chỉ có thể thêm lịch sử của chính h,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
-public,product_view_history,Người dùng chỉ có thể xem lịch sử của chính h,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
-public,product_view_history,Người dùng chỉ có thể xóa lịch sử của chính h,PERMISSIVE,{authenticated},DELETE,(auth.uid() = user_id),null
-public,product_discounts,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
+public,orders,Users can insert own orders,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
+public,order_vouchers,admin_all_order_vouchers,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))","(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))"
+public,order_vouchers,user_insert_order_vouchers,PERMISSIVE,{authenticated},INSERT,null,true
+public,banners,Public can view active banners,PERMISSIVE,{public},SELECT,(is_active = true),null
+public,banners,Staff and admins can view all banners,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,banners,Admins and staff can manage banners,PERMISSIVE,{public},ALL,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))","(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,profiles,Users can view own profile,PERMISSIVE,{authenticated},SELECT,(auth.uid() = id),null
+public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
+public,profiles,Users can update own profile,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = id),null
+public,membership_levels,Cho phép đọc membership levels cho tất cả người dùn,PERMISSIVE,{authenticated},SELECT,true,null
+public,orders,Users can view own orders,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
+public,membership_levels,Cho phép admin/staff quản lý membership levels,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))","(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,membership_levels,Allow read all,PERMISSIVE,{public},SELECT,true,null
+public,membership_levels,Allow service_role all,PERMISSIVE,{public},ALL,(auth.role() = 'service_role'::text),null
+public,order_items,Users can view own order items,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))",null
+public,order_items,Users can insert own order items,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))"
