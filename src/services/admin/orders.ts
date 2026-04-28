@@ -180,16 +180,21 @@ export async function pushOrderToGHN(order: any): Promise<string> {
   }
 
   // --- Chuẩn bị danh sách sản phẩm ---
-  const items = (order.order_items ?? []).map((item: any) => ({
-    name:     item.products?.name ?? "Sản phẩm",
-    quantity: item.quantity,
-    price:    Math.round(item.price_at_purchase ?? 0),
-    weight:   500, // Mặc định 500g/item (chưa có trường weight trong products)
-  }));
-
-  if (items.length === 0) {
-    throw new Error("Đơn hàng không có sản phẩm nào!");
-  }
+  const items = (order.order_items && order.order_items.length > 0)
+    ? order.order_items.map((item: any) => ({
+        name:     item.products?.name ?? "Sản phẩm",
+        quantity: item.quantity || 1,
+        price:    Math.round(item.price_at_purchase ?? 0),
+        weight:   500, // Mặc định 500g/item
+      }))
+    : [
+        {
+          name: "Sản phẩm E-Shop (Không xác định)",
+          quantity: 1,
+          price: Math.round(order.total_amount ?? 0),
+          weight: 500,
+        }
+      ];
 
   // Tổng trọng lượng: 500g × mỗi item × số lượng, tối thiểu 1g
   const totalWeight = Math.max(
