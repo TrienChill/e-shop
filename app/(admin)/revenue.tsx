@@ -14,6 +14,7 @@ import {
   AlertCircle,
   BarChart3,
   Calendar,
+  CheckCircle2,
   Download,
   Package2,
   ShoppingCart,
@@ -33,6 +34,7 @@ import {
   View,
 } from "react-native";
 import Echarts from "react-native-echarts-pro";
+import * as XLSX from "xlsx";
 
 // ─────────────────────────────────────────────
 // Types
@@ -227,6 +229,87 @@ export default function AdminRevenueScreen() {
   useEffect(() => {
     handleFilterChange(filter.startDate, filter.endDate);
   }, [filter.startDate, filter.endDate]);
+
+  // ── Export state ──
+  const [exporting, setExporting] = useState(false);
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "info" | "success" | "error" }>({
+    visible: false, message: "", type: "info",
+  });
+  const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (message: string, type: "info" | "success" | "error" = "info", duration = 2800) => {
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    setToast({ visible: true, message, type });
+    toastTimeout.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration);
+  };
+
+  // ── Excel Export ──
+  const handleExportExcel = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      showToast("Tính năng xuất Excel chỉ khả dụng trên Web.", "error");
+      return;
+    }
+    if (rows.length === 0) {
+      showToast("Không có dữ liệu để xuất.", "error");
+      return;
+    }
+    setExporting(true);
+    showToast("Đang tạo file Excel...", "info");
+    try {
+      const startStr = format(filter.startDate, "dd-MM-yyyy");
+      const endStr   = format(filter.endDate,   "dd-MM-yyyy");
+      const fileName = `Bao_cao_doanh_thu_${startStr}_den_${endStr}.xlsx`;
+
+      // ── Sheet 1: Tổng quan ──
+      const overviewData = [
+        ["Báo cáo Doanh thu", ""],
+        ["Từ ngày", format(filter.startDate, "dd/MM/yyyy")],
+        ["Đến ngày", format(filter.endDate, "dd/MM/yyyy")],
+        ["", ""],
+        ["Chỉ số", "Giá trị"],
+        ["Tổng doanh thu (₫)", totalRevenue],
+        ["Tổng đơn hàng", totalOrders],
+        ["Doanh thu trung bình / ngày (₫)", Math.round(avgDaily)],
+        ["Số ngày có dữ liệu", rows.length],
+      ];
+      const wsOverview = XLSX.utils.aoa_to_sheet(overviewData);
+      wsOverview["!cols"] = [{ wch: 36 }, { wch: 20 }];
+
+      // ── Sheet 2: Xu hướng theo ngày ──
+      const trendHeaders = ["Ngày", "Doanh thu (₫)", "Số đơn hàng"];
+      const trendRows = rows.map((r) => [
+        r.date_str,
+        r.daily_revenue,
+        r.orders_count,
+      ]);
+      const wsTrend = XLSX.utils.aoa_to_sheet([trendHeaders, ...trendRows]);
+      wsTrend["!cols"] = [{ wch: 14 }, { wch: 20 }, { wch: 16 }];
+
+      // ── Sheet 3: Top 5 ngày doanh thu cao nhất ──
+      const top5Headers = ["Hạng", "Ngày", "Doanh thu (₫)", "Số đơn hàng"];
+      const top5Rows = topDays.map((r, i) => [
+        i + 1,
+        r.date_str,
+        r.daily_revenue,
+        r.orders_count,
+      ]);
+      const wsTop5 = XLSX.utils.aoa_to_sheet([top5Headers, ...top5Rows]);
+      wsTop5["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 20 }, { wch: 16 }];
+
+      // ── Build workbook ──
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsOverview, "Tổng quan");
+      XLSX.utils.book_append_sheet(wb, wsTrend, "Xu hướng theo ngày");
+      XLSX.utils.book_append_sheet(wb, wsTop5, "Top 5 ngày");
+
+      XLSX.writeFile(wb, fileName);
+      showToast(`✓ Đã xuất "${fileName}" thành công!`, "success", 4000);
+    } catch (err: any) {
+      showToast("Lỗi khi xuất file: " + (err?.message ?? "Không xác định"), "error");
+    } finally {
+      setExporting(false);
+    }
+  }, [rows, filter, totalRevenue, totalOrders, avgDaily, topDays]);
 
   // ── Chart options ──
   const chartLabels = rows.map((r) => {
@@ -446,9 +529,18 @@ export default function AdminRevenueScreen() {
           <Text style={styles.headerSub}>Hệ thống quản trị</Text>
           <Text style={styles.headerTitle}>Quản lý Doanh thu</Text>
         </View>
-        <TouchableOpacity style={styles.exportBtn} activeOpacity={0.8}>
-          <Download size={16} color="#6366F1" />
-          <Text style={styles.exportBtnText}>Xuất Excel</Text>
+        <TouchableOpacity
+          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+          activeOpacity={0.8}
+          onPress={handleExportExcel}
+          disabled={exporting}
+        >
+          {exporting
+            ? <ActivityIndicator size="small" color="#6366F1" />
+            : <Download size={16} color="#6366F1" />}
+          <Text style={styles.exportBtnText}>
+            {exporting ? "Đang xuất..." : "Xuất Excel"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -600,6 +692,23 @@ export default function AdminRevenueScreen() {
           </View>
         )}
       </View>
+
+      {/* ── Toast Notification ── */}
+      {toast.visible && (
+        <View
+          style={[
+            styles.toast,
+            toast.type === "success" && styles.toastSuccess,
+            toast.type === "error"   && styles.toastError,
+          ]}
+          pointerEvents="none"
+        >
+          {toast.type === "success" && <CheckCircle2 size={16} color="#fff" />}
+          {toast.type === "error"   && <AlertCircle  size={16} color="#fff" />}
+          {toast.type === "info"    && <Download     size={16} color="#fff" />}
+          <Text style={styles.toastText}>{toast.message}</Text>
+        </View>
+      )}
 
       {/* ── Detail Table ── */}
       <View style={styles.card}>
@@ -813,6 +922,33 @@ const styles = StyleSheet.create({
   tdText: { fontSize: 13, color: "#374151", fontWeight: "500" },
   tdRevenue: { fontSize: 13, color: "#6366F1", fontWeight: "700" },
   tdOrders: { fontSize: 13, color: "#10B981", fontWeight: "700" },
+
+  // Export button disabled
+  exportBtnDisabled: { opacity: 0.6 },
+
+  // Toast
+  toast: {
+    position: "absolute",
+    bottom: 32,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#374151",
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 999,
+    maxWidth: 420,
+  },
+  toastSuccess: { backgroundColor: "#059669" },
+  toastError:   { backgroundColor: "#DC2626" },
+  toastText: { color: "#fff", fontSize: 13, fontWeight: "600", flexShrink: 1 },
 
   // Permission guard
   permCard: {
