@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { LineChart, PieChart } from "react-native-gifted-charts";
 import {
@@ -17,81 +18,50 @@ import {
   Users,
   Bell,
   MoreVertical,
+  AlertCircle,
 } from "lucide-react-native";
-
-// --- Dummy Data ---
-const dummySummary = {
-  revenue: 125000000,
-  newOrders: 42,
-  returnRequests: 5,
-  newCustomers: 128,
-};
-
-const dummyLineChartData = [
-  { value: 15000000, label: "22/4" },
-  { value: 18000000, label: "23/4" },
-  { value: 12000000, label: "24/4" },
-  { value: 25000000, label: "25/4" },
-  { value: 22000000, label: "26/4" },
-  { value: 30000000, label: "27/4" },
-  { value: 35000000, label: "28/4" },
-];
-
-const dummyPieChartData = [
-  { value: 40, color: "#F59E0B", text: "40%" }, // Pending
-  { value: 30, color: "#3B82F6", text: "30%" }, // Shipping
-  { value: 25, color: "#10B981", text: "25%" }, // Completed
-  { value: 5, color: "#EF4444", text: "5%" }, // Cancelled
-];
-
-const dummyTopProducts = [
-  {
-    id: "1",
-    name: "Áo Thun Basic Cotton",
-    sales: 124,
-    image: "https://via.placeholder.com/60",
-    price: 150000,
-  },
-  {
-    id: "2",
-    name: "Quần Jean Nữ Cạp Cao",
-    sales: 98,
-    image: "https://via.placeholder.com/60",
-    price: 350000,
-  },
-  {
-    id: "3",
-    name: "Váy Hoa Nhí Mùa Hè",
-    sales: 85,
-    image: "https://via.placeholder.com/60",
-    price: 280000,
-  },
-  {
-    id: "4",
-    name: "Áo Khoác Gió Thể Thao",
-    sales: 72,
-    image: "https://via.placeholder.com/60",
-    price: 450000,
-  },
-  {
-    id: "5",
-    name: "Giày Sneaker Unisex",
-    sales: 64,
-    image: "https://via.placeholder.com/60",
-    price: 650000,
-  },
-];
+import { supabase } from "@/src/lib/supabase";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
-  }).format(amount);
+  }).format(amount || 0);
 };
 
 // --- Components ---
 
-const KPICard = ({ title, value, icon: Icon, color, iconBg }: any) => (
+const Shimmer = ({ width, height, borderRadius = 8, style }: any) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [opacity]);
+
+  return (
+    <Animated.View
+      style={[
+        { width, height, borderRadius, backgroundColor: "#E5E7EB", opacity },
+        style,
+      ]}
+    />
+  );
+};
+
+const KPICard = ({ title, value, icon: Icon, color, iconBg, isLoading }: any) => (
   <View style={styles.kpiCardWrapper}>
     <View style={styles.kpiCard}>
       <View style={styles.kpiHeader}>
@@ -104,7 +74,11 @@ const KPICard = ({ title, value, icon: Icon, color, iconBg }: any) => (
       </View>
       <View>
         <Text style={styles.kpiTitle}>{title}</Text>
-        <Text style={styles.kpiValue}>{value}</Text>
+        {isLoading ? (
+          <Shimmer width={120} height={26} style={{ marginTop: 4 }} />
+        ) : (
+          <Text style={styles.kpiValue}>{value}</Text>
+        )}
       </View>
     </View>
   </View>
@@ -112,7 +86,21 @@ const KPICard = ({ title, value, icon: Icon, color, iconBg }: any) => (
 
 export default function AdminDashboardHome() {
   const { width } = useWindowDimensions();
-  const [chartWidth, setChartWidth] = useState(300); // Default fallback
+  const [chartWidth, setChartWidth] = useState(300);
+
+  // States for real data
+  const [summaryData, setSummaryData] = useState<any>({
+    revenue: 0,
+    new_orders: 0,
+    new_returns: 0,
+    new_customers: 0,
+  });
+  const [revenueData, setRevenueData] = useState<any[]>([]);
+  const [statusData, setStatusData] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
@@ -135,6 +123,129 @@ export default function AdminDashboardHome() {
     return "100%";
   };
 
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMsg("");
+
+      const [
+        { data: summary, error: err1 },
+        { data: revenue, error: err2 },
+        { data: status, error: err3 },
+        { data: products, error: err4 },
+      ] = await Promise.all([
+        supabase.rpc("get_dashboard_summary"),
+        supabase.rpc("get_revenue_last_7_days"),
+        supabase.rpc("get_order_status_distribution"),
+        supabase.rpc("get_top_selling_products", { limit_num: 5 }),
+      ]);
+
+      if (err1 || err2 || err3 || err4) {
+        console.warn("Lỗi fetch RPC:", err1 || err2 || err3 || err4);
+        setErrorMsg("Không thể tải một số dữ liệu từ máy chủ.");
+      }
+
+      // 1. Map Summary
+      const sumObj = Array.isArray(summary) ? summary[0] : summary;
+      if (sumObj) {
+        setSummaryData({
+          revenue: sumObj.revenue || 0,
+          new_orders: sumObj.new_orders || 0,
+          new_returns: sumObj.new_returns || 0,
+          new_customers: sumObj.new_customers || 0,
+        });
+      }
+
+      // 2. Map Revenue
+      if (revenue && Array.isArray(revenue)) {
+        const mappedRevenue = revenue.map((r: any) => {
+          // Format date from YYYY-MM-DD to DD/MM
+          const parts = r.date_str ? r.date_str.split("-") : [];
+          const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
+          return {
+            value: Number(r.daily_revenue) || 0,
+            label,
+          };
+        });
+        setRevenueData(mappedRevenue);
+      }
+
+      // 3. Map Status (with Vietnamese labels and colors)
+      if (status && Array.isArray(status)) {
+        const statusColors: any = {
+          pending: "#F59E0B", // Yellow
+          shipping: "#3B82F6", // Blue
+          completed: "#10B981", // Green
+          cancelled: "#EF4444", // Red
+        };
+        const statusLabels: any = {
+          pending: "Chờ xử lý",
+          shipping: "Đang giao",
+          completed: "Hoàn thành",
+          cancelled: "Đã hủy",
+        };
+
+        const totalCount = status.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0);
+
+        const mappedStatus = status.map((s: any) => {
+          const val = Number(s.count) || 0;
+          return {
+            value: val,
+            color: statusColors[s.status] || "#9CA3AF",
+            text: statusLabels[s.status] || s.status,
+            label: statusLabels[s.status] || s.status, // Keep label for legend mapping
+            percentage: totalCount > 0 ? Math.round((val / totalCount) * 100) + "%" : "0%",
+          };
+        });
+        setStatusData(mappedStatus);
+      }
+
+      // 4. Map Products
+      if (products && Array.isArray(products)) {
+        setTopProducts(products);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Lỗi kết nối. Vui lòng thử lại sau.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper to render Pie Chart gracefully when no data
+  const renderPieChart = () => {
+    if (isLoading) {
+      return <Shimmer width={180} height={180} borderRadius={90} />;
+    }
+    if (statusData.length === 0) {
+      return (
+        <View style={[styles.pieCenter, { height: 180 }]}>
+          <Text style={{ color: "#9CA3AF" }}>Chưa có dữ liệu</Text>
+        </View>
+      );
+    }
+    return (
+      <PieChart
+        data={statusData}
+        donut
+        radius={90}
+        innerRadius={60}
+        centerLabelComponent={() => {
+          return (
+            <View style={styles.pieCenter}>
+              <Text style={styles.pieCenterText}>Tổng</Text>
+              <Text style={styles.pieCenterValue}>100%</Text>
+            </View>
+          );
+        }}
+      />
+    );
+  };
+
   return (
     <ScrollView
       style={styles.root}
@@ -148,6 +259,9 @@ export default function AdminDashboardHome() {
           <Text style={styles.topBarTitle}>Dashboard Tổng Quan</Text>
         </View>
         <View style={styles.topBarActions}>
+          <TouchableOpacity style={styles.iconButton} onPress={loadDashboardData}>
+            <RotateCcw size={20} color="#1F2937" />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconButton}>
             <Bell size={20} color="#1F2937" />
             <View style={styles.notificationBadge} />
@@ -167,42 +281,54 @@ export default function AdminDashboardHome() {
         </View>
       </View>
 
+      {/* Error Message */}
+      {errorMsg ? (
+        <View style={styles.errorAlert}>
+          <AlertCircle size={20} color="#EF4444" />
+          <Text style={styles.errorAlertText}>{errorMsg}</Text>
+        </View>
+      ) : null}
+
       {/* Khu vực 1: Hàng Thẻ Thống Kê Nhanh */}
       <View style={styles.kpiGrid}>
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
             title="Doanh thu (Tháng này)"
-            value={formatCurrency(dummySummary.revenue)}
+            value={formatCurrency(summaryData.revenue)}
             icon={TrendingUp}
             color="#6366F1"
             iconBg="#EEF2FF"
+            isLoading={isLoading}
           />
         </View>
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
             title="Đơn hàng mới"
-            value={`${dummySummary.newOrders} (Pending)`}
+            value={`${summaryData.new_orders} (Pending)`}
             icon={ShoppingBag}
             color="#F59E0B"
             iconBg="#FEF3C7"
+            isLoading={isLoading}
           />
         </View>
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
             title="Yêu cầu hoàn trả"
-            value={`${dummySummary.returnRequests} (Pending)`}
+            value={`${summaryData.new_returns} (Pending)`}
             icon={RotateCcw}
             color="#EF4444"
             iconBg="#FEE2E2"
+            isLoading={isLoading}
           />
         </View>
         <View style={{ width: getResponsiveCardWidth() }}>
           <KPICard
             title="Khách hàng mới"
-            value={dummySummary.newCustomers.toString()}
+            value={summaryData.new_customers.toString()}
             icon={Users}
             color="#10B981"
             iconBg="#D1FAE5"
+            isLoading={isLoading}
           />
         </View>
       </View>
@@ -217,28 +343,35 @@ export default function AdminDashboardHome() {
               style={styles.chartWrapper}
               onLayout={(event) => {
                 const { width } = event.nativeEvent.layout;
-                // Leave some margin for Y axis
-                setChartWidth(width - 60);
+                setChartWidth(Math.max(width - 60, 200));
               }}
             >
-              <LineChart
-                data={dummyLineChartData}
-                width={chartWidth}
-                height={220}
-                spacing={chartWidth / dummyLineChartData.length}
-                color="#6366F1"
-                thickness={3}
-                dataPointsColor="#6366F1"
-                dataPointsRadius={5}
-                hideRules
-                yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
-                xAxisLabelTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
-                yAxisLabelPrefix=" "
-                formatYLabel={(label) => {
-                  return (parseInt(label) / 1000000).toString() + "M";
-                }}
-                isAnimated
-              />
+              {isLoading ? (
+                <Shimmer width="100%" height={220} />
+              ) : revenueData.length > 0 ? (
+                <LineChart
+                  data={revenueData}
+                  width={chartWidth}
+                  height={220}
+                  spacing={chartWidth / revenueData.length}
+                  color="#6366F1"
+                  thickness={3}
+                  dataPointsColor="#6366F1"
+                  dataPointsRadius={5}
+                  hideRules
+                  yAxisTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
+                  xAxisLabelTextStyle={{ color: "#9CA3AF", fontSize: 11 }}
+                  yAxisLabelPrefix=" "
+                  formatYLabel={(label) => {
+                    return (parseInt(label) / 1000000).toString() + "M";
+                  }}
+                  isAnimated
+                />
+              ) : (
+                <View style={[styles.chartWrapper, { height: 220 }]}>
+                  <Text style={{ color: "#9CA3AF" }}>Chưa có dữ liệu giao dịch</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -248,36 +381,26 @@ export default function AdminDashboardHome() {
           <View style={styles.whiteCard}>
             <Text style={styles.cardTitle}>Tỉ lệ trạng thái đơn hàng</Text>
             <View style={styles.pieWrapper}>
-              <PieChart
-                data={dummyPieChartData}
-                donut
-                radius={90}
-                innerRadius={60}
-                centerLabelComponent={() => {
-                  return (
-                    <View style={styles.pieCenter}>
-                      <Text style={styles.pieCenterText}>Tổng</Text>
-                      <Text style={styles.pieCenterValue}>100%</Text>
-                    </View>
-                  );
-                }}
-              />
+              {renderPieChart()}
+              
               {/* Legend */}
-              <View style={styles.legendContainer}>
-                {[
-                  { label: "Pending", color: "#F59E0B" },
-                  { label: "Shipping", color: "#3B82F6" },
-                  { label: "Completed", color: "#10B981" },
-                  { label: "Cancelled", color: "#EF4444" },
-                ].map((item, index) => (
-                  <View key={index} style={styles.legendItem}>
-                    <View
-                      style={[styles.legendDot, { backgroundColor: item.color }]}
-                    />
-                    <Text style={styles.legendText}>{item.label}</Text>
-                  </View>
-                ))}
-              </View>
+              {!isLoading && statusData.length > 0 && (
+                <View style={styles.legendContainer}>
+                  {statusData.map((item, index) => (
+                    <View key={index} style={styles.legendItem}>
+                      <View
+                        style={[
+                          styles.legendDot,
+                          { backgroundColor: item.color },
+                        ]}
+                      />
+                      <Text style={styles.legendText}>
+                        {item.label} ({item.percentage})
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -292,33 +415,64 @@ export default function AdminDashboardHome() {
               <Text style={styles.seeAllText}>Xem tất cả</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.tableHeader}>
             <Text style={[styles.tableHeaderText, { flex: 0.5 }]}>#</Text>
             <Text style={[styles.tableHeaderText, { flex: 3 }]}>Sản phẩm</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1.5, textAlign: 'right' }]}>Giá</Text>
-            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Đã bán</Text>
+            <Text style={[styles.tableHeaderText, { flex: 1.5, textAlign: "right" }]}>
+              Giá
+            </Text>
+            <Text style={[styles.tableHeaderText, { flex: 1, textAlign: "right" }]}>
+              Đã bán
+            </Text>
           </View>
 
-          {dummyTopProducts.map((product, index) => (
-            <View key={product.id} style={styles.tableRow}>
-              <Text style={[styles.tableCellText, styles.rankText, { flex: 0.5 }]}>
-                {index + 1}
-              </Text>
-              <View style={[styles.productCell, { flex: 3 }]}>
-                <Image source={{ uri: product.image }} style={styles.productImage} />
-                <Text style={styles.productName} numberOfLines={1}>
-                  {product.name}
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <View key={index} style={styles.tableRow}>
+                <Shimmer width="100%" height={40} />
+              </View>
+            ))
+          ) : topProducts.length > 0 ? (
+            topProducts.map((product, index) => (
+              <View key={product.product_id} style={styles.tableRow}>
+                <Text style={[styles.tableCellText, styles.rankText, { flex: 0.5 }]}>
+                  {index + 1}
+                </Text>
+                <View style={[styles.productCell, { flex: 3 }]}>
+                  <Image
+                    source={{ uri: product.image_url || "https://via.placeholder.com/60" }}
+                    style={styles.productImage}
+                  />
+                  <Text style={styles.productName} numberOfLines={1}>
+                    {product.name}
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    styles.tableCellText,
+                    styles.priceText,
+                    { flex: 1.5, textAlign: "right" },
+                  ]}
+                >
+                  {formatCurrency(product.price)}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCellText,
+                    styles.salesText,
+                    { flex: 1, textAlign: "right" },
+                  ]}
+                >
+                  {product.total_sales}
                 </Text>
               </View>
-              <Text style={[styles.tableCellText, styles.priceText, { flex: 1.5, textAlign: 'right' }]}>
-                {formatCurrency(product.price)}
-              </Text>
-              <Text style={[styles.tableCellText, styles.salesText, { flex: 1, textAlign: 'right' }]}>
-                {product.sales}
-              </Text>
+            ))
+          ) : (
+            <View style={{ paddingVertical: 20, alignItems: "center" }}>
+              <Text style={{ color: "#9CA3AF" }}>Chưa có sản phẩm bán chạy</Text>
             </View>
-          ))}
+          )}
         </View>
       </View>
     </ScrollView>
@@ -379,6 +533,18 @@ const styles = StyleSheet.create({
   profileInfo: { display: "flex" },
   profileName: { color: "#111827", fontWeight: "700", fontSize: 13 },
   profileRole: { color: "#9CA3AF", fontSize: 11 },
+
+  errorAlert: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF2F2",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: "#EF4444",
+  },
+  errorAlertText: { color: "#B91C1C", marginLeft: 8, fontWeight: "500" },
 
   kpiGrid: {
     flexDirection: "row",
@@ -453,7 +619,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,
-    marginLeft: -10, // Adjust label alignment
+    marginLeft: -10,
   },
   pieWrapper: {
     alignItems: "center",
@@ -500,7 +666,7 @@ const styles = StyleSheet.create({
   tableCellText: { color: "#111827", fontSize: 14, fontWeight: "500" },
   rankText: { color: "#6B7280", fontWeight: "700" },
   productCell: { flexDirection: "row", alignItems: "center" },
-  productImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12, backgroundColor: '#F3F4F6' },
+  productImage: { width: 40, height: 40, borderRadius: 8, marginRight: 12, backgroundColor: "#F3F4F6" },
   productName: { color: "#111827", fontSize: 14, fontWeight: "600", flex: 1 },
   priceText: { color: "#4B5563" },
   salesText: { color: "#10B981", fontWeight: "700" },
