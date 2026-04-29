@@ -2,6 +2,7 @@ import { supabase } from "@/src/lib/supabase";
 import {
   AlertCircle,
   Bell,
+  Calendar,
   Filter,
   MoreVertical,
   RefreshCw,
@@ -20,11 +21,49 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
 import Echarts from "@/src/components/admin/EchartsWrapper";
+import {
+  endOfDay,
+  endOfMonth,
+  endOfYear,
+  format,
+  startOfDay,
+  startOfMonth,
+  startOfYear,
+} from "date-fns";
+
+type TimeRange = "30days" | "month" | "year" | "custom";
+
+interface FilterState {
+  timeRange: TimeRange;
+  startDate: Date;
+  endDate: Date;
+}
+
+function computeDateRange(range: TimeRange, now = new Date()): { startDate: Date; endDate: Date } {
+  switch (range) {
+    case "30days": {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 29); // 30 days including today
+      return { startDate: startOfDay(start), endDate: endOfDay(now) };
+    }
+    case "month":
+      return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
+    case "year":
+      return { startDate: startOfYear(now), endDate: endOfYear(now) };
+    default:
+      return { startDate: startOfMonth(now), endDate: endOfMonth(now) };
+  }
+}
+
+function formatDisplay(d: Date) {
+  return format(d, "dd/MM/yyyy");
+}
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
@@ -62,6 +101,60 @@ const Shimmer = ({ width, height, borderRadius = 8, style }: any) => {
         style,
       ]}
     />
+  );
+};
+
+const SegBtn = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
+  <TouchableOpacity
+    style={[styles.segBtn, active && styles.segBtnActive]}
+    onPress={onPress}
+    activeOpacity={0.7}
+  >
+    <Text style={[styles.segBtnText, active && styles.segBtnTextActive]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const DateField = ({ label, value, onChange, disabled }: {
+  label: string; value: Date; onChange: (d: Date) => void; disabled: boolean;
+}) => {
+  const str = format(value, "yyyy-MM-dd");
+  return (
+    <View style={[styles.dateField, disabled && styles.dateFieldDisabled]}>
+      <Calendar size={14} color={disabled ? "#CBD5E1" : "#6366F1"} style={{ marginRight: 6 }} />
+      <Text style={[styles.dateFieldLabel, disabled && { color: "#CBD5E1" }]}>{label}: </Text>
+      {Platform.OS === "web" && !disabled ? (
+        <input
+          type="date"
+          value={str}
+          onChange={(e) => {
+            const d = new Date(e.target.value);
+            if (!isNaN(d.getTime())) onChange(d);
+          }}
+          style={{
+            border: "none",
+            background: "transparent",
+            fontSize: 13,
+            fontWeight: "600",
+            color: "#111827",
+            outline: "none",
+            cursor: "pointer",
+          }}
+        />
+      ) : (
+        <TextInput
+          editable={!disabled}
+          value={formatDisplay(value)}
+          style={[styles.dateFieldInput, disabled && { color: "#CBD5E1" }]}
+          onChangeText={(t) => {
+            const parts = t.split("/");
+            if (parts.length === 3) {
+              const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+              if (!isNaN(d.getTime())) onChange(d);
+            }
+          }}
+        />
+      )}
+    </View>
   );
 };
 
@@ -134,12 +227,26 @@ export default function AdminDashboardHome() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const now = new Date();
+  const [filter, setFilter] = useState<FilterState>({
+    timeRange: "30days",
+    ...computeDateRange("30days", now),
+  });
+
+  const handleRangeChange = (range: TimeRange) => {
+    if (range === "custom") {
+      setFilter((f) => ({ ...f, timeRange: "custom" }));
+      return;
+    }
+    const { startDate, endDate } = computeDateRange(range);
+    setFilter({ timeRange: range, startDate, endDate });
+  };
+
   const [chartTab, setChartTab] = useState<"revenue" | "orders" | "profit">("revenue");
 
   // Sub-chart States
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [subChartData, setSubChartData] = useState<any[]>([]);
-  const [subChartFilter, setSubChartFilter] = useState<"7" | "30" | "month">("7");
   const [isSubChartLoading, setIsSubChartLoading] = useState(false);
 
   const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.revenue) || 0), 0);
@@ -173,23 +280,17 @@ export default function AdminDashboardHome() {
     loadOtherData(true);
   }, []);
 
-  // Fetch Revenue when component mounts
+  // Fetch Revenue when component mounts or filter changes
   useEffect(() => {
-    // Default to 30 days for the chart
-    fetchRevenueData(30, !isRefreshing);
-  }, []);
+    fetchRevenueData(filter.startDate, filter.endDate, !isRefreshing);
+  }, [filter.startDate, filter.endDate]);
 
   // Fetch Sub-chart when filter or status changes
   useEffect(() => {
     if (selectedStatus) {
-      let days = 7;
-      const now = new Date();
-      if (subChartFilter === "30") days = 30;
-      else if (subChartFilter === "month") days = now.getDate();
-
-      fetchSubChartData(selectedStatus, days);
+      fetchSubChartData(selectedStatus, filter.startDate, filter.endDate);
     }
-  }, [selectedStatus, subChartFilter]);
+  }, [selectedStatus, filter.startDate, filter.endDate]);
 
   const handleSliceClick = (statusKey: string) => {
     setSelectedStatus(statusKey);
@@ -205,24 +306,51 @@ export default function AdminDashboardHome() {
     }, 400);
   };
 
-  const fetchSubChartData = async (status: string, days: number) => {
+  const fetchSubChartData = async (status: string, start: Date, end: Date) => {
     setIsSubChartLoading(true);
     try {
-      const { data, error } = await supabase.rpc("get_order_count_by_status_and_days", {
-        p_status: status,
-        p_days: days,
-      });
+      const s = startOfDay(start);
+      const e = endOfDay(end);
+
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("created_at")
+        .eq("status", status)
+        .gte("created_at", s.toISOString())
+        .lte("created_at", e.toISOString());
 
       if (error) {
         console.warn("Lỗi fetch subchart:", error);
       }
-      if (data && Array.isArray(data)) {
-        const mappedData = data.map((r: any) => ({
-          value: Number(r.order_count) || 0,
-          label: r.date_str, // RPC already returns "DD/MM"
-        }));
-        setSubChartData(mappedData);
+
+      const dailyMap: Record<string, number> = {};
+      const diffTime = Math.abs(e.getTime() - s.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const daysCount = diffDays === 0 ? 1 : diffDays;
+
+      for (let i = 0; i < daysCount; i++) {
+        const d = new Date(s);
+        d.setDate(d.getDate() + i);
+        if (d > e) break;
+        const k = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        dailyMap[k] = 0;
       }
+
+      if (orders && Array.isArray(orders)) {
+        orders.forEach((o: any) => {
+          const d = new Date(o.created_at);
+          const k = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+          if (dailyMap[k] !== undefined) {
+            dailyMap[k] += 1;
+          }
+        });
+      }
+
+      const mappedData = Object.keys(dailyMap).map((k) => ({
+        value: dailyMap[k],
+        label: k,
+      }));
+      setSubChartData(mappedData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -345,27 +473,32 @@ export default function AdminDashboardHome() {
     }
   };
 
-  const fetchRevenueData = async (days: number, showSpinner = false) => {
+  const fetchRevenueData = async (start: Date, end: Date, showSpinner = false) => {
     if (showSpinner) setIsChartLoading(true);
     try {
-      const now = new Date();
-      const startDate = new Date();
-      startDate.setDate(now.getDate() - days + 1);
-      startDate.setHours(0, 0, 0, 0);
+      const s = startOfDay(start);
+      const e = endOfDay(end);
 
       const { data: orders, error } = await supabase
         .from("orders")
         .select("created_at, total_amount, status")
-        .gte("created_at", startDate.toISOString());
+        .gte("created_at", s.toISOString())
+        .lte("created_at", e.toISOString());
 
       if (error) {
         console.warn("Lỗi fetch orders:", error);
       }
 
       const dailyMap: Record<string, { revenue: number; orders: number; profit: number }> = {};
-      for (let i = days - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+      
+      const diffTime = Math.abs(endOfDay(end).getTime() - startOfDay(start).getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const daysCount = diffDays === 0 ? 1 : diffDays;
+
+      for (let i = 0; i < daysCount; i++) {
+        const d = new Date(s);
+        d.setDate(d.getDate() + i);
+        if (d > e) break;
         const k = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
         dailyMap[k] = { revenue: 0, orders: 0, profit: 0 };
       }
@@ -403,7 +536,7 @@ export default function AdminDashboardHome() {
     setIsRefreshing(true);
     await Promise.all([
       loadOtherData(false),
-      fetchRevenueData(30, false),
+      fetchRevenueData(filter.startDate, filter.endDate, false),
     ]);
     setIsRefreshing(false);
   };
@@ -707,6 +840,41 @@ export default function AdminDashboardHome() {
         </View>
       </View>
 
+      {/* ── Filter Panel ── */}
+      <View style={[styles.filterPanel, { marginBottom: 24 }]}>
+        <View style={styles.segGroup}>
+          {[
+            { key: "30days", label: "30 Ngày qua" },
+            { key: "month", label: "Tháng này" },
+            { key: "year", label: "Năm nay" },
+            { key: "custom", label: "Tùy chọn" },
+          ].map((btn) => (
+            <SegBtn
+              key={btn.key}
+              label={btn.label}
+              active={filter.timeRange === btn.key}
+              onPress={() => handleRangeChange(btn.key as TimeRange)}
+            />
+          ))}
+        </View>
+
+        <View style={styles.dateRow}>
+          <DateField
+            label="Từ"
+            value={filter.startDate}
+            disabled={filter.timeRange !== "custom"}
+            onChange={(d) => setFilter((f) => ({ ...f, startDate: d }))}
+          />
+          <View style={styles.dateSep} />
+          <DateField
+            label="Đến"
+            value={filter.endDate}
+            disabled={filter.timeRange !== "custom"}
+            onChange={(d) => setFilter((f) => ({ ...f, endDate: d }))}
+          />
+        </View>
+      </View>
+
       {/* Khu vực 2: Khu vực Biểu đồ */}
       <View style={styles.chartGrid}>
         {/* Cột 1: Biểu đồ đường (Doanh thu) */}
@@ -821,23 +989,11 @@ export default function AdminDashboardHome() {
                 </Text>
               </View>
 
-              <View style={styles.filterGroup}>
-                <Filter size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
-                <FilterButton
-                  label="7 Ngày"
-                  isActive={subChartFilter === "7"}
-                  onPress={() => setSubChartFilter("7")}
-                />
-                <FilterButton
-                  label="30 Ngày"
-                  isActive={subChartFilter === "30"}
-                  onPress={() => setSubChartFilter("30")}
-                />
-                <FilterButton
-                  label="Tháng này"
-                  isActive={subChartFilter === "month"}
-                  onPress={() => setSubChartFilter("month")}
-                />
+              <View style={[styles.filterGroup, { justifyContent: 'center', backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }]}>
+                <Calendar size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '600' }}>
+                  {formatDisplay(filter.startDate)} - {formatDisplay(filter.endDate)}
+                </Text>
               </View>
             </View>
 
@@ -1046,6 +1202,66 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   kpiValue: { color: "#111827", fontSize: 22, fontWeight: "800" },
+
+  // Filter Panel
+  filterPanel: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#6366F1",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    gap: 12,
+  },
+  segGroup: {
+    flexDirection: "row",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 14,
+    padding: 4,
+    gap: 2,
+  },
+  segBtn: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  segBtnActive: {
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segBtnText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
+  segBtnTextActive: { color: "#6366F1" },
+
+  dateRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  dateField: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dateFieldDisabled: { backgroundColor: "#F9FAFB", borderColor: "#F3F4F6" },
+  dateFieldLabel: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
+  dateFieldInput: { fontSize: 13, fontWeight: "600", color: "#111827", flex: 1 },
+  dateSep: {
+    width: 16,
+    height: 1.5,
+    backgroundColor: "#CBD5E1",
+    borderRadius: 2,
+  },
 
   chartGrid: {
     flexDirection: "row",
