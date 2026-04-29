@@ -331,6 +331,7 @@ export default function AdminDashboardHome() {
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   // Loading & Filtering States
   const [isLoading, setIsLoading] = useState(true);
@@ -485,6 +486,7 @@ export default function AdminDashboardHome() {
         { count: newOrdersCount },
         { count: newReturnsCount },
         { count: newCustomersCount },
+        { data: recentOrdersData },
       ] = await Promise.all([
         supabase.rpc("get_dashboard_summary"),
         supabase.rpc("get_order_status_distribution"),
@@ -492,7 +494,36 @@ export default function AdminDashboardHome() {
         supabase.from("orders").select("*", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("return_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", startOfMonth.toISOString()),
+        supabase.from("orders").select(`
+          id, total_amount, status, created_at,
+          user_id, receiver_name, phone_contact,
+          order_items!order_items_order_id_fkey (
+            id,
+            quantity,
+            products!order_items_product_id_fkey ( id, name )
+          )
+        `).order("created_at", { ascending: false }).limit(5),
       ]);
+
+      if (recentOrdersData && recentOrdersData.length > 0) {
+        // Enrich with profile names via secondary query
+        const userIds = [...new Set(recentOrdersData.map((o: any) => o.user_id).filter(Boolean))];
+        let profileMap: Record<string, any> = {};
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .in('id', userIds);
+          if (profiles) {
+            profiles.forEach((p: any) => { profileMap[p.id] = p; });
+          }
+        }
+        const enriched = recentOrdersData.map((o: any) => ({
+          ...o,
+          _profile: profileMap[o.user_id] || null,
+        }));
+        setRecentOrders(enriched);
+      }
 
       if (err1 || err2 || err3) {
         console.warn("Lỗi fetch RPC khác:", err1 || err2 || err3);
@@ -1313,6 +1344,142 @@ export default function AdminDashboardHome() {
               <Text style={{ color: "#9CA3AF" }}>Chưa có sản phẩm bán chạy</Text>
             </View>
           )}
+        </View>
+      </View>
+
+      {/* Khu vực 4: Đơn hàng & Hoạt động */}
+      <View style={[styles.chartGrid, { marginTop: 24 }]}>
+        {/* Đơn hàng gần đây */}
+        <View style={[styles.chartCol, { flex: isDesktop ? 2 : 1, width: isDesktop ? '66.66%' : '100%' }]}>
+          <View style={[styles.whiteCard, { paddingHorizontal: 0 }]}>
+            <View style={[styles.cardHeader, { paddingHorizontal: 24 }]}>
+              <View>
+                <Text style={styles.cardTitle}>Đơn hàng gần đây</Text>
+                <Text style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>Các giao dịch mới nhất từ cửa hàng</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/(admin)/orders')}>
+                <Text style={styles.seeAllText}>Xem tất cả ↗</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={[styles.tableHeader, { paddingHorizontal: 24 }]}>
+              <Text style={[styles.tableHeaderText, { flex: 2 }]}>Khách hàng</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1 }]}>Mã ĐH</Text>
+              <Text style={[styles.tableHeaderText, { flex: 2 }]}>Sản phẩm</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'center' }]}>Trạng thái</Text>
+              <Text style={[styles.tableHeaderText, { flex: 1, textAlign: 'right' }]}>Tổng tiền</Text>
+            </View>
+
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <View key={i} style={[styles.tableRow, { paddingHorizontal: 24 }]}>
+                  <Shimmer width="100%" height={50} />
+                </View>
+              ))
+            ) : recentOrders.length > 0 ? (
+              recentOrders.map((order, i) => {
+                const profile = order._profile || (Array.isArray(order.profiles) ? order.profiles[0] : order.profiles);
+                const name = order.receiver_name || profile?.full_name || 'Khách vãng lai';
+                const email = profile?.email || '';
+                const initials = name.substring(0, 2).toUpperCase();
+                
+                const productNames = order.order_items
+                  ?.map((item: any) => item.products?.name)
+                  .filter(Boolean) || [];
+                const productName = productNames[0] || 'Sản phẩm';
+                const hasMore = productNames.length > 1;
+
+                const statusColors: any = {
+                  pending: { bg: '#FEF3C7', text: '#D97706' },
+                  processing: { bg: '#D1FAE5', text: '#059669' },
+                  shipping: { bg: '#DBEAFE', text: '#2563EB' },
+                  completed: { bg: '#D1FAE5', text: '#059669' },
+                  cancelled: { bg: '#FEE2E2', text: '#DC2626' },
+                };
+                const sColor = statusColors[order.status] || { bg: '#F3F4F6', text: '#4B5563' };
+
+                return (
+                  <View key={order.id} style={[styles.tableRow, { paddingHorizontal: 24, paddingVertical: 16 }]}>
+                    <View style={[{ flex: 2, flexDirection: 'row', alignItems: 'center' }]}>
+                      <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: sColor.text, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 12 }}>{initials}</Text>
+                      </View>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#111827' }} numberOfLines={1}>{name}</Text>
+                        <Text style={{ fontSize: 12, color: '#6B7280' }} numberOfLines={1}>{email}</Text>
+                      </View>
+                    </View>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#4B5563' }}>
+                      ORD-{String(order.id).slice(-6).toUpperCase()}
+                    </Text>
+                    <Text style={{ flex: 2, fontSize: 13, color: '#111827', fontWeight: '500' }} numberOfLines={1}>
+                      {productName}{hasMore ? ` +${productNames.length - 1}` : ''}
+                    </Text>
+                    <View style={{ flex: 1, alignItems: 'center' }}>
+                      <View style={{ backgroundColor: sColor.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                        <Text style={{ color: sColor.text, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
+                          {STATUS_LABELS[order.status] || order.status}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ flex: 1, textAlign: 'right', fontSize: 14, fontWeight: '700', color: '#111827' }}>
+                      {formatCurrency(order.total_amount)}
+                    </Text>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={{ padding: 40, alignItems: "center" }}>
+                <Text style={{ color: "#9CA3AF" }}>Chưa có đơn hàng nào</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Hoạt động gần đây */}
+        <View style={[styles.chartCol, { flex: isDesktop ? 1 : 1, width: isDesktop ? '33.33%' : '100%' }]}>
+          <View style={[styles.whiteCard, { padding: 0, overflow: 'hidden' }]}>
+            <View style={[styles.cardHeader, { padding: 24, paddingBottom: 16, marginBottom: 0 }]}>
+              <View>
+                <Text style={styles.cardTitle}>Hoạt động gần đây</Text>
+                <Text style={{ color: '#6B7280', fontSize: 13, marginTop: 4 }}>Sự kiện mới nhất từ cửa hàng</Text>
+              </View>
+              <TouchableOpacity onPress={() => router.push('/(admin)/notifications')}>
+                <Text style={styles.seeAllText}>Xem tất cả ↗</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 450 }} showsVerticalScrollIndicator={false} nestedScrollEnabled>
+              {notifications.length > 0 ? (
+                notifications.slice(0, 5).map((item) => {
+                  const style = getNotificationStyle(item.type);
+                  const Icon = style.icon;
+                  return (
+                    <View key={item.id} style={[styles.notifItem, { paddingHorizontal: 24, paddingVertical: 16 }]}>
+                      <View style={[styles.notifIconContainer, { backgroundColor: style.bgColor, width: 40, height: 40, borderRadius: 20 }]}>
+                        <Icon size={18} color={style.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, color: '#111827', fontWeight: '600' }}>
+                          {item.title}
+                        </Text>
+                        <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 2 }} numberOfLines={2}>
+                          {item.content}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>
+                          {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: vi })}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })
+              ) : (
+                <View style={{ padding: 40, alignItems: 'center' }}>
+                  <Text style={{ color: '#9CA3AF', fontSize: 14 }}>Không có hoạt động nào</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
         </View>
       </View>
       </ScrollView>
