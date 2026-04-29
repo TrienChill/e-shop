@@ -12,6 +12,10 @@ import {
   ShoppingBag,
   TrendingUp,
   Users,
+  CreditCard,
+  Star,
+  CheckCheck,
+  Settings,
 } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -37,7 +41,9 @@ import {
   startOfDay,
   startOfMonth,
   startOfYear,
+  formatDistanceToNow,
 } from "date-fns";
+import { vi } from "date-fns/locale";
 
 type TimeRange = "30days" | "month" | "year" | "custom";
 
@@ -206,6 +212,23 @@ const STATUS_LABELS: Record<string, string> = {
   returned: "Đã hoàn trả",
 };
 
+const getNotificationStyle = (type: string) => {
+  switch (type) {
+    case 'order':
+      return { icon: ShoppingBag, color: '#10B981', bgColor: '#D1FAE5' };
+    case 'payment':
+      return { icon: CreditCard, color: '#3B82F6', bgColor: '#DBEAFE' };
+    case 'customer':
+    case 'user':
+      return { icon: Users, color: '#8B5CF6', bgColor: '#EDE9FE' };
+    case 'review':
+      return { icon: Star, color: '#F59E0B', bgColor: '#FEF3C7' };
+    case 'system':
+    default:
+      return { icon: Settings, color: '#6B7280', bgColor: '#F3F4F6' };
+  }
+};
+
 export default function AdminDashboardHome() {
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -214,6 +237,71 @@ export default function AdminDashboardHome() {
   const [chartWidth, setChartWidth] = useState(300);
   const scrollViewRef = useRef<ScrollView>(null);
   const subChartRef = useRef<View>(null);
+
+  // --- Notification States ---
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchHeaderNotifications();
+
+    const channel = supabase
+      .channel('header-notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        () => fetchHeaderNotifications()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications' },
+        () => fetchHeaderNotifications()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchHeaderNotifications = async () => {
+    try {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (data) setNotifications(data);
+
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    } catch (err) {
+      console.warn("Lỗi fetch thông báo header:", err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await supabase.from('notifications').update({ is_read: true }).eq('is_read', false);
+      fetchHeaderNotifications();
+    } catch (err) {
+      console.warn("Lỗi đánh dấu đã đọc:", err);
+    }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+      fetchHeaderNotifications();
+    } catch (err) {
+      console.warn("Lỗi đánh dấu đã đọc item:", err);
+    }
+  };
 
   const ADMIN_ROUTES = [
     { id: 'dashboard', name: 'Dashboard Tổng Quan', path: '/(admin)/dashboard' },
@@ -229,7 +317,7 @@ export default function AdminDashboardHome() {
     { id: 'membership', name: 'Hạng Thành viên', path: '/(admin)/membership' },
   ];
 
-  const filteredRoutes = ADMIN_ROUTES.filter(route => 
+  const filteredRoutes = ADMIN_ROUTES.filter(route =>
     route.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -413,7 +501,7 @@ export default function AdminDashboardHome() {
 
       // 1. Map Summary
       const sumObj = Array.isArray(summary) ? summary[0] : summary;
-      
+
       setSummaryData({
         revenue: sumObj?.revenue ?? sumObj?.total_revenue ?? sumObj?.totalAmount ?? 0,
         new_orders: newOrdersCount ?? 0,
@@ -476,14 +564,14 @@ export default function AdminDashboardHome() {
           .from("products")
           .select("id, price")
           .in("id", productIds);
-          
+
         const priceMap = new Map(priceData?.map(p => [p.id, p.price]) || []);
-        
+
         const enrichedProducts = products.map((p: any) => ({
           ...p,
           price: priceMap.get(p.product_id) || 0,
         }));
-        
+
         setTopProducts(enrichedProducts);
       } else {
         setTopProducts([]);
@@ -513,7 +601,7 @@ export default function AdminDashboardHome() {
       }
 
       const dailyMap: Record<string, { revenue: number; orders: number; profit: number }> = {};
-      
+
       const diffTime = Math.abs(endOfDay(end).getTime() - startOfDay(start).getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       const daysCount = diffDays === 0 ? 1 : diffDays;
@@ -703,7 +791,7 @@ export default function AdminDashboardHome() {
         type: chartConfig.type,
         smooth: true,
         data: revenueData.map(item => item[chartConfig.dataKey as keyof typeof item]),
-        itemStyle: { 
+        itemStyle: {
           color: chartConfig.color,
           borderRadius: chartConfig.type === 'bar' ? [4, 4, 0, 0] : 0
         },
@@ -823,19 +911,83 @@ export default function AdminDashboardHome() {
             <TouchableOpacity style={styles.iconButton} onPress={handleRefresh}>
               <RefreshCw size={20} color="#1F2937" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton}>
-              <Bell size={20} color="#1F2937" />
-              <View style={styles.notificationBadge} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.profileButton}>
-              <Image source={{ uri: "https://i.pravatar.cc/150?u=admin" }} style={styles.profileImage} />
-              {Platform.OS === "web" && (
-                <View style={styles.profileInfo}>
-                  <Text style={styles.profileName}>Admin</Text>
-                  <Text style={styles.profileRole}>Quản trị viên</Text>
+            <View style={{ position: 'relative', zIndex: 100 }}>
+              <TouchableOpacity 
+                style={styles.iconButton} 
+                onPress={() => setIsNotificationOpen(!isNotificationOpen)}
+              >
+                <Bell size={20} color="#1F2937" />
+                {unreadCount > 0 && <View style={styles.notificationBadge} />}
+              </TouchableOpacity>
+
+              {isNotificationOpen && (
+                <View style={styles.notifDropdown}>
+                  <View style={styles.notifHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={styles.notifHeaderTitle}>Thông báo</Text>
+                      {unreadCount > 0 && (
+                        <View style={styles.notifCountBadge}>
+                          <Text style={styles.notifCountText}>{unreadCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <TouchableOpacity onPress={handleMarkAllRead}>
+                      <Text style={styles.notifMarkRead}>Đánh dấu đã đọc</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
+                    {notifications.length > 0 ? (
+                      notifications.map((item) => {
+                        const style = getNotificationStyle(item.type);
+                        const Icon = style.icon;
+                        return (
+                          <TouchableOpacity 
+                            key={item.id} 
+                            style={styles.notifItem}
+                            onPress={() => {
+                              handleMarkAsRead(item.id);
+                              setIsNotificationOpen(false);
+                            }}
+                          >
+                            <View style={[styles.notifIconContainer, { backgroundColor: style.bgColor }]}>
+                              <Icon size={16} color={style.color} />
+                            </View>
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Text style={[styles.notifItemTitle, !item.is_read && { fontWeight: '700', color: '#111827' }]}>
+                                  {item.title}
+                                </Text>
+                                {!item.is_read && <View style={styles.unreadDot} />}
+                              </View>
+                              <Text style={styles.notifItemDesc} numberOfLines={2}>{item.content}</Text>
+                              <Text style={styles.notifItemTime}>
+                                {formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: vi })}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })
+                    ) : (
+                      <View style={{ padding: 40, alignItems: 'center' }}>
+                        <Bell size={32} color="#D1D5DB" />
+                        <Text style={{ marginTop: 12, color: '#9CA3AF', fontSize: 14 }}>Không có thông báo mới</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  <TouchableOpacity 
+                    style={styles.notifFooter}
+                    onPress={() => {
+                      setIsNotificationOpen(false);
+                      router.push("/(admin)/notifications" as any);
+                    }}
+                  >
+                    <Text style={styles.notifFooterText}>Xem tất cả thông báo</Text>
+                  </TouchableOpacity>
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -1164,8 +1316,9 @@ export default function AdminDashboardHome() {
         </View>
       </View>
       </ScrollView>
-    </View>
+    </View >
   );
+
 }
 
 const styles = StyleSheet.create({
@@ -1208,21 +1361,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "white",
   },
-  profileButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    padding: 4,
-    paddingRight: 16,
-    borderRadius: 9999,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  profileImage: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
-  profileInfo: { display: "flex" },
-  profileName: { color: "#111827", fontWeight: "700", fontSize: 13 },
-  profileRole: { color: "#9CA3AF", fontSize: 11 },
-
   errorAlert: {
     flexDirection: "row",
     alignItems: "center",
@@ -1459,4 +1597,98 @@ const styles = StyleSheet.create({
   productName: { color: "#111827", fontSize: 14, fontWeight: "600", flex: 1 },
   priceText: { color: "#4B5563" },
   salesText: { color: "#10B981", fontWeight: "700" },
+
+  // Notification Dropdown
+  notifDropdown: {
+    position: 'absolute',
+    top: 52,
+    right: 0,
+    width: 360,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  notifHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  notifHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  notifCountBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  notifCountText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  notifMarkRead: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  notifItem: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  notifIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifItemTitle: {
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  notifItemDesc: {
+    fontSize: 13,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
+  notifItemTime: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  notifFooter: {
+    padding: 14,
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  notifFooterText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#10B981',
+  },
 });

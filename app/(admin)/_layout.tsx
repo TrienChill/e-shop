@@ -19,6 +19,7 @@ import {
 import React from "react";
 import {
   ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -107,6 +108,14 @@ export default function AdminLayout() {
         </ScrollView>
 
         <View style={styles.sidebarFooter}>
+          <View style={styles.profileSection}>
+            <Image source={{ uri: "https://i.pravatar.cc/150?u=admin" }} style={styles.profileImage} />
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName}>Admin</Text>
+              <Text style={styles.profileRole}>Quản trị viên</Text>
+            </View>
+          </View>
+
           <Pressable style={styles.footerLink} onPress={() => signOut()}>
             <LogOut size={18} color="#9CA3AF" />
             <Text style={styles.footerLinkText}>Đăng xuất</Text>
@@ -226,6 +235,32 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     fontSize: 14,
     fontWeight: "500",
+  },
+  profileSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    marginBottom: 20,
+    gap: 12,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  profileRole: {
+    color: "#9CA3AF",
+    fontSize: 12,
   },
   content: {
     flex: 1,
