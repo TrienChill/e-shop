@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform, ActivityIndicator } from 'react-native';
 import { ShoppingCart, CreditCard, Users, Settings, Bell, Search, Star, Download, RefreshCw, MoreVertical } from 'lucide-react-native';
+import { supabase } from '@/src/lib/supabase';
+import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
 interface NotificationItem {
   id: string;
-  type: 'order' | 'payment' | 'user' | 'system' | 'review';
+  type: 'order' | 'payment' | 'customer' | 'system' | 'review' | 'user';
   title: string;
   message: string;
   time: string;
@@ -12,151 +15,141 @@ interface NotificationItem {
   icon: any;
   color: string;
   bgColor: string;
+  created_at?: string;
 }
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
-};
-
-const initialNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    type: 'order',
-    title: 'Đơn hàng mới nhận được',
-    message: `Emma Wilson đã đặt đơn hàng ORD-7891 trị giá ${formatCurrency(299000)}`,
-    time: '2 phút trước',
-    isUnread: true,
-    icon: ShoppingCart,
-    color: '#10B981', // green
-    bgColor: '#D1FAE5'
-  },
-  {
-    id: '2',
-    type: 'payment',
-    title: 'Thanh toán đã xử lý',
-    message: `Đã xác nhận khoản thanh toán ${formatCurrency(1499000)} từ Sofia Garcia`,
-    time: '15 phút trước',
-    isUnread: true,
-    icon: CreditCard,
-    color: '#3B82F6', // blue
-    bgColor: '#DBEAFE'
-  },
-  {
-    id: '3',
-    type: 'user',
-    title: 'Đăng ký khách hàng mới',
-    message: 'James Chen đã tạo một tài khoản mới',
-    time: '1 giờ trước',
-    isUnread: true,
-    icon: Users,
-    color: '#8B5CF6', // purple
-    bgColor: '#EDE9FE'
-  },
-  {
-    id: '4',
-    type: 'order',
-    title: 'Đơn hàng đã giao',
-    message: 'Đơn hàng ORD-7889 đã được giao cho Sofia Garcia',
-    time: '2 giờ trước',
-    isUnread: false,
-    icon: ShoppingCart,
-    color: '#10B981',
-    bgColor: '#D1FAE5'
-  },
-  {
-    id: '5',
-    type: 'system',
-    title: 'Cập nhật hệ thống',
-    message: 'Bảng điều khiển v2.1 đã được triển khai thành công',
-    time: '3 giờ trước',
-    isUnread: false,
-    icon: Settings,
-    color: '#6B7280', // gray
-    bgColor: '#F3F4F6'
-  },
-  {
-    id: '6',
-    type: 'payment',
-    title: 'Thanh toán thất bại',
-    message: 'Lần thử thanh toán cho đơn hàng ORD-7888 từ Alex Thompson không thành công',
-    time: '4 giờ trước',
-    isUnread: false,
-    icon: CreditCard,
-    color: '#EF4444', // red
-    bgColor: '#FEE2E2'
-  },
-  {
-    id: '7',
-    type: 'review',
-    title: 'Đánh giá mới',
-    message: 'Maria Santos đã để lại đánh giá 5 sao: "Sản phẩm tuyệt vời!"',
-    time: '5 giờ trước',
-    isUnread: false,
-    icon: Star,
-    color: '#F59E0B', // yellow
-    bgColor: '#FEF3C7'
-  },
-  {
-    id: '8',
-    type: 'payment',
-    title: 'Gia hạn gói đăng ký',
-    message: 'Gói Nhóm (Team Plan) của James Chen đã được gia hạn thêm một tháng',
-    time: '6 giờ trước',
-    isUnread: false,
-    icon: CreditCard,
-    color: '#3B82F6',
-    bgColor: '#DBEAFE'
-  },
-  {
-    id: '9',
-    type: 'system',
-    title: 'Bảo trì máy chủ',
-    message: 'Cửa sổ bảo trì định kỳ: Ngày 20 tháng 2, từ 2:00 sáng - 4:00 sáng (giờ UTC)',
-    time: '1 ngày trước',
-    isUnread: false,
-    icon: Settings,
-    color: '#6B7280',
-    bgColor: '#F3F4F6'
-  },
-  {
-    id: '10',
-    type: 'order',
-    title: 'Đơn hàng mới nhận được',
-    message: `David Kim đã đặt đơn hàng ORD-7886 trị giá ${formatCurrency(599000)}`,
-    time: '2 ngày trước',
-    isUnread: false,
-    icon: ShoppingCart,
-    color: '#10B981',
-    bgColor: '#D1FAE5'
-  },
-  {
-    id: '11',
-    type: 'system',
-    title: 'Xuất dữ liệu hàng loạt hoàn tất',
-    message: 'Dữ liệu khách hàng bạn yêu cầu xuất đã sẵn sàng để tải xuống',
-    time: '2 ngày trước',
-    isUnread: false,
-    icon: Download,
-    color: '#6B7280',
-    bgColor: '#F3F4F6'
-  },
-  {
-    id: '12',
-    type: 'payment',
-    title: 'Hoàn tiền đã xử lý',
-    message: `Khoản hoàn tiền ${formatCurrency(599000)} đã được thực hiện cho đơn hàng ORD-7886`,
-    time: '3 ngày trước',
-    isUnread: false,
-    icon: CreditCard,
-    color: '#3B82F6',
-    bgColor: '#DBEAFE'
+const getNotificationStyle = (type: string) => {
+  switch (type) {
+    case 'order':
+      return { icon: ShoppingCart, color: '#10B981', bgColor: '#D1FAE5' };
+    case 'payment':
+      return { icon: CreditCard, color: '#3B82F6', bgColor: '#DBEAFE' };
+    case 'customer':
+    case 'user':
+      return { icon: Users, color: '#8B5CF6', bgColor: '#EDE9FE' };
+    case 'review':
+      return { icon: Star, color: '#F59E0B', bgColor: '#FEF3C7' };
+    case 'system':
+    default:
+      return { icon: Settings, color: '#6B7280', bgColor: '#F3F4F6' };
   }
-];
+};
 
 export default function NotificationsPage() {
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchNotifications();
+
+    const channel = supabase
+      .channel('public:notifications')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        (payload) => {
+          const newRow = payload.new;
+          const style = getNotificationStyle(newRow.type);
+          const newNotif: NotificationItem = {
+            id: newRow.id,
+            type: newRow.type as any,
+            title: newRow.title,
+            message: newRow.content,
+            time: formatDistanceToNow(new Date(newRow.created_at), { addSuffix: true, locale: vi }),
+            isUnread: !newRow.is_read,
+            icon: style.icon,
+            color: style.color,
+            bgColor: style.bgColor,
+            created_at: newRow.created_at
+          };
+          setNotifications((prev) => [newNotif, ...prev]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      await supabase.auth.getUser();
+
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Error fetching notifications:", error);
+        return;
+      }
+
+      if (data) {
+        const formatted = data.map((item: any) => {
+          const style = getNotificationStyle(item.type);
+          return {
+            id: item.id,
+            type: item.type,
+            title: item.title,
+            message: item.content,
+            time: formatDistanceToNow(new Date(item.created_at), { addSuffix: true, locale: vi }),
+            isUnread: !item.is_read,
+            icon: style.icon,
+            color: style.color,
+            bgColor: style.bgColor,
+            created_at: item.created_at
+          };
+        });
+        setNotifications(formatted);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('is_read', false);
+
+      if (error) throw error;
+
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, isUnread: false }))
+      );
+    } catch (error) {
+      console.error("Error updating all notifications:", error);
+    }
+  };
+
+  const markAsRead = async (id: string) => {
+    const notif = notifications.find(n => n.id === id);
+    if (!notif || !notif.isUnread) return;
+
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isUnread: false } : n))
+      );
+    } catch (error) {
+      console.error("Error updating notification:", error);
+    }
+  };
 
   const filteredNotifications = notifications.filter(n => {
     if (filter === 'unread') return n.isUnread;
@@ -165,14 +158,6 @@ export default function NotificationsPage() {
   });
 
   const unreadCount = notifications.filter(n => n.isUnread).length;
-
-  const markAllAsRead = () => {
-    setNotifications(notifications.map(n => ({ ...n, isUnread: false })));
-  };
-
-  const markAsRead = (id: string) => {
-    setNotifications(notifications.map(n => n.id === id ? { ...n, isUnread: false } : n));
-  };
 
   return (
     <View style={styles.container}>
@@ -225,7 +210,12 @@ export default function NotificationsPage() {
 
           {/* List */}
           <View style={styles.listContainer}>
-            {filteredNotifications.length === 0 ? (
+            {loading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#2563EB" />
+                <Text style={styles.emptyText}>Đang tải thông báo...</Text>
+              </View>
+            ) : filteredNotifications.length === 0 ? (
               <View style={styles.emptyState}>
                 <Bell size={48} color="#D1D5DB" />
                 <Text style={styles.emptyText}>Không có thông báo nào</Text>

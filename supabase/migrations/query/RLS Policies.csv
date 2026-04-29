@@ -84,7 +84,6 @@ public,reviews,Admins can delete all reviews,PERMISSIVE,{public},DELETE,"(EXISTS
   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
 public,order_vouchers,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
 public,user_vouchers,user_update_own_vouchers,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
-public,vouchers,user_update_vouchers_usage,PERMISSIVE,{public},UPDATE,(is_active = true),(is_active = true)
 public,product_images,Public read product_images,PERMISSIVE,{public},SELECT,true,null
 public,return_requests,Users own returns,PERMISSIVE,{public},ALL,"((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM profiles
@@ -109,7 +108,6 @@ public,order_vouchers,admin_all_order_vouchers,PERMISSIVE,{authenticated},ALL,"(
   WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))","(EXISTS ( SELECT 1
    FROM profiles p
   WHERE ((p.id = auth.uid()) AND (p.role = 'admin'::user_role))))"
-public,order_vouchers,user_insert_order_vouchers,PERMISSIVE,{authenticated},INSERT,null,true
 public,banners,Public can view active banners,PERMISSIVE,{public},SELECT,(is_active = true),null
 public,banners,Staff and admins can view all banners,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
    FROM profiles
@@ -120,7 +118,6 @@ public,banners,Admins and staff can manage banners,PERMISSIVE,{public},ALL,"(EXI
    FROM profiles
   WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
 public,profiles,Users can view own profile,PERMISSIVE,{authenticated},SELECT,(auth.uid() = id),null
-public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
 public,profiles,Users can update own profile,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = id),null
 public,membership_levels,Cho phép đọc membership levels cho tất cả người dùn,PERMISSIVE,{authenticated},SELECT,true,null
 public,orders,Users can view own orders,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
@@ -137,3 +134,16 @@ public,order_items,Users can view own order items,PERMISSIVE,{public},SELECT,"(E
 public,order_items,Users can insert own order items,PERMISSIVE,{public},INSERT,null,"(EXISTS ( SELECT 1
    FROM orders
   WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))"
+public,order_vouchers,Users can insert order vouchers for own orders,PERMISSIVE,{authenticated},INSERT,null,"(EXISTS ( SELECT 1
+   FROM orders
+  WHERE ((orders.id = order_vouchers.order_id) AND (orders.user_id = auth.uid()))))"
+public,profiles,Public profiles are viewable by everyone,PERMISSIVE,{public},SELECT,true,null
+public,notifications,Users can view their own notifications,PERMISSIVE,{authenticated},SELECT,(auth.uid() = recipient_id),null
+public,notifications,Users can view own notifications,PERMISSIVE,{authenticated},SELECT,(auth.uid() = recipient_id),null
+public,notifications,Users can update own notifications,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = recipient_id),(auth.uid() = recipient_id)
+public,notifications,Admin and staff can insert notifications,PERMISSIVE,{authenticated},INSERT,null,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,notifications,Admins can delete notifications,PERMISSIVE,{authenticated},DELETE,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
