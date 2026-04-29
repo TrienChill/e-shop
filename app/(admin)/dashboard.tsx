@@ -134,7 +134,7 @@ export default function AdminDashboardHome() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const [filterType, setFilterType] = useState<"7" | "30" | "month" | "quarter" | "year">("7");
+  const [chartTab, setChartTab] = useState<"revenue" | "orders" | "profit">("revenue");
 
   // Sub-chart States
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
@@ -142,7 +142,9 @@ export default function AdminDashboardHome() {
   const [subChartFilter, setSubChartFilter] = useState<"7" | "30" | "month">("7");
   const [isSubChartLoading, setIsSubChartLoading] = useState(false);
 
-  const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const filteredRevenueTotal = revenueData.reduce((sum, item) => sum + (Number(item.revenue) || 0), 0);
+  const filteredOrdersTotal = revenueData.reduce((sum, item) => sum + (Number(item.orders) || 0), 0);
+  const filteredProfitTotal = revenueData.reduce((sum, item) => sum + (Number(item.profit) || 0), 0);
   const filteredSubChartTotal = subChartData.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
 
   const isDesktop = width >= 1024;
@@ -171,29 +173,11 @@ export default function AdminDashboardHome() {
     loadOtherData(true);
   }, []);
 
-  // Fetch Revenue when filter changes
+  // Fetch Revenue when component mounts
   useEffect(() => {
-    let days = 7;
-    const now = new Date();
-    
-    if (filterType === "30") days = 30;
-    else if (filterType === "month") days = now.getDate();
-    else if (filterType === "quarter") {
-      const currentMonth = now.getMonth(); // 0-11
-      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
-      const quarterStartDate = new Date(now.getFullYear(), quarterStartMonth, 1);
-      const diffTime = Math.abs(now.getTime() - quarterStartDate.getTime());
-      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    } 
-    else if (filterType === "year") {
-      const yearStartDate = new Date(now.getFullYear(), 0, 1);
-      const diffTime = Math.abs(now.getTime() - yearStartDate.getTime());
-      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    }
-
-    // Do not show isolated chart spinner if it's already doing a full refresh pull
-    fetchRevenueData(days, !isRefreshing);
-  }, [filterType]);
+    // Default to 30 days for the chart
+    fetchRevenueData(30, !isRefreshing);
+  }, []);
 
   // Fetch Sub-chart when filter or status changes
   useEffect(() => {
@@ -364,24 +348,50 @@ export default function AdminDashboardHome() {
   const fetchRevenueData = async (days: number, showSpinner = false) => {
     if (showSpinner) setIsChartLoading(true);
     try {
-      const { data: revenue, error } = await supabase.rpc("get_revenue_by_days", {
-        p_days: days,
-      });
+      const now = new Date();
+      const startDate = new Date();
+      startDate.setDate(now.getDate() - days + 1);
+      startDate.setHours(0, 0, 0, 0);
+
+      const { data: orders, error } = await supabase
+        .from("orders")
+        .select("created_at, total_amount, status")
+        .gte("created_at", startDate.toISOString());
+
       if (error) {
-        console.warn("Lỗi fetch revenue:", error);
+        console.warn("Lỗi fetch orders:", error);
       }
-      if (revenue && Array.isArray(revenue)) {
-        const mappedRevenue = revenue.map((r: any) => {
-          // Format date from YYYY-MM-DD to DD/MM
-          const parts = r.date_str ? r.date_str.split("-") : [];
-          const label = parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
-          return {
-            value: Number(r.daily_revenue) || 0,
-            label,
-          };
+
+      const dailyMap: Record<string, { revenue: number; orders: number; profit: number }> = {};
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const k = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+        dailyMap[k] = { revenue: 0, orders: 0, profit: 0 };
+      }
+
+      if (orders && Array.isArray(orders)) {
+        orders.forEach((o: any) => {
+          const d = new Date(o.created_at);
+          const k = `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+          if (dailyMap[k]) {
+            if (o.status === "completed") {
+              const amount = Number(o.total_amount) || 0;
+              dailyMap[k].revenue += amount;
+              dailyMap[k].profit += amount * 0.2; // Giả sử 20% biên lợi nhuận
+            }
+            dailyMap[k].orders += 1;
+          }
         });
-        setRevenueData(mappedRevenue);
       }
+
+      const mappedRevenue = Object.keys(dailyMap).map((k) => ({
+        label: k,
+        revenue: dailyMap[k].revenue,
+        orders: dailyMap[k].orders,
+        profit: dailyMap[k].profit,
+      }));
+      setRevenueData(mappedRevenue);
     } catch (err) {
       console.error(err);
     } finally {
@@ -391,13 +401,9 @@ export default function AdminDashboardHome() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    let days = 7;
-    if (filterType === "30") days = 30;
-    if (filterType === "month") days = new Date().getDate();
-
     await Promise.all([
       loadOtherData(false),
-      fetchRevenueData(days, false),
+      fetchRevenueData(30, false),
     ]);
     setIsRefreshing(false);
   };
@@ -473,6 +479,33 @@ export default function AdminDashboardHome() {
     );
   };
 
+  const getChartConfig = () => {
+    let dataKey = 'revenue';
+    let type = 'line';
+    let color = '#4F46E5';
+    let areaColor = 'rgba(99, 102, 241, 0.4)';
+    let name = 'Doanh thu';
+    let isCurrency = true;
+
+    if (chartTab === 'orders') {
+      dataKey = 'orders';
+      type = 'bar';
+      color = '#10B981';
+      name = 'Đơn hàng';
+      isCurrency = false;
+    } else if (chartTab === 'profit') {
+      dataKey = 'profit';
+      type = 'line';
+      color = '#F59E0B';
+      areaColor = 'rgba(245, 158, 11, 0.4)';
+      name = 'Lợi nhuận';
+    }
+
+    return { dataKey, type, color, areaColor, name, isCurrency };
+  };
+
+  const chartConfig = getChartConfig();
+
   const revenueOption = {
     tooltip: {
       trigger: 'axis',
@@ -480,14 +513,14 @@ export default function AdminDashboardHome() {
       textStyle: { color: 'white' },
       formatter: `function (params) {
         let p = params[0];
-        let val = Number(p.value).toLocaleString('vi-VN') + ' đ';
+        let val = ${chartConfig.isCurrency ? "Number(p.value).toLocaleString('vi-VN') + ' đ'" : "p.value + ' đơn'"};
         return '<div style="font-size:10px;color:#9CA3AF;margin-bottom:2px">' + p.name + '</div><div style="font-weight:800;font-size:12px">' + val + '</div>';
       }`
     },
     grid: { left: '2%', right: '2%', bottom: '2%', top: '10%', containLabel: true },
     xAxis: {
       type: 'category',
-      boundaryGap: false,
+      boundaryGap: chartConfig.type === 'bar',
       data: revenueData.map(item => item.label),
       axisLine: { lineStyle: { color: '#F3F4F6' } },
       axisLabel: { color: '#6B7280', fontSize: 10, fontWeight: '500' }
@@ -500,30 +533,36 @@ export default function AdminDashboardHome() {
         fontSize: 11,
         fontWeight: '600',
         formatter: `function (value) {
-          if (value >= 1000000000) return (value / 1000000000).toFixed(1) + "B";
-          if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
-          if (value >= 1000) return (value / 1000).toFixed(0) + "k";
+          if (${chartConfig.isCurrency}) {
+            if (value >= 1000000000) return (value / 1000000000).toFixed(1) + "B";
+            if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
+            if (value >= 1000) return (value / 1000).toFixed(0) + "k";
+          }
           return value.toString();
         }`
       }
     },
     series: [
       {
-        type: 'line',
+        type: chartConfig.type,
         smooth: true,
-        data: revenueData.map(item => item.value),
-        itemStyle: { color: '#4F46E5' },
-        lineStyle: { width: 4, color: '#6366F1' },
-        areaStyle: {
+        data: revenueData.map(item => item[chartConfig.dataKey as keyof typeof item]),
+        itemStyle: { 
+          color: chartConfig.color,
+          borderRadius: chartConfig.type === 'bar' ? [4, 4, 0, 0] : 0
+        },
+        lineStyle: chartConfig.type === 'line' ? { width: 4, color: chartConfig.color } : undefined,
+        areaStyle: chartConfig.type === 'line' ? {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
-              { offset: 1, color: 'rgba(99, 102, 241, 0.05)' }
+              { offset: 0, color: chartConfig.areaColor },
+              { offset: 1, color: chartConfig.areaColor.replace('0.4', '0.05') }
             ]
           }
-        }
+        } : undefined,
+        barMaxWidth: 20
       }
     ]
   };
@@ -677,43 +716,36 @@ export default function AdminDashboardHome() {
               <View>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                   <Text style={[styles.cardTitle, { marginBottom: 0 }]}>
-                    Biểu đồ Doanh thu
+                    Thống kê 30 ngày qua
                   </Text>
                   {isChartLoading && (
                     <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 12 }} />
                   )}
                 </View>
                 <Text style={{ fontSize: 13, color: '#6B7280', fontWeight: '500' }}>
-                  Tổng lọc: <Text style={{ color: '#6366F1', fontWeight: '700' }}>{formatCurrency(filteredRevenueTotal)}</Text>
+                  Tổng: <Text style={{ color: chartConfig.color, fontWeight: '700' }}>
+                    {chartTab === 'revenue' ? formatCurrency(filteredRevenueTotal) : 
+                     chartTab === 'orders' ? filteredOrdersTotal + ' đơn' : 
+                     formatCurrency(filteredProfitTotal)}
+                  </Text>
                 </Text>
               </View>
 
               <View style={styles.filterGroup}>
-                <Filter size={14} color="#9CA3AF" style={{ marginRight: 6 }} />
                 <FilterButton
-                  label="7 Ngày"
-                  isActive={filterType === "7"}
-                  onPress={() => setFilterType("7")}
+                  label="Doanh thu"
+                  isActive={chartTab === "revenue"}
+                  onPress={() => setChartTab("revenue")}
                 />
                 <FilterButton
-                  label="30 Ngày"
-                  isActive={filterType === "30"}
-                  onPress={() => setFilterType("30")}
+                  label="Đơn đặt hàng"
+                  isActive={chartTab === "orders"}
+                  onPress={() => setChartTab("orders")}
                 />
                 <FilterButton
-                  label="Tháng này"
-                  isActive={filterType === "month"}
-                  onPress={() => setFilterType("month")}
-                />
-                <FilterButton
-                  label="Quý này"
-                  isActive={filterType === "quarter"}
-                  onPress={() => setFilterType("quarter")}
-                />
-                <FilterButton
-                  label="Năm nay"
-                  isActive={filterType === "year"}
-                  onPress={() => setFilterType("year")}
+                  label="Lợi nhuận"
+                  isActive={chartTab === "profit"}
+                  onPress={() => setChartTab("profit")}
                 />
               </View>
             </View>
