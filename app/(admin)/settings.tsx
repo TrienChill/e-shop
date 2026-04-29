@@ -17,6 +17,13 @@ import {
   Save,
   Upload,
   XCircle,
+  Sun,
+  Moon,
+  Monitor,
+  Circle,
+  AlignJustify,
+  StretchHorizontal,
+  Maximize2,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/src/lib/supabase';
@@ -425,6 +432,102 @@ function ProfileTab({ userId }: { userId: string }) {
   );
 }
 
+// ─── Tab Giao diện ────────────────────────────────────────────────────────
+function AppearanceTab() {
+  const [theme, setTheme] = useState('light');
+  const [colorScheme, setColorScheme] = useState('emerald');
+  const [density, setDensity] = useState('compact');
+
+  const THEMES = [
+    { id: 'light', label: 'Sáng', icon: Sun },
+    { id: 'dark', label: 'Tối', icon: Moon },
+    { id: 'system', label: 'Hệ thống', icon: Monitor },
+  ];
+
+  const COLOR_SCHEMES = [
+    { id: 'emerald', label: 'Lục bảo', color: '#10B981' },
+    { id: 'blue', label: 'Xanh dương', color: '#3B82F6' },
+    { id: 'violet', label: 'Tím', color: '#8B5CF6' },
+    { id: 'rose', label: 'Hồng', color: '#F43F5E' },
+    { id: 'orange', label: 'Cam', color: '#F97316' },
+    { id: 'slate', label: 'Xám', color: '#64748B' },
+  ];
+
+  const DENSITIES = [
+    { id: 'compact', label: 'Gọn gàng', icon: AlignJustify },
+    { id: 'comfortable', label: 'Thoải mái', icon: Maximize2 },
+    { id: 'spacious', label: 'Rộng rãi', icon: StretchHorizontal },
+  ];
+
+  return (
+    <View style={styles.formCard}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>Giao diện</Text>
+        <Text style={styles.cardSubtitle}>Tùy chỉnh giao diện và cảm nhận của bảng điều khiển</Text>
+      </View>
+      <View style={styles.cardDivider} />
+      
+      <View style={{ padding: 24 }}>
+        {/* Chủ đề */}
+        <Text style={appearanceStyles.sectionTitle}>Chủ đề</Text>
+        <View style={appearanceStyles.grid}>
+          {THEMES.map((item) => {
+            const isActive = theme === item.id;
+            const Icon = item.icon;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
+                onPress={() => setTheme(item.id)}
+              >
+                <Icon size={24} color={isActive ? '#059669' : '#6B7280'} />
+                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Bảng màu */}
+        <Text style={[appearanceStyles.sectionTitle, { marginTop: 32 }]}>Bảng màu</Text>
+        <View style={appearanceStyles.grid}>
+          {COLOR_SCHEMES.map((item) => {
+            const isActive = colorScheme === item.id;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
+                onPress={() => setColorScheme(item.id)}
+              >
+                <Circle size={16} color={item.color} fill={item.color} />
+                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Mật độ hiển thị */}
+        <Text style={[appearanceStyles.sectionTitle, { marginTop: 32 }]}>Mật độ hiển thị</Text>
+        <View style={appearanceStyles.grid}>
+          {DENSITIES.map((item) => {
+            const isActive = density === item.id;
+            const Icon = item.icon;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
+                onPress={() => setDensity(item.id)}
+              >
+                <Icon size={24} color={isActive ? '#059669' : '#6B7280'} />
+                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── Placeholder Tab ────────────────────────────────────────────────────────
 function PlaceholderTab({ title }: { title: string }) {
   return (
@@ -498,7 +601,7 @@ export default function ProfileSettings() {
             </View>
           </View>
         )}
-        {activeTab === 'appearance' && <PlaceholderTab title="Giao diện" />}
+        {activeTab === 'appearance' && <AppearanceTab />}
       </ScrollView>
     </View>
   );
@@ -696,4 +799,46 @@ const formStyles = StyleSheet.create({
   },
   textarea: { minHeight: 100, paddingTop: 10 },
   disabledHint: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+});
+
+// ─── Styles cho AppearanceTab ────────────────────────────────────────────────
+const appearanceStyles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#374151',
+    marginBottom: 16,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  card: {
+    flex: 1,
+    minWidth: '30%',
+    aspectRatio: 2.2,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    ...Platform.select({
+      web: { cursor: 'pointer' } as any,
+    }),
+  },
+  cardActive: {
+    borderColor: '#059669',
+    backgroundColor: 'rgba(5, 150, 105, 0.04)',
+  },
+  cardLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  cardLabelActive: {
+    color: '#059669',
+  },
 });
