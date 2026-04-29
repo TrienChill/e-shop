@@ -1,6 +1,6 @@
 
 import { useAuth } from "@/src/auth/AuthContext";
-import { getRevenueReport, RevenueReportRow } from "@/src/services/admin/revenue";
+import { getRevenueReport, RevenueReport } from "@/src/services/admin/revenue";
 import {
   endOfDay,
   endOfMonth,
@@ -186,21 +186,17 @@ export default function AdminRevenueScreen() {
   });
 
   // ── Data State ──
-  const [rows, setRows] = useState<RevenueReportRow[]>([]);
+  const [reportData, setReportData] = useState<RevenueReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Derived KPIs ──
-  const totalRevenue = rows.reduce((s, r) => s + r.daily_revenue, 0);
-  const totalOrders = rows.reduce((s, r) => s + r.orders_count, 0);
-  const avgDaily = rows.length > 0 ? totalRevenue / rows.length : 0;
-
-  // ── Top products: aggregate by date_str prefix is not available, so we
-  //    show the top-5 days by revenue as a proxy "top days" bar chart.
+  // ── Derived values from RPC ──
   const TOP_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
-  const topDays = [...rows]
-    .sort((a, b) => b.daily_revenue - a.daily_revenue)
-    .slice(0, 5);
+  const revenueIn  = reportData?.revenue_in  ?? 0;
+  const revenueOut = reportData?.revenue_out ?? 0;
+  const profit     = reportData?.profit      ?? 0;
+  const trendData  = reportData?.trend_data  ?? [];
+  const topProducts = reportData?.top_products ?? [];
 
   // ── Change timeRange ──
   const handleRangeChange = useCallback((range: TimeRange) => {
@@ -218,7 +214,7 @@ export default function AdminRevenueScreen() {
     setError(null);
     try {
       const data = await getRevenueReport(start, end);
-      setRows(data);
+      setReportData(data);
     } catch (e: any) {
       setError(e.message ?? "Lỗi tải dữ liệu");
     } finally {
@@ -249,7 +245,7 @@ export default function AdminRevenueScreen() {
       showToast("Tính năng xuất Excel chỉ khả dụng trên Web.", "error");
       return;
     }
-    if (rows.length === 0) {
+    if (!reportData || trendData.length === 0) {
       showToast("Không có dữ liệu để xuất.", "error");
       return;
     }
@@ -266,41 +262,32 @@ export default function AdminRevenueScreen() {
         ["Từ ngày", format(filter.startDate, "dd/MM/yyyy")],
         ["Đến ngày", format(filter.endDate, "dd/MM/yyyy")],
         ["", ""],
-        ["Chỉ số", "Giá trị"],
-        ["Tổng doanh thu (₫)", totalRevenue],
-        ["Tổng đơn hàng", totalOrders],
-        ["Doanh thu trung bình / ngày (₫)", Math.round(avgDaily)],
-        ["Số ngày có dữ liệu", rows.length],
+        ["Chỉ số", "Giá trị (₫)"],
+        ["Doanh thu (Tiền vào)", revenueIn],
+        ["Hoàn trả (Tiền ra)", revenueOut],
+        ["Lợi nhuận", profit],
+        ["Số ngày có dữ liệu", trendData.length],
       ];
       const wsOverview = XLSX.utils.aoa_to_sheet(overviewData);
-      wsOverview["!cols"] = [{ wch: 36 }, { wch: 20 }];
+      wsOverview["!cols"] = [{ wch: 30 }, { wch: 20 }];
 
       // ── Sheet 2: Xu hướng theo ngày ──
-      const trendHeaders = ["Ngày", "Doanh thu (₫)", "Số đơn hàng"];
-      const trendRows = rows.map((r) => [
-        r.date_str,
-        r.daily_revenue,
-        r.orders_count,
-      ]);
+      const trendHeaders = ["Ngày", "Doanh thu (₫)"];
+      const trendRows = trendData.map((r) => [r.date, r.amount]);
       const wsTrend = XLSX.utils.aoa_to_sheet([trendHeaders, ...trendRows]);
-      wsTrend["!cols"] = [{ wch: 14 }, { wch: 20 }, { wch: 16 }];
+      wsTrend["!cols"] = [{ wch: 14 }, { wch: 20 }];
 
-      // ── Sheet 3: Top 5 ngày doanh thu cao nhất ──
-      const top5Headers = ["Hạng", "Ngày", "Doanh thu (₫)", "Số đơn hàng"];
-      const top5Rows = topDays.map((r, i) => [
-        i + 1,
-        r.date_str,
-        r.daily_revenue,
-        r.orders_count,
-      ]);
+      // ── Sheet 3: Top sản phẩm ──
+      const top5Headers = ["Hạng", "Tên sản phẩm", "Doanh thu (₫)"];
+      const top5Rows = topProducts.map((r, i) => [i + 1, r.name, r.revenue]);
       const wsTop5 = XLSX.utils.aoa_to_sheet([top5Headers, ...top5Rows]);
-      wsTop5["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 20 }, { wch: 16 }];
+      wsTop5["!cols"] = [{ wch: 8 }, { wch: 30 }, { wch: 20 }];
 
       // ── Build workbook ──
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, wsOverview, "Tổng quan");
       XLSX.utils.book_append_sheet(wb, wsTrend, "Xu hướng theo ngày");
-      XLSX.utils.book_append_sheet(wb, wsTop5, "Top 5 ngày");
+      XLSX.utils.book_append_sheet(wb, wsTop5, "Top sản phẩm");
 
       XLSX.writeFile(wb, fileName);
       showToast(`✓ Đã xuất "${fileName}" thành công!`, "success", 4000);
@@ -309,14 +296,12 @@ export default function AdminRevenueScreen() {
     } finally {
       setExporting(false);
     }
-  }, [rows, filter, totalRevenue, totalOrders, avgDaily, topDays]);
+  }, [reportData, filter, revenueIn, revenueOut, profit, trendData, topProducts]);
 
   // ── Chart options ──
-  const chartLabels = rows.map((r) => {
-    const parts = r.date_str?.split("-") ?? [];
-    return parts.length === 3 ? `${parts[2]}/${parts[1]}` : r.date_str;
-  });
-  const chartValues = rows.map((r) => r.daily_revenue);
+  // trendData: [{date: "DD/MM", amount: number}] — from RPC directly
+  const chartLabels = trendData.map((r) => r.date);
+  const chartValues = trendData.map((r) => r.amount);
 
   // 1. Revenue Trend — Smooth Line + Area
   const revenueOption = {
@@ -415,7 +400,7 @@ export default function AdminRevenueScreen() {
       {
         type: "line",
         smooth: true,
-        data: rows.map((r) => r.orders_count),
+        data: trendData.map((r) => r.amount),
         symbol: "circle",
         symbolSize: 6,
         itemStyle: { color: "#10B981", borderWidth: 2, borderColor: "#fff" },
@@ -455,10 +440,7 @@ export default function AdminRevenueScreen() {
     grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
     xAxis: {
       type: "category",
-      data: topDays.map((r) => {
-        const p = r.date_str?.split("-") ?? [];
-        return p.length === 3 ? `${p[2]}/${p[1]}` : r.date_str;
-      }),
+      data: topProducts.map((r) => r.name),
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: "#6B7280", fontSize: 11, fontWeight: "600" },
@@ -480,8 +462,8 @@ export default function AdminRevenueScreen() {
     series: [
       {
         type: "bar",
-        data: topDays.map((r, i) => ({
-          value: r.daily_revenue,
+        data: topProducts.map((r, i) => ({
+          value: r.revenue,
           itemStyle: {
             color: {
               type: "linear", x: 0, y: 0, x2: 0, y2: 1,
@@ -597,9 +579,9 @@ export default function AdminRevenueScreen() {
       <View style={[styles.kpiRow, isDesktop && styles.kpiRowDesktop]}>
         <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
           <KPICard
-            title="Tổng doanh thu"
-            value={formatCurrency(totalRevenue)}
-            subtitle={`${rows.length} ngày trong khoảng lọc`}
+            title="Doanh thu (Tiền vào)"
+            value={formatCurrency(revenueIn)}
+            subtitle={`${trendData.length} ngày trong khoảng lọc`}
             icon={TrendingUp}
             color="#6366F1"
             iconBg="#EEF2FF"
@@ -608,23 +590,23 @@ export default function AdminRevenueScreen() {
         </View>
         <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
           <KPICard
-            title="Tổng đơn hàng"
-            value={totalOrders.toLocaleString()}
-            subtitle="Đơn hàng hoàn thành"
+            title="Hoàn trả (Tiền ra)"
+            value={formatCurrency(revenueOut)}
+            subtitle="Đơn hoàn trả / hoàn tiền"
             icon={ShoppingCart}
-            color="#10B981"
-            iconBg="#D1FAE5"
+            color="#EF4444"
+            iconBg="#FEE2E2"
             isLoading={loading}
           />
         </View>
         <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
           <KPICard
-            title="Doanh thu TB / ngày"
-            value={formatCurrency(avgDaily)}
-            subtitle="Trung bình mỗi ngày"
+            title="Lợi nhuận"
+            value={formatCurrency(profit)}
+            subtitle="Doanh thu − Hoàn trả"
             icon={BarChart3}
-            color="#F59E0B"
-            iconBg="#FEF3C7"
+            color="#10B981"
+            iconBg="#D1FAE5"
             isLoading={loading}
           />
         </View>
@@ -639,9 +621,9 @@ export default function AdminRevenueScreen() {
           </View>
           {loading && <ActivityIndicator size="small" color="#6366F1" />}
         </View>
-        {loading && rows.length === 0 ? (
+        {loading && trendData.length === 0 ? (
           <Shimmer width="100%" height={260} />
-        ) : rows.length > 0 ? (
+        ) : trendData.length > 0 ? (
           <Echarts option={revenueOption} height={260} />
         ) : (
           <View style={styles.emptyChart}>
@@ -660,9 +642,9 @@ export default function AdminRevenueScreen() {
           </View>
           {loading && <ActivityIndicator size="small" color="#10B981" />}
         </View>
-        {loading && rows.length === 0 ? (
+        {loading && trendData.length === 0 ? (
           <Shimmer width="100%" height={220} />
-        ) : rows.length > 0 ? (
+        ) : trendData.length > 0 ? (
           <Echarts option={ordersOption} height={220} />
         ) : (
           <View style={styles.emptyChart}>
@@ -676,14 +658,14 @@ export default function AdminRevenueScreen() {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View>
-            <Text style={styles.cardTitle}>Top 5 Ngày Doanh thu Cao Nhất</Text>
-            <Text style={styles.cardSubtitle}>So sánh các ngày đỉnh trong khoảng lọc</Text>
+            <Text style={styles.cardTitle}>Top Sản phẩm Doanh thu Cao Nhất</Text>
+            <Text style={styles.cardSubtitle}>Dữ liệu từ đơn hàng hoàn thành</Text>
           </View>
           {loading && <ActivityIndicator size="small" color="#F59E0B" />}
         </View>
-        {loading && rows.length === 0 ? (
+        {loading && topProducts.length === 0 ? (
           <Shimmer width="100%" height={220} />
-        ) : topDays.length > 0 ? (
+        ) : topProducts.length > 0 ? (
           <Echarts option={topDaysOption} height={220} />
         ) : (
           <View style={styles.emptyChart}>
@@ -718,7 +700,6 @@ export default function AdminRevenueScreen() {
         <View style={styles.tableHeader}>
           <Text style={[styles.thText, { flex: 1.2 }]}>Ngày</Text>
           <Text style={[styles.thText, { flex: 2, textAlign: "right" }]}>Doanh thu</Text>
-          <Text style={[styles.thText, { flex: 1, textAlign: "right" }]}>Đơn hàng</Text>
         </View>
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
@@ -726,15 +707,12 @@ export default function AdminRevenueScreen() {
                 <Shimmer width="100%" height={36} />
               </View>
             ))
-          : rows.length > 0
-          ? rows.map((r, i) => (
+          : trendData.length > 0
+          ? trendData.map((r, i) => (
               <View key={i} style={[styles.tableRow, i % 2 === 0 && styles.tableRowEven]}>
-                <Text style={[styles.tdText, { flex: 1.2 }]}>{r.date_str}</Text>
+                <Text style={[styles.tdText, { flex: 1.2 }]}>{r.date}</Text>
                 <Text style={[styles.tdRevenue, { flex: 2, textAlign: "right" }]}>
-                  {formatCurrency(r.daily_revenue)}
-                </Text>
-                <Text style={[styles.tdOrders, { flex: 1, textAlign: "right" }]}>
-                  {r.orders_count}
+                  {formatCurrency(r.amount)}
                 </Text>
               </View>
             ))
