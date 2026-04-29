@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Truck,
   Bell,
+  UserCircle,
+  SlidersHorizontal,
 } from "lucide-react-native";
 import React from "react";
 import {
@@ -108,12 +110,46 @@ export default function AdminLayout() {
         </ScrollView>
 
         <View style={styles.sidebarFooter}>
-          <View style={styles.profileSection}>
-            <Image source={{ uri: "https://i.pravatar.cc/150?u=admin" }} style={styles.profileImage} />
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>Admin</Text>
-              <Text style={styles.profileRole}>Quản trị viên</Text>
-            </View>
+          {/* Profile widget — click vào avatar/tên → Hồ sơ; icon gear → Cài đặt */}
+          <View style={[
+            styles.profileWidget,
+            (pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings'))
+              && styles.profileWidgetActive,
+          ]}>
+            {/* Phần trái: Avatar + Tên — navigate tới Hồ sơ */}
+            <Pressable
+              style={styles.profileLeft}
+              onPress={() => router.push('/(admin)/profile' as any)}
+            >
+              <View style={[
+                styles.avatarCircle,
+                pathname.startsWith('/(admin)/profile') && styles.avatarCircleActive,
+              ]}>
+                <Text style={styles.avatarInitials}>AS</Text>
+              </View>
+              <View style={styles.profileInfo}>
+                <Text style={styles.profileName}>Admin</Text>
+                <Text style={[
+                  styles.profileRole,
+                  (pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings'))
+                    && styles.profileRoleActive,
+                ]}>Quản trị viên</Text>
+              </View>
+            </Pressable>
+
+            {/* Icon Settings — navigate tới Cài đặt */}
+            <Pressable
+              style={[
+                styles.settingsIconBtn,
+                pathname.startsWith('/(admin)/settings') && styles.settingsIconBtnActive,
+              ]}
+              onPress={() => router.push('/(admin)/settings' as any)}
+            >
+              <SlidersHorizontal
+                size={16}
+                color={pathname.startsWith('/(admin)/settings') ? '#10B981' : '#6B7280'}
+              />
+            </Pressable>
           </View>
 
           <Pressable style={styles.footerLink} onPress={() => signOut()}>
@@ -236,19 +272,58 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
   },
-  profileSection: {
+  // Profile Widget (footer)
+  profileWidget: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    marginBottom: 20,
-    gap: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 10,
+    backgroundColor: "transparent",
   },
-  profileImage: {
+  profileWidgetActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+  },
+  profileLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    ...Platform.select({ web: { cursor: "pointer" } as any }),
+  },
+  avatarCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: "#374151",
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarCircleActive: {
+    backgroundColor: "#059669",
+    borderColor: "#10B981",
+  },
+  avatarInitials: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  settingsIconBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
+    ...Platform.select({ web: { cursor: "pointer" } as any }),
+  },
+  settingsIconBtnActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
   profileInfo: {
     flex: 1,
@@ -259,8 +334,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   profileRole: {
-    color: "#9CA3AF",
+    color: "#6B7280",
     fontSize: 12,
+  },
+  profileRoleActive: {
+    color: "#10B981",
   },
   content: {
     flex: 1,
