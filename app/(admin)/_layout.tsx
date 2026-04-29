@@ -14,12 +14,14 @@ import {
   Ticket,
   TrendingUp,
   Truck,
+  Bell,
 } from "lucide-react-native";
 import React from "react";
 import {
   ActivityIndicator,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -70,6 +72,7 @@ export default function AdminLayout() {
     { href: "/(admin)/returns", label: "Trả hàng", icon: Truck },
     { href: "/(admin)/banners", label: "Banner", icon: ImageIcon },
     { href: "/(admin)/users", label: "Người dùng & Quyền", icon: Shield },
+    { href: "/(admin)/notifications", label: "Thông báo", icon: Bell },
   ];
 
   // BƯỚC 6: Render Giao diện chính cho Web Admin
@@ -84,7 +87,11 @@ export default function AdminLayout() {
           <Text style={styles.sidebarTitle}>E-Shop Admin</Text>
         </View>
 
-        <View style={styles.menu}>
+        <ScrollView 
+          style={styles.menuScroll} 
+          contentContainerStyle={styles.menu}
+          showsVerticalScrollIndicator={false}
+        >
           {menuItems.map((item) => {
             const isActive = pathname.startsWith(item.href);
             return (
@@ -97,7 +104,7 @@ export default function AdminLayout() {
               />
             );
           })}
-        </View>
+        </ScrollView>
 
         <View style={styles.sidebarFooter}>
           <Pressable style={styles.footerLink} onPress={() => signOut()}>
@@ -182,7 +189,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     letterSpacing: -0.5,
   },
-  menu: { flex: 1, gap: 4 },
+  menuScroll: { flex: 1 },
+  menu: { gap: 4, paddingBottom: 20 },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
