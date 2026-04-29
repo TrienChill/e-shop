@@ -33,7 +33,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Echarts from "react-native-echarts-pro";
+import Echarts from "@/src/components/admin/EchartsWrapper";
 import * as XLSX from "xlsx";
 
 // ─────────────────────────────────────────────

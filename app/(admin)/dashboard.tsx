@@ -24,7 +24,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Echarts from "react-native-echarts-pro";
+import Echarts from "@/src/components/admin/EchartsWrapper";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("vi-VN", {
