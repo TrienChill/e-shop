@@ -1,4 +1,5 @@
 import { supabase } from "@/src/lib/supabase";
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   Bell,
@@ -7,6 +8,7 @@ import {
   MoreVertical,
   RefreshCw,
   RotateCcw,
+  Search,
   ShoppingBag,
   TrendingUp,
   Users,
@@ -206,9 +208,30 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function AdminDashboardHome() {
   const { width } = useWindowDimensions();
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [chartWidth, setChartWidth] = useState(300);
   const scrollViewRef = useRef<ScrollView>(null);
   const subChartRef = useRef<View>(null);
+
+  const ADMIN_ROUTES = [
+    { id: 'dashboard', name: 'Dashboard Tổng Quan', path: '/(admin)/dashboard' },
+    { id: 'orders', name: 'Quản lý Đơn hàng', path: '/(admin)/orders' },
+    { id: 'returns', name: 'Yêu cầu Hoàn trả', path: '/(admin)/returns' },
+    { id: 'products', name: 'Quản lý Sản phẩm', path: '/(admin)/products' },
+    { id: 'categories', name: 'Danh mục Sản phẩm', path: '/(admin)/categories' },
+    { id: 'revenue', name: 'Báo cáo Doanh thu', path: '/(admin)/revenue' },
+    { id: 'users', name: 'Quản lý Người dùng', path: '/(admin)/users' },
+    { id: 'banners', name: 'Quản lý Banners', path: '/(admin)/banners' },
+    { id: 'vouchers', name: 'Quản lý Vouchers', path: '/(admin)/vouchers' },
+    { id: 'reviews', name: 'Đánh giá Sản phẩm', path: '/(admin)/reviews' },
+    { id: 'membership', name: 'Hạng Thành viên', path: '/(admin)/membership' },
+  ];
+
+  const filteredRoutes = ADMIN_ROUTES.filter(route => 
+    route.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // States for real data
   const [summaryData, setSummaryData] = useState<any>({
@@ -745,48 +768,92 @@ export default function AdminDashboardHome() {
   };
 
   return (
-    <ScrollView
-      ref={scrollViewRef}
-      style={styles.root}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.rootContent}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          colors={["#6366F1"]}
-          tintColor="#6366F1"
-        />
-      }
-    >
-      {/* Top Bar */}
-      <View style={styles.topBar}>
-        <View>
-          <Text style={styles.topBarLabel}>Hệ thống quản trị</Text>
-          <Text style={styles.topBarTitle}>Dashboard Tổng Quan</Text>
-        </View>
-        <View style={styles.topBarActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={handleRefresh}>
-            <RefreshCw size={20} color="#1F2937" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Bell size={20} color="#1F2937" />
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.profileButton}>
-            <Image
-              source={{ uri: "https://i.pravatar.cc/150?u=admin" }}
-              style={styles.profileImage}
-            />
-            {Platform.OS === "web" && (
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>Admin</Text>
-                <Text style={styles.profileRole}>Quản trị viên</Text>
+    <View style={styles.root}>
+      {/* Top Bar - Fixed Header */}
+      <View style={[styles.topBar, { backgroundColor: "white", paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", zIndex: 50, marginBottom: 0 }]}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View>
+            <Text style={styles.topBarLabel}>Hệ thống quản trị</Text>
+            <Text style={styles.topBarTitle}>Dashboard Tổng Quan</Text>
+          </View>
+
+          {/* Search Bar */}
+          {isDesktop && (
+            <View style={{ flex: 1, marginHorizontal: 24, maxWidth: 400, position: 'relative', zIndex: 60 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 12, height: 40 }}>
+                <Search size={18} color="#9CA3AF" />
+                <TextInput
+                  style={{ flex: 1, marginLeft: 8, fontSize: 14, color: '#111827', outlineStyle: 'none' } as any}
+                  placeholder="Tìm kiếm tính năng, quản lý..."
+                  placeholderTextColor="#9CA3AF"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                />
               </View>
-            )}
-          </TouchableOpacity>
+              {isSearchFocused && searchQuery.length > 0 && (
+                <View style={{ position: 'absolute', top: 48, left: 0, right: 0, backgroundColor: 'white', borderRadius: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 5, padding: 8, maxHeight: 300, overflow: 'hidden' }}>
+                  <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    {filteredRoutes.length > 0 ? (
+                      filteredRoutes.map((route) => (
+                        <TouchableOpacity
+                          key={route.id}
+                          style={{ padding: 12, borderRadius: 8, backgroundColor: 'white', flexDirection: 'row', alignItems: 'center' }}
+                          onPress={() => {
+                            setSearchQuery("");
+                            setIsSearchFocused(false);
+                            router.push(route.path as any);
+                          }}
+                        >
+                          <Search size={16} color="#6366F1" style={{ marginRight: 8 }} />
+                          <Text style={{ fontSize: 14, color: '#1F2937', fontWeight: '500' }}>{route.name}</Text>
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text style={{ padding: 12, color: '#9CA3AF', textAlign: 'center' }}>Không tìm thấy kết quả</Text>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={styles.topBarActions}>
+            <TouchableOpacity style={styles.iconButton} onPress={handleRefresh}>
+              <RefreshCw size={20} color="#1F2937" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton}>
+              <Bell size={20} color="#1F2937" />
+              <View style={styles.notificationBadge} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.profileButton}>
+              <Image source={{ uri: "https://i.pravatar.cc/150?u=admin" }} style={styles.profileImage} />
+              {Platform.OS === "web" && (
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>Admin</Text>
+                  <Text style={styles.profileRole}>Quản trị viên</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
+
+      <ScrollView
+        ref={scrollViewRef}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.rootContent, { paddingTop: 24 }]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            colors={["#6366F1"]}
+            tintColor="#6366F1"
+          />
+        }
+      >
 
       {/* Error Message */}
       {errorMsg ? (
@@ -1096,7 +1163,8 @@ export default function AdminDashboardHome() {
           )}
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
