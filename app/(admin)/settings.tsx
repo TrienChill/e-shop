@@ -1,27 +1,85 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Platform,
+  ActivityIndicator,
   Alert,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { ChevronRight, Upload, Save } from 'lucide-react-native';
+import {
+  CheckCircle,
+  ChevronRight,
+  Save,
+  Upload,
+  XCircle,
+} from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { supabase } from '@/src/lib/supabase';
+import { useAuth } from '@/src/auth/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
 
-// ─── Kiểu Tab ─────────────────────────────────────────────────────────────
-type TabId = 'profile' | 'preferences' | 'appearance';
-
+// ─── Kiểu Tab ──────────────────────────────────────────────────────────────
+type TabId = 'profile' | 'appearance';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'profile', label: 'Hồ sơ' },
-  { id: 'preferences', label: 'Tùy chọn' },
   { id: 'appearance', label: 'Giao diện' },
 ];
 
-// ─── Input có focus style ───────────────────────────────────────────────────
+// ─── Kiểu dữ liệu Form ─────────────────────────────────────────────────────
+interface ProfileForm {
+  full_name: string;
+  phone: string;
+  email: string;
+  avatar_url: string | null;
+}
+
+// ─── Toast nội tuyến ───────────────────────────────────────────────────────
+type ToastType = 'success' | 'error';
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+}
+
+function InlineToast({ toast }: { toast: ToastState }) {
+  if (!toast.visible) return null;
+  const isSuccess = toast.type === 'success';
+  return (
+    <View style={[toastStyles.container, isSuccess ? toastStyles.success : toastStyles.error]}>
+      {isSuccess
+        ? <CheckCircle size={16} color="#065F46" />
+        : <XCircle size={16} color="#991B1B" />
+      }
+      <Text style={[toastStyles.text, isSuccess ? toastStyles.successText : toastStyles.errorText]}>
+        {toast.message}
+      </Text>
+    </View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  success: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  error: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  text: { fontSize: 14, fontWeight: '600', flex: 1 },
+  successText: { color: '#065F46' },
+  errorText: { color: '#991B1B' },
+});
+
+// ─── FormInput có focus style ───────────────────────────────────────────────
 function FormInput({
   label,
   value,
@@ -29,13 +87,17 @@ function FormInput({
   placeholder,
   multiline,
   numberOfLines,
+  editable = true,
+  keyboardType,
 }: {
   label: string;
   value: string;
-  onChangeText: (t: string) => void;
+  onChangeText?: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
   numberOfLines?: number;
+  editable?: boolean;
+  keyboardType?: any;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -46,9 +108,10 @@ function FormInput({
           formStyles.input,
           multiline && formStyles.textarea,
           focused && formStyles.inputFocused,
+          !editable && formStyles.inputDisabled,
         ]}
         value={value}
-        onChangeText={onChangeText}
+        onChangeText={editable ? onChangeText : undefined}
         placeholder={placeholder}
         placeholderTextColor="#9CA3AF"
         multiline={multiline}
@@ -56,29 +119,206 @@ function FormInput({
         textAlignVertical={multiline ? 'top' : 'center'}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
+        editable={editable}
+        keyboardType={keyboardType}
       />
+      {!editable && (
+        <Text style={formStyles.disabledHint}>Không thể chỉnh sửa</Text>
+      )}
     </View>
   );
 }
 
-// ─── Tab Hồ sơ (Form chính) ─────────────────────────────────────────────────
-function ProfileTab() {
-  const [firstName, setFirstName] = useState('Aigars');
-  const [lastName, setLastName] = useState('Silkalns');
-  const [email, setEmail] = useState('aigars@colorlib.com');
-  const [bio, setBio] = useState(
-    'Nhà sáng lập tại Colorlib. Xây dựng các mẫu web đẹp.'
-  );
+// ─── Tab Hồ sơ ─────────────────────────────────────────────────────────────
+function ProfileTab({ userId }: { userId: string }) {
+  const [form, setForm] = useState<ProfileForm>({
+    full_name: '',
+    phone: '',
+    email: '',
+    avatar_url: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarHovered, setAvatarHovered] = useState(false);
   const [saveHovered, setSaveHovered] = useState(false);
+  const [toast, setToast] = useState<ToastState>({ visible: false, type: 'success', message: '' });
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSave = () => {
-    if (Platform.OS === 'web') {
-      alert('Đã lưu thay đổi thành công!');
-    } else {
-      Alert.alert('Thành công', 'Đã lưu thay đổi thành công!');
+  const showToast = (type: ToastType, message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ visible: true, type, message });
+    toastTimer.current = setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 3500);
+  };
+
+  // ── Fetch profile từ Supabase ──────────────────────────────────────────
+  const fetchProfile = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !user) throw new Error('Không lấy được thông tin người dùng');
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone, avatar_url')
+        .eq('id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      setForm({
+        full_name: data?.full_name ?? '',
+        phone: data?.phone ?? '',
+        email: user.email ?? '',
+        avatar_url: data?.avatar_url ?? null,
+      });
+    } catch (err: any) {
+      console.error('[Settings] fetchProfile error:', err);
+      showToast('error', 'Không thể tải thông tin hồ sơ: ' + (err?.message ?? 'Lỗi không xác định'));
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    fetchProfile();
+    return () => { if (toastTimer.current) clearTimeout(toastTimer.current); };
+  }, [fetchProfile]);
+
+  // ── Upload avatar ──────────────────────────────────────────────────────
+  const handlePickAvatar = async () => {
+    try {
+      // Yêu cầu quyền truy cập ảnh (mobile)
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Cần quyền truy cập', 'Vui lòng cấp quyền truy cập thư viện ảnh.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.85,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      const asset = result.assets[0];
+
+      // Kiểm tra kích thước (tối đa 2MB)
+      if (asset.fileSize && asset.fileSize > 2 * 1024 * 1024) {
+        showToast('error', 'Ảnh quá lớn. Vui lòng chọn ảnh dưới 2MB.');
+        return;
+      }
+
+      setUploadingAvatar(true);
+
+      // Tạo tên file duy nhất
+      const ext = asset.uri.split('.').pop() ?? 'jpg';
+      const fileName = `avatar_${userId}_${Date.now()}.${ext}`;
+      const filePath = `${userId}/${fileName}`;
+
+      // Đọc file dưới dạng blob (web) hoặc base64 (mobile)
+      let uploadData: Blob | ArrayBuffer;
+      let contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+
+      if (Platform.OS === 'web') {
+        const response = await fetch(asset.uri);
+        uploadData = await response.blob();
+      } else {
+        // Trên mobile, đọc base64 rồi convert
+        const response = await fetch(asset.uri);
+        uploadData = await response.blob();
+      }
+
+      // Upload lên Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, uploadData, { contentType, upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Lấy public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData.publicUrl;
+
+      // Cập nhật avatar_url vào bảng profiles
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      setForm((prev) => ({ ...prev, avatar_url: publicUrl }));
+      showToast('success', 'Đã cập nhật ảnh đại diện thành công!');
+    } catch (err: any) {
+      console.error('[Settings] handlePickAvatar error:', err);
+      showToast('error', 'Không thể tải ảnh lên: ' + (err?.message ?? 'Lỗi không xác định'));
+    } finally {
+      setUploadingAvatar(false);
     }
   };
+
+  // ── Lưu thông tin ─────────────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!form.full_name.trim()) {
+      showToast('error', 'Vui lòng nhập họ và tên.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: form.full_name.trim(),
+          phone: form.phone.trim() || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      showToast('success', 'Đã lưu thay đổi thành công!');
+    } catch (err: any) {
+      console.error('[Settings] handleSave error:', err);
+      showToast('error', 'Lưu thất bại: ' + (err?.message ?? 'Lỗi không xác định'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Lấy initials ──────────────────────────────────────────────────────
+  const initials = (() => {
+    const name = form.full_name.trim();
+    if (name) {
+      const parts = name.split(' ');
+      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    return form.email.slice(0, 2).toUpperCase() || 'AD';
+  })();
+
+  if (loading) {
+    return (
+      <View style={styles.formCard}>
+        <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color="#059669" />
+          <Text style={{ fontSize: 14, color: '#6B7280' }}>Đang tải thông tin...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.formCard}>
@@ -89,82 +329,96 @@ function ProfileTab() {
       </View>
       <View style={styles.cardDivider} />
 
-      {/* Section Ảnh đại diện */}
-      <View style={styles.avatarSection}>
-        {/* Avatar tròn */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>AS</Text>
-        </View>
-        {/* Nút đổi + chú thích */}
-        <View style={styles.avatarMeta}>
-          <TouchableOpacity
-            style={[styles.changeAvatarBtn, avatarHovered && styles.changeAvatarBtnHover]}
-            activeOpacity={0.8}
-            {...(Platform.OS === 'web'
-              ? {
-                  onMouseEnter: () => setAvatarHovered(true),
-                  onMouseLeave: () => setAvatarHovered(false),
-                }
-              : {})}
-          >
-            <Upload size={14} color={avatarHovered ? '#059669' : '#374151'} strokeWidth={2} />
-            <Text style={[styles.changeAvatarText, avatarHovered && styles.changeAvatarTextHover]}>
-              Đổi ảnh đại diện
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.avatarHint}>JPG, PNG hoặc GIF. Tối đa 2MB.</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardDivider} />
-
-      {/* Form Fields */}
       <View style={styles.formBody}>
-        {/* Hàng 1: Tên + Họ */}
-        <View style={styles.gridRow}>
-          <View style={styles.gridCell}>
-            <FormInput label="Tên" value={firstName} onChangeText={setFirstName} placeholder="Nhập tên..." />
-          </View>
-          <View style={styles.gridCell}>
-            <FormInput label="Họ" value={lastName} onChangeText={setLastName} placeholder="Nhập họ..." />
+        {/* Toast */}
+        <InlineToast toast={toast} />
+
+        {/* Section Ảnh đại diện */}
+        <View style={styles.avatarSection}>
+          {/* Avatar */}
+          {form.avatar_url ? (
+            <Image source={{ uri: form.avatar_url }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+
+          {/* Meta: nút + chú thích */}
+          <View style={styles.avatarMeta}>
+            <TouchableOpacity
+              style={[styles.changeAvatarBtn, avatarHovered && styles.changeAvatarBtnHover]}
+              onPress={handlePickAvatar}
+              disabled={uploadingAvatar}
+              activeOpacity={0.8}
+              {...(Platform.OS === 'web'
+                ? { onMouseEnter: () => setAvatarHovered(true), onMouseLeave: () => setAvatarHovered(false) }
+                : {})}
+            >
+              {uploadingAvatar ? (
+                <ActivityIndicator size="small" color="#059669" />
+              ) : (
+                <Upload size={14} color={avatarHovered ? '#059669' : '#374151'} strokeWidth={2} />
+              )}
+              <Text style={[styles.changeAvatarText, avatarHovered && styles.changeAvatarTextHover]}>
+                {uploadingAvatar ? 'Đang tải lên...' : 'Đổi ảnh đại diện'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.avatarHint}>JPG, PNG hoặc GIF. Tối đa 2MB.</Text>
           </View>
         </View>
 
-        {/* Hàng 2: Email */}
-        <FormInput
-          label="Email"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="email@example.com"
-        />
+        <View style={styles.cardDivider} />
 
-        {/* Hàng 3: Tiểu sử */}
-        <FormInput
-          label="Tiểu sử"
-          value={bio}
-          onChangeText={setBio}
-          placeholder="Viết vài dòng giới thiệu về bạn..."
-          multiline
-          numberOfLines={4}
-        />
+        {/* Form Fields */}
+        <View style={styles.fieldsWrapper}>
+          {/* Họ và tên */}
+          <FormInput
+            label="Họ và tên"
+            value={form.full_name}
+            onChangeText={(t) => setForm((prev) => ({ ...prev, full_name: t }))}
+            placeholder="Nhập họ và tên..."
+          />
+
+          {/* Email (read-only) */}
+          <FormInput
+            label="Email"
+            value={form.email}
+            placeholder="email@example.com"
+            editable={false}
+          />
+
+          {/* Số điện thoại */}
+          <FormInput
+            label="Số điện thoại"
+            value={form.phone}
+            onChangeText={(t) => setForm((prev) => ({ ...prev, phone: t }))}
+            placeholder="Nhập số điện thoại..."
+            keyboardType="phone-pad"
+          />
+        </View>
       </View>
 
       {/* Footer: Nút lưu */}
       <View style={styles.cardDivider} />
       <View style={styles.formFooter}>
         <TouchableOpacity
-          style={[styles.saveButton, saveHovered && styles.saveButtonHover]}
+          style={[styles.saveButton, saveHovered && styles.saveButtonHover, (saving || uploadingAvatar) && styles.saveButtonDisabled]}
           onPress={handleSave}
+          disabled={saving || uploadingAvatar}
           activeOpacity={0.85}
           {...(Platform.OS === 'web'
-            ? {
-                onMouseEnter: () => setSaveHovered(true),
-                onMouseLeave: () => setSaveHovered(false),
-              }
+            ? { onMouseEnter: () => setSaveHovered(true), onMouseLeave: () => setSaveHovered(false) }
             : {})}
         >
-          <Save size={16} color="white" strokeWidth={2.5} />
-          <Text style={styles.saveButtonText}>Lưu thay đổi</Text>
+          {saving ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <Save size={16} color="white" strokeWidth={2.5} />
+          )}
+          <Text style={styles.saveButtonText}>
+            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -177,7 +431,7 @@ function PlaceholderTab({ title }: { title: string }) {
     <View style={styles.formCard}>
       <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontSize: 16, color: '#9CA3AF', fontWeight: '500' }}>
-          Nội dung tab "{title}" đang được phát triển
+          Tab "{title}" đang được phát triển
         </Text>
       </View>
     </View>
@@ -187,7 +441,10 @@ function PlaceholderTab({ title }: { title: string }) {
 // ─── Màn hình chính ─────────────────────────────────────────────────────────
 export default function ProfileSettings() {
   const router = useRouter();
+  const { session } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>('profile');
+
+  const userId = session?.user?.id;
 
   return (
     <View style={styles.container}>
@@ -209,7 +466,10 @@ export default function ProfileSettings() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* ── Navigation Tabs ── */}
         <View style={styles.tabBar}>
           {TABS.map((tab) => {
@@ -230,20 +490,23 @@ export default function ProfileSettings() {
         </View>
 
         {/* ── Tab Content ── */}
-        {activeTab === 'profile' && <ProfileTab />}
-        {activeTab === 'preferences' && <PlaceholderTab title="Tùy chọn" />}
+        {activeTab === 'profile' && userId && <ProfileTab userId={userId} />}
+        {activeTab === 'profile' && !userId && (
+          <View style={styles.formCard}>
+            <View style={{ padding: 48, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#059669" />
+            </View>
+          </View>
+        )}
         {activeTab === 'appearance' && <PlaceholderTab title="Giao diện" />}
       </ScrollView>
     </View>
   );
 }
 
-// ─── Styles chính ───────────────────────────────────────────────────────────
+// ─── Styles ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
+  container: { flex: 1, backgroundColor: '#F9FAFB' },
 
   // Header
   pageHeader: {
@@ -284,12 +547,9 @@ const styles = StyleSheet.create({
   },
 
   // Scroll
-  scrollContent: {
-    padding: 24,
-    gap: 20,
-  },
+  scrollContent: { padding: 24, gap: 20 },
 
-  // Tab Bar (pill style)
+  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#F3F4F6',
@@ -312,14 +572,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  tabTextActive: {
-    color: '#111827',
-  },
+  tabText: { fontSize: 14, fontWeight: '600', color: '#6B7280' },
+  tabTextActive: { color: '#111827' },
 
   // Form Card
   formCard: {
@@ -339,30 +593,29 @@ const styles = StyleSheet.create({
     paddingTop: 22,
     paddingBottom: 14,
   },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
+  cardTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  cardSubtitle: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+  cardDivider: { height: 1, backgroundColor: '#E5E7EB' },
+
+  // Form Body
+  formBody: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 4 },
+  fieldsWrapper: { gap: 18, paddingTop: 20 },
 
   // Avatar Section
   avatarSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
     gap: 16,
+    paddingBottom: 20,
   },
-  avatar: {
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  avatarFallback: {
     width: 64,
     height: 64,
     borderRadius: 32,
@@ -370,15 +623,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: 'white',
-    letterSpacing: 1,
-  },
-  avatarMeta: {
-    gap: 6,
-  },
+  avatarText: { fontSize: 20, fontWeight: '800', color: 'white', letterSpacing: 1 },
+  avatarMeta: { gap: 6 },
   changeAvatarBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -392,36 +638,10 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     ...Platform.select({ web: { cursor: 'pointer' } as any }),
   },
-  changeAvatarBtnHover: {
-    borderColor: '#059669',
-    backgroundColor: '#F0FDF4',
-  },
-  changeAvatarText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  changeAvatarTextHover: {
-    color: '#059669',
-  },
-  avatarHint: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-
-  // Form Body
-  formBody: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    gap: 18,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  gridCell: {
-    flex: 1,
-  },
+  changeAvatarBtnHover: { borderColor: '#059669', backgroundColor: '#F0FDF4' },
+  changeAvatarText: { fontSize: 14, fontWeight: '600', color: '#374151' },
+  changeAvatarTextHover: { color: '#059669' },
+  avatarHint: { fontSize: 12, color: '#9CA3AF' },
 
   // Footer
   formFooter: {
@@ -440,26 +660,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     ...Platform.select({ web: { cursor: 'pointer' } as any }),
   },
-  saveButtonHover: {
-    backgroundColor: '#047857',
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  saveButtonHover: { backgroundColor: '#047857' },
+  saveButtonDisabled: { opacity: 0.7 },
+  saveButtonText: { color: 'white', fontSize: 14, fontWeight: '700' },
 });
 
-// ─── Styles riêng cho FormInput ──────────────────────────────────────────────
+// ─── Styles cho FormInput ────────────────────────────────────────────────────
 const formStyles = StyleSheet.create({
-  fieldWrapper: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-  },
+  fieldWrapper: { gap: 6 },
+  label: { fontSize: 13, fontWeight: '600', color: '#374151' },
   input: {
     borderWidth: 1,
     borderColor: '#D1D5DB',
@@ -478,13 +687,13 @@ const formStyles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     ...Platform.select({
-      web: {
-        boxShadow: '0 0 0 3px rgba(5, 150, 105, 0.15)',
-      } as any,
+      web: { boxShadow: '0 0 0 3px rgba(5, 150, 105, 0.15)' } as any,
     }),
   },
-  textarea: {
-    minHeight: 100,
-    paddingTop: 10,
+  inputDisabled: {
+    backgroundColor: '#F9FAFB',
+    color: '#9CA3AF',
   },
+  textarea: { minHeight: 100, paddingTop: 10 },
+  disabledHint: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
 });
