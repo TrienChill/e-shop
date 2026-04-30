@@ -1,6 +1,7 @@
 import { listOrders, updateOrderStatus, pushOrderToGHN } from "@/src/services/admin/orders";
+import { supabase } from "@/src/lib/supabase";
 import { hexToRgba } from "@/src/context/AppearanceContext";
-import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle, Printer, ExternalLink } from "lucide-react-native";
+import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle, Printer, ExternalLink, AlertTriangle } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { InvoiceTemplate, InvoiceOrderData } from "@/src/components/admin/InvoiceTemplate";
@@ -22,6 +23,7 @@ const STATUS_LABELS: any = {
   pending: "Chờ xử lý",
   processing: "Đang chuẩn bị",
   shipping: "Đang giao",
+  delivery_failed: "Giao thất bại",
   completed: "Đã hoàn thành",
   cancelled: "Đã hủy",
 };
@@ -30,6 +32,7 @@ const STATUS_COLORS: any = {
   pending: "#F59E0B",
   processing: "#2563EB",
   shipping: "#8B5CF6",
+  delivery_failed: "#F97316",
   completed: "#10B981",
   cancelled: "#EF4444",
 };
@@ -39,6 +42,7 @@ const STATUS_TABS = [
   { id: "pending", label: "Chờ duyệt", icon: Clock },
   { id: "processing", label: "Đang chuẩn bị", icon: Settings },
   { id: "shipping", label: "Đang giao", icon: Truck },
+  { id: "delivery_failed", label: "Giao thất bại", icon: AlertTriangle },
   { id: "completed", label: "Thành công", icon: Check },
   { id: "cancelled", label: "Đã hủy", icon: XCircle },
 ];
@@ -65,6 +69,13 @@ export default function AdminOrdersScreen() {
     trackingCode?: string;
     errorMsg?: string;
   }>({ visible: false, success: false });
+
+  // Fail Delivery Modal
+  const [failModal, setFailModal] = useState<{
+    visible: boolean;
+    orderId: string | null;
+    reason: string;
+  }>({ visible: false, orderId: null, reason: "" });
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -158,6 +169,40 @@ export default function AdminOrdersScreen() {
     setProcessingOrderId(order.id);
     try {
       await updateOrderStatus(order.id, newStatus);
+      await fetchOrders();
+    } catch (e: any) {
+      alert("Lỗi cập nhật trạng thái: " + e.message);
+    } finally {
+      setProcessingOrderId(null);
+    }
+  };
+
+  const promptDeliveryFailed = (order: any) => {
+    setFailModal({ visible: true, orderId: order.id, reason: "" });
+  };
+
+  const handleSubmitDeliveryFailed = async () => {
+    const { orderId, reason } = failModal;
+    if (!reason || reason.trim().length < 5) {
+      alert("Vui lòng nhập lý do rõ ràng (ít nhất 5 ký tự)!");
+      return;
+    }
+
+    setProcessingOrderId(orderId);
+    setFailModal({ visible: false, orderId: null, reason: "" });
+
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "delivery_failed",
+          cancel_reason: reason.trim(),
+        })
+        .eq("id", orderId);
+
+      if (error) throw error;
+      
+      alert("Đã cập nhật trạng thái giao thất bại!");
       await fetchOrders();
     } catch (e: any) {
       alert("Lỗi cập nhật trạng thái: " + e.message);
@@ -354,11 +399,18 @@ export default function AdminOrdersScreen() {
                               />
                             )}
                             {order.status === "shipping" && (
-                              <ActionButton
-                                onPress={() => handleUpdateStatus(order, "completed")}
-                                label="Xong"
-                                color="#10B981"
-                              />
+                              <>
+                                <ActionButton
+                                  onPress={() => handleUpdateStatus(order, "completed")}
+                                  label="Xong"
+                                  color="#10B981"
+                                />
+                                <ActionButton
+                                  onPress={() => promptDeliveryFailed(order)}
+                                  label="Giao thất bại"
+                                  color="#F97316"
+                                />
+                              </>
                             )}
                             {["pending", "processing"].includes(order.status) && (
                               <ActionButton
@@ -456,6 +508,39 @@ export default function AdminOrdersScreen() {
           </View>
         </View>
       </Modal>
+      {/* ── Fail Delivery Modal ── */}
+      <Modal
+        visible={failModal.visible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFailModal({ ...failModal, visible: false })}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={[styles.modalIconError, { backgroundColor: "#F97316" }]}>
+              <AlertTriangle size={32} color="white" />
+            </View>
+            <Text style={styles.modalTitle}>Khách không nhận hàng</Text>
+            <Text style={styles.modalSubtitle}>Vui lòng nhập lý do giao thất bại (VD: Khách thuê bao, sai địa chỉ...)</Text>
+            
+            <TextInput
+              style={{ width: "100%", height: 100, marginBottom: 20, textAlignVertical: "top", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB", outlineStyle: "none" as any }}
+              placeholder="Nhập lý do (ít nhất 5 ký tự)..."
+              multiline
+              value={failModal.reason}
+              onChangeText={(text) => setFailModal({ ...failModal, reason: text })}
+            />
+
+            <Pressable style={[styles.modalBtn, { backgroundColor: "#F97316" }]} onPress={handleSubmitDeliveryFailed}>
+              <Text style={styles.modalBtnText}>Xác nhận thất bại</Text>
+            </Pressable>
+            <Pressable style={styles.modalBtnOutline} onPress={() => setFailModal({ ...failModal, visible: false })}>
+              <Text style={styles.modalBtnOutlineText}>Hủy</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
