@@ -400,7 +400,7 @@ export default function AdminRevenueScreen() {
       {
         type: "line",
         smooth: true,
-        data: trendData.map((r) => r.amount),
+        data: trendData.map((r) => r.orders || 0),
         symbol: "circle",
         symbolSize: 6,
         itemStyle: { color: "#10B981", borderWidth: 2, borderColor: "#fff" },

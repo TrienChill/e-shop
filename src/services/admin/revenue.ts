@@ -10,6 +10,7 @@ export type RevenueSummary = {
 export type TrendDataItem = {
   date: string;    // "DD/MM" format as returned by the RPC
   amount: number;
+  orders?: number; // Added to support order count in trends
 };
 
 export type TopProductItem = {
