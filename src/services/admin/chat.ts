@@ -4,17 +4,38 @@ import { Conversation, Message } from "@/src/types/chat";
 export const chatService = {
   // 1. Lấy danh sách hội thoại
   getConversations: async (): Promise<Conversation[]> => {
-    const { data, error } = await supabase
+    // Lấy conversations
+    const { data: convs, error: convError } = await supabase
       .from('conversations')
-      .select(`
-        *,
-        customer:profiles!user_id(id, full_name, avatar_url),
-        staff:profiles!staff_id(id, full_name, avatar_url)
-      `)
+      .select('*')
       .order('last_message_at', { ascending: false });
 
-    if (error) throw error;
-    return data as any;
+    if (convError) throw convError;
+    if (!convs || convs.length === 0) return [];
+
+    // Lấy danh sách user_id và staff_id
+    const userIds = convs.map(c => c.user_id).filter(Boolean);
+    const staffIds = convs.map(c => c.staff_id).filter(Boolean);
+    const allProfileIds = Array.from(new Set([...userIds, ...staffIds]));
+
+    // Fetch thông tin profile
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
+      .in('id', allProfileIds);
+
+    if (profileError) throw profileError;
+
+    // Gộp dữ liệu
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    const enrichedConvs = convs.map(conv => ({
+      ...conv,
+      customer: profileMap.get(conv.user_id),
+      staff: conv.staff_id ? profileMap.get(conv.staff_id) : undefined,
+    }));
+
+    return enrichedConvs as any;
   },
 
   // 2. Lấy tin nhắn của một hội thoại

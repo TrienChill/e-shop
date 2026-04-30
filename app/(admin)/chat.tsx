@@ -391,7 +391,7 @@ export default function AdminChat() {
                 style={styles.profileAvatar}
               />
               <Text style={styles.profileName}>{activeConv.customer?.full_name || 'Khách hàng'}</Text>
-              <Text style={styles.profileId}>ID: {activeConv.customer?.id?.substring(0,8)}</Text>
+              <Text style={styles.profileId}>ID: {String(activeConv.customer?.id || '').substring(0,8)}</Text>
             </View>
 
             <View style={styles.infoSection}>
@@ -410,7 +410,7 @@ export default function AdminChat() {
                 customerOrders.map((order) => (
                   <View key={order.id} style={styles.orderCard}>
                     <View style={styles.orderCardHeader}>
-                      <Text style={styles.orderId}>#{order.id.substring(0,6)}</Text>
+                      <Text style={styles.orderId}>#{String(order.id).substring(0,6)}</Text>
                       <Text style={[styles.orderStatus, order.status === 'completed' && { color: '#059669', backgroundColor: '#D1FAE5' }]}>
                         {order.status}
                       </Text>
