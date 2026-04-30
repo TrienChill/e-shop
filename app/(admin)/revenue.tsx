@@ -1,4 +1,5 @@
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/auth/AuthContext";
 import { getRevenueReport, RevenueReport } from "@/src/services/admin/revenue";
 import {
@@ -19,6 +20,9 @@ import {
   Package2,
   ShoppingCart,
   TrendingUp,
+  CreditCard,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -190,6 +194,9 @@ export default function AdminRevenueScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [compareMode, setCompareMode] = useState(false);
+  const [prevReportData, setPrevReportData] = useState<RevenueReport | null>(null);
+
   // ── Derived values from RPC ──
   const TOP_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
   const revenueIn  = reportData?.revenue_in  ?? 0;
@@ -197,6 +204,13 @@ export default function AdminRevenueScreen() {
   const profit     = reportData?.profit      ?? 0;
   const trendData  = reportData?.trend_data  ?? [];
   const topProducts = reportData?.top_products ?? [];
+  const paymentMethods = reportData?.payment_methods ?? [];
+  const heatmapData = reportData?.heatmap ?? [];
+  
+  const prevTrendData = prevReportData?.trend_data ?? [];
+
+  const totalOrders = trendData.reduce((acc, r) => acc + (r.orders || 0), 0);
+  const aovValue = totalOrders > 0 ? revenueIn / totalOrders : 0;
 
   // ── Change timeRange ──
   const handleRangeChange = useCallback((range: TimeRange) => {
@@ -209,12 +223,21 @@ export default function AdminRevenueScreen() {
   }, []);
 
   // ── Fetch ──
-  const handleFilterChange = useCallback(async (start: Date, end: Date) => {
+  const handleFilterChange = useCallback(async (start: Date, end: Date, compare: boolean) => {
     setLoading(true);
     setError(null);
     try {
       const data = await getRevenueReport(start, end);
       setReportData(data);
+      if (compare) {
+        const diff = end.getTime() - start.getTime();
+        const prevEnd = new Date(start.getTime() - 1);
+        const prevStart = new Date(prevEnd.getTime() - diff);
+        const prevData = await getRevenueReport(prevStart, prevEnd);
+        setPrevReportData(prevData);
+      } else {
+        setPrevReportData(null);
+      }
     } catch (e: any) {
       setError(e.message ?? "Lỗi tải dữ liệu");
     } finally {
@@ -223,8 +246,8 @@ export default function AdminRevenueScreen() {
   }, []);
 
   useEffect(() => {
-    handleFilterChange(filter.startDate, filter.endDate);
-  }, [filter.startDate, filter.endDate]);
+    handleFilterChange(filter.startDate, filter.endDate, compareMode);
+  }, [filter.startDate, filter.endDate, compareMode, handleFilterChange]);
 
   // ── Export state ──
   const [exporting, setExporting] = useState(false);
@@ -303,8 +326,53 @@ export default function AdminRevenueScreen() {
   const chartLabels = trendData.map((r) => r.date);
   const chartValues = trendData.map((r) => r.amount);
 
+  const TOOLBOX_CONFIG = {
+    show: true,
+    feature: {
+      magicType: { type: ["line", "bar"], title: { line: "Line", bar: "Bar" } },
+      restore: { title: "Reset" },
+      saveAsImage: { title: "Lưu ảnh" },
+    },
+  };
+
   // 1. Revenue Trend — Smooth Line + Area
+  const revenueSeries: any[] = [
+    {
+      name: "Kỳ này",
+      type: "line",
+      smooth: true,
+      data: chartValues,
+      symbol: "circle",
+      symbolSize: 6,
+      itemStyle: { color: "#6366F1", borderWidth: 2, borderColor: "#fff" },
+      lineStyle: { width: 3, color: "#6366F1" },
+      areaStyle: {
+        color: {
+          type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: "rgba(99,102,241,0.2)" },
+            { offset: 1, color: "rgba(99,102,241,0.0)" },
+          ],
+        },
+      },
+      emphasis: { focus: "series" },
+    },
+  ];
+
+  if (compareMode && prevTrendData.length > 0) {
+    revenueSeries.push({
+      name: "Kỳ trước",
+      type: "line",
+      smooth: true,
+      data: prevTrendData.map((r) => r.amount),
+      symbol: "none",
+      lineStyle: { width: 2, type: "dashed", color: "#9CA3AF" },
+      itemStyle: { color: "#9CA3AF" },
+    });
+  }
+
   const revenueOption = {
+    toolbox: TOOLBOX_CONFIG,
     tooltip: {
       trigger: "axis",
       backgroundColor: "#1F2937",
@@ -314,11 +382,18 @@ export default function AdminRevenueScreen() {
       formatter: `function(params){
         let p=params[0];
         let v=Number(p.value).toLocaleString('vi-VN')+' ₫';
-        return '<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">' + p.name + '</div>'
-             + '<div style="font-weight:800;font-size:14px;color:#A5B4FC">' + v + '</div>';
+        let html = '<div style="font-size:11px;color:#9CA3AF;margin-bottom:4px">' + p.name + '</div>';
+        html += '<div style="font-weight:800;font-size:14px;color:' + p.color + '">' + p.seriesName + ': ' + v + '</div>';
+        if (params.length > 1) {
+          let p2 = params[1];
+          let v2 = Number(p2.value).toLocaleString('vi-VN')+' ₫';
+          html += '<div style="font-weight:600;font-size:13px;color:' + p2.color + '">' + p2.seriesName + ': ' + v2 + '</div>';
+        }
+        return html;
       }`,
     },
-    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    legend: { show: compareMode, bottom: 0 },
+    grid: { left: "1%", right: "1%", bottom: compareMode ? "10%" : "2%", top: "10%", containLabel: true },
     xAxis: {
       type: "category",
       boundaryGap: false,
@@ -341,34 +416,12 @@ export default function AdminRevenueScreen() {
         }`,
       },
     },
-    series: [
-      {
-        type: "line",
-        smooth: true,
-        data: chartValues,
-        symbol: "circle",
-        symbolSize: 6,
-        itemStyle: { color: "#6366F1", borderWidth: 2, borderColor: "#fff" },
-        lineStyle: { width: 3, color: "#6366F1" },
-        areaStyle: {
-          color: {
-            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: "rgba(99,102,241,0.2)" },
-              { offset: 1, color: "rgba(99,102,241,0.0)" },
-            ],
-          },
-        },
-        emphasis: {
-          focus: "series",
-          itemStyle: { color: "#4F46E5", borderWidth: 3, borderColor: "#fff", shadowBlur: 8, shadowColor: "rgba(99,102,241,0.4)" },
-        },
-      },
-    ],
+    series: revenueSeries,
   };
 
   // 2. Orders Trend — Smooth Line + Area (emerald)
   const ordersOption = {
+    toolbox: TOOLBOX_CONFIG,
     tooltip: {
       trigger: "axis",
       backgroundColor: "#1F2937",
@@ -481,6 +534,87 @@ export default function AdminRevenueScreen() {
     ],
   };
 
+  // 4. Payment Methods (Donut)
+  const paymentOption = {
+    tooltip: { trigger: "item" },
+    legend: { bottom: "0%", left: "center" },
+    series: [
+      {
+        type: "pie",
+        radius: ["40%", "70%"],
+        avoidLabelOverlap: false,
+        itemStyle: { borderRadius: 10, borderColor: "#fff", borderWidth: 2 },
+        label: { show: false, position: "center" },
+        emphasis: { label: { show: true, fontSize: 16, fontWeight: "bold" } },
+        labelLine: { show: false },
+        data: paymentMethods.map((pm, i) => ({
+          value: pm.amount,
+          name: pm.method,
+          itemStyle: { color: TOP_COLORS[i % TOP_COLORS.length] },
+        })),
+      },
+    ],
+  };
+
+  // 5. Average Order Value (AOV)
+  const aovOption = {
+    toolbox: TOOLBOX_CONFIG,
+    tooltip: {
+      trigger: "axis",
+      formatter: `function(params){
+        let p=params[0];
+        let v=Number(p.value).toLocaleString('vi-VN')+' ₫';
+        return '<div>' + p.name + '</div><div style="font-weight:800;color:#F59E0B">' + v + '/đơn</div>';
+      }`,
+    },
+    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    xAxis: { type: "category", data: chartLabels, axisLine: { show: false }, axisTick: { show: false } },
+    yAxis: { type: "value", splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } } },
+    series: [
+      {
+        type: "line",
+        smooth: true,
+        data: trendData.map((r) => r.orders && r.orders > 0 ? Math.round(r.amount / r.orders) : 0),
+        itemStyle: { color: "#F59E0B" },
+        lineStyle: { width: 3, color: "#F59E0B" },
+        areaStyle: {
+          color: {
+            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [{ offset: 0, color: "rgba(245,158,11,0.2)" }, { offset: 1, color: "rgba(245,158,11,0)" }],
+          },
+        },
+      },
+    ],
+  };
+
+  // 6. Heatmap Matrix (24x7)
+  const hours = Array.from({ length: 24 }, (_, i) => i + "h");
+  const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+  const maxHeatmap = Math.max(...heatmapData.map((item) => item[2]), 5);
+  const heatmapOption = {
+    tooltip: { position: "top" },
+    grid: { height: "70%", top: "5%", bottom: "15%" },
+    xAxis: { type: "category", data: hours, splitArea: { show: true } },
+    yAxis: { type: "category", data: days, splitArea: { show: true } },
+    visualMap: {
+      min: 0, max: maxHeatmap,
+      calculable: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: "0%",
+      inRange: { color: ["#F3F4F6", "#6366F1", "#312E81"] },
+    },
+    series: [
+      {
+        name: "Đơn hàng",
+        type: "heatmap",
+        data: heatmapData,
+        label: { show: true, fontSize: 10 },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0, 0, 0, 0.5)" } },
+      },
+    ],
+  };
+
   // ── Permission guard ──
   if (role !== "admin") {
     return (
@@ -498,6 +632,101 @@ export default function AdminRevenueScreen() {
     { key: "year", label: "Năm nay" },
     { key: "custom", label: "Tùy chọn" },
   ];
+
+  const renderChart = (key: string) => {
+    switch (key) {
+      case "revenue":
+        return (
+          <View style={[styles.card, { flex: 1 }]} key={key}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Xu hướng Doanh thu</Text>
+                <Text style={styles.cardSubtitle}>Biểu đồ đường theo từng ngày</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#6366F1" />}
+            </View>
+            {loading && trendData.length === 0 ? (
+              <Shimmer width="100%" height={260} />
+            ) : trendData.length > 0 ? (
+              <Echarts option={revenueOption} height={260} />
+            ) : (
+              <View style={styles.emptyChart}>
+                <BarChart3 size={32} color="#E5E7EB" />
+                <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
+              </View>
+            )}
+          </View>
+        );
+      case "payment":
+        return (
+          <View style={[styles.card, { flex: 1 }]} key={key}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Tỷ lệ Thanh toán</Text>
+                <Text style={styles.cardSubtitle}>Cơ cấu nguồn tiền thu về</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#6366F1" />}
+            </View>
+            {loading && paymentMethods.length === 0 ? (
+              <Shimmer width="100%" height={260} />
+            ) : paymentMethods.length > 0 ? (
+              <Echarts option={paymentOption} height={260} />
+            ) : (
+              <View style={styles.emptyChart}>
+                <CreditCard size={32} color="#E5E7EB" />
+                <Text style={styles.emptyText}>Chưa có dữ liệu thanh toán</Text>
+              </View>
+            )}
+          </View>
+        );
+      case "top":
+        return (
+          <View style={[styles.card, { flex: 1 }]} key={key}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Top Sản phẩm</Text>
+                <Text style={styles.cardSubtitle}>Doanh thu cao nhất</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#F59E0B" />}
+            </View>
+            {loading && topProducts.length === 0 ? (
+              <Shimmer width="100%" height={260} />
+            ) : topProducts.length > 0 ? (
+              <Echarts option={topDaysOption} height={260} />
+            ) : (
+              <View style={styles.emptyChart}>
+                <Package2 size={32} color="#E5E7EB" />
+                <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
+              </View>
+            )}
+          </View>
+        );
+      case "heatmap":
+        return (
+          <View style={[styles.card, { flex: 1 }]} key={key}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>Bản đồ nhiệt đơn hàng</Text>
+                <Text style={styles.cardSubtitle}>Tần suất theo giờ & ngày</Text>
+              </View>
+              {loading && <ActivityIndicator size="small" color="#312E81" />}
+            </View>
+            {loading && heatmapData.length === 0 ? (
+              <Shimmer width="100%" height={260} />
+            ) : heatmapData.length > 0 ? (
+              <Echarts option={heatmapOption} height={260} />
+            ) : (
+              <View style={styles.emptyChart}>
+                <Calendar size={32} color="#E5E7EB" />
+                <Text style={styles.emptyText}>Chưa có dữ liệu mua hàng</Text>
+              </View>
+            )}
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <ScrollView
@@ -558,13 +787,24 @@ export default function AdminRevenueScreen() {
         </View>
       </View>
 
-      {/* ── Period Label ── */}
+      {/* ── Period Label & Compare Toggle ── */}
       <View style={styles.periodRow}>
-        <Calendar size={14} color="#6B7280" />
-        <Text style={styles.periodText}>
-          {formatDisplay(filter.startDate)} → {formatDisplay(filter.endDate)}
-        </Text>
-        {loading && <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 8 }} />}
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Calendar size={14} color="#6B7280" />
+          <Text style={styles.periodText}>
+            {formatDisplay(filter.startDate)} → {formatDisplay(filter.endDate)}
+          </Text>
+          {loading && <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 8 }} />}
+        </View>
+        <TouchableOpacity 
+          style={styles.compareToggle} 
+          onPress={() => setCompareMode(!compareMode)}
+        >
+          <View style={[styles.checkbox, compareMode && styles.checkboxActive]}>
+            {compareMode && <CheckCircle2 size={12} color="#FFF" />}
+          </View>
+          <Text style={styles.compareText}>So sánh với kỳ trước</Text>
+        </TouchableOpacity>
       </View>
 
       {/* ── Error ── */}
@@ -575,11 +815,11 @@ export default function AdminRevenueScreen() {
         </View>
       )}
 
-      {/* ── KPI Cards ── */}
+      {/* ── KPI Cards (Top Row) ── */}
       <View style={[styles.kpiRow, isDesktop && styles.kpiRowDesktop]}>
         <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
           <KPICard
-            title="Doanh thu (Tiền vào)"
+            title="Tổng doanh thu"
             value={formatCurrency(revenueIn)}
             subtitle={`${trendData.length} ngày trong khoảng lọc`}
             icon={TrendingUp}
@@ -590,89 +830,57 @@ export default function AdminRevenueScreen() {
         </View>
         <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
           <KPICard
-            title="Hoàn trả (Tiền ra)"
+            title="Đơn hàng"
+            value={`${totalOrders} đơn`}
+            subtitle="Hoàn thành thành công"
+            icon={Package2}
+            color="#10B981"
+            iconBg="#D1FAE5"
+            isLoading={loading}
+          />
+        </View>
+        <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
+          <KPICard
+            title="Giá trị / Đơn (AOV)"
+            value={formatCurrency(aovValue)}
+            subtitle="Chi tiêu bình quân"
+            icon={BarChart3}
+            color="#F59E0B"
+            iconBg="#FEF3C7"
+            isLoading={loading}
+          />
+        </View>
+        <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
+          <KPICard
+            title="Tiền hoàn trả / Hủy"
             value={formatCurrency(revenueOut)}
-            subtitle="Đơn hoàn trả / hoàn tiền"
+            subtitle="Tỷ lệ hủy đơn (Quy đổi)"
             icon={ShoppingCart}
             color="#EF4444"
             iconBg="#FEE2E2"
             isLoading={loading}
           />
         </View>
-        <View style={[styles.kpiWrap, isDesktop && styles.kpiWrapDesktop]}>
-          <KPICard
-            title="Lợi nhuận"
-            value={formatCurrency(profit)}
-            subtitle="Doanh thu − Hoàn trả"
-            icon={BarChart3}
-            color="#10B981"
-            iconBg="#D1FAE5"
-            isLoading={loading}
-          />
+      </View>
+
+      {/* ── Main Row: Trend (2/3) + Donut (1/3) ── */}
+      <View style={{ flexDirection: isDesktop ? "row" : "column", gap: 16 }}>
+        <View style={{ flex: isDesktop ? 2 : 1 }}>
+          {renderChart("revenue")}
+        </View>
+        <View style={{ flex: isDesktop ? 1 : 1 }}>
+          {renderChart("payment")}
         </View>
       </View>
 
-      {/* ── Revenue Trend Chart ── */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Xu hướng Doanh thu</Text>
-            <Text style={styles.cardSubtitle}>Biểu đồ đường theo từng ngày</Text>
-          </View>
-          {loading && <ActivityIndicator size="small" color="#6366F1" />}
+      {/* ── Bottom Row: Top Products + Heatmap ── */}
+      <View style={{ flexDirection: isDesktop ? "row" : "column", gap: 16, marginTop: 16 }}>
+        <View style={{ flex: 1 }}>
+          {renderChart("top")}
         </View>
-        {loading && trendData.length === 0 ? (
-          <Shimmer width="100%" height={260} />
-        ) : trendData.length > 0 ? (
-          <Echarts option={revenueOption} height={260} />
-        ) : (
-          <View style={styles.emptyChart}>
-            <BarChart3 size={32} color="#E5E7EB" />
-            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
-          </View>
-        )}
-      </View>
-
-      {/* ── Orders Trend Chart ── */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Xu hướng Đơn hàng</Text>
-            <Text style={styles.cardSubtitle}>Số đơn hàng hoàn thành theo ngày</Text>
-          </View>
-          {loading && <ActivityIndicator size="small" color="#10B981" />}
+        <View style={{ flex: 1 }}>
+          {renderChart("heatmap")}
         </View>
-        {loading && trendData.length === 0 ? (
-          <Shimmer width="100%" height={220} />
-        ) : trendData.length > 0 ? (
-          <Echarts option={ordersOption} height={220} />
-        ) : (
-          <View style={styles.emptyChart}>
-            <ShoppingCart size={32} color="#E5E7EB" />
-            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
-          </View>
-        )}
-      </View>
-
-      {/* ── Top-5 Days Bar Chart ── */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <Text style={styles.cardTitle}>Top Sản phẩm Doanh thu Cao Nhất</Text>
-            <Text style={styles.cardSubtitle}>Dữ liệu từ đơn hàng hoàn thành</Text>
-          </View>
-          {loading && <ActivityIndicator size="small" color="#F59E0B" />}
-        </View>
-        {loading && topProducts.length === 0 ? (
-          <Shimmer width="100%" height={220} />
-        ) : topProducts.length > 0 ? (
-          <Echarts option={topDaysOption} height={220} />
-        ) : (
-          <View style={styles.emptyChart}>
-            <Package2 size={32} color="#E5E7EB" />
-            <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
-          </View>
-        )}
       </View>
 
       {/* ── Toast Notification ── */}
@@ -941,4 +1149,15 @@ const styles = StyleSheet.create({
   },
   permTitle: { fontSize: 18, fontWeight: "800", color: "#111827" },
   permText: { fontSize: 14, color: "#6B7280", textAlign: "center" },
+
+  // Compare Toggle
+  compareToggle: { flexDirection: "row", alignItems: "center", gap: 6, marginLeft: "auto" },
+  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: "#D1D5DB", alignItems: "center", justifyContent: "center", backgroundColor: "#FFF" },
+  checkboxActive: { backgroundColor: "#6366F1", borderColor: "#6366F1" },
+  compareText: { fontSize: 13, color: "#4B5563", fontWeight: "600" },
+
+  // Chart Controls
+  chartControls: { flexDirection: "row", alignItems: "center", gap: 4 },
+  moveBtn: { padding: 6, backgroundColor: "#F3F4F6", borderRadius: 8 },
+  moveBtnDisabled: { opacity: 0.5 },
 });

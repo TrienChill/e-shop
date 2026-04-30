@@ -18,12 +18,22 @@ export type TopProductItem = {
   revenue: number;
 };
 
+export type PaymentMethodItem = {
+  method: string;
+  count: number;
+  amount: number;
+};
+
+export type HeatmapItem = [number, number, number];
+
 export type RevenueReport = {
   revenue_in: number;
   revenue_out: number;
   profit: number;
   trend_data: TrendDataItem[];
   top_products: TopProductItem[];
+  payment_methods: PaymentMethodItem[];
+  heatmap: HeatmapItem[];
 };
 
 // ─── Legacy function (kept for backward compat) ───────────────────────────────
@@ -70,5 +80,7 @@ export async function getRevenueReport(
     profit:       Number(result?.profit      ?? 0),
     trend_data:   Array.isArray(result?.trend_data)   ? result.trend_data   : [],
     top_products: Array.isArray(result?.top_products) ? result.top_products : [],
+    payment_methods: Array.isArray(result?.payment_methods) ? result.payment_methods : [],
+    heatmap:      Array.isArray(result?.heatmap)      ? result.heatmap      : [],
   };
 }
