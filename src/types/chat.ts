@@ -1,11 +1,12 @@
 export interface Conversation {
-  id: string;
-  customer_id: string;
+  id: number;
+  user_id: string;
   staff_id: string | null;
-  last_message: string;
+  is_active: boolean;
+  last_message: string | null;
   last_message_at: string;
-  is_read: boolean;
   created_at: string;
+  // Joined from profiles
   customer?: {
     id: string;
     full_name: string;
@@ -19,10 +20,11 @@ export interface Conversation {
 }
 
 export interface Message {
-  id: string;
-  conversation_id: string;
+  id: number;
+  conversation_id: number;
   sender_id: string;
   content: string;
   is_ai: boolean;
+  is_read: boolean;
   created_at: string;
 }

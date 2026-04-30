@@ -8,7 +8,7 @@ export const chatService = {
       .from('conversations')
       .select(`
         *,
-        customer:profiles!customer_id(id, full_name, avatar_url),
+        customer:profiles!user_id(id, full_name, avatar_url),
         staff:profiles!staff_id(id, full_name, avatar_url)
       `)
       .order('last_message_at', { ascending: false });
@@ -18,7 +18,7 @@ export const chatService = {
   },
 
   // 2. Lấy tin nhắn của một hội thoại
-  getMessages: async (conversationId: string): Promise<Message[]> => {
+  getMessages: async (conversationId: number): Promise<Message[]> => {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
@@ -31,7 +31,7 @@ export const chatService = {
 
   // 3. Gửi tin nhắn mới
   sendMessage: async (
-    conversationId: string, 
+    conversationId: number, 
     content: string, 
     senderId: string,
     isAi: boolean = false
@@ -55,7 +55,6 @@ export const chatService = {
       .update({
         last_message: content,
         last_message_at: new Date().toISOString(),
-        is_read: false
       })
       .eq('id', conversationId);
 
@@ -63,7 +62,7 @@ export const chatService = {
   },
 
   // 4. Gán nhân viên cho hội thoại
-  assignStaff: async (conversationId: string, staffId: string): Promise<void> => {
+  assignStaff: async (conversationId: number, staffId: string): Promise<void> => {
     const { error } = await supabase
       .from('conversations')
       .update({ staff_id: staffId })
@@ -72,12 +71,13 @@ export const chatService = {
     if (error) throw error;
   },
 
-  // 5. Đánh dấu đã đọc
-  markAsRead: async (conversationId: string): Promise<void> => {
+  // 5. Đánh dấu tin nhắn đã đọc (đánh dấu trên bảng messages)
+  markAsRead: async (conversationId: number): Promise<void> => {
     const { error } = await supabase
-      .from('conversations')
+      .from('messages')
       .update({ is_read: true })
-      .eq('id', conversationId);
+      .eq('conversation_id', conversationId)
+      .eq('is_read', false);
 
     if (error) throw error;
   },

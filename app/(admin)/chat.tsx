@@ -64,16 +64,12 @@ export default function AdminChat() {
   useEffect(() => {
     if (activeConv) {
       loadMessages(activeConv.id);
-      loadCustomerOrders(activeConv.customer_id);
-      
-      if (!activeConv.is_read) {
-        chatService.markAsRead(activeConv.id);
-        setConversations(prev => prev.map(c => c.id === activeConv.id ? { ...c, is_read: true } : c));
-      }
+      loadCustomerOrders(activeConv.user_id);
+      chatService.markAsRead(activeConv.id);
     }
   }, [activeConv]);
 
-  const loadMessages = async (convId: string) => {
+  const loadMessages = async (convId: number) => {
     try {
       const data = await chatService.getMessages(convId);
       setMessages(data);
@@ -115,7 +111,7 @@ export default function AdminChat() {
         const newMsg = payload.new as Message;
         
         // Cập nhật messages nếu đang xem hội thoại này
-        if (activeConv && newMsg.conversation_id === activeConv.id) {
+        if (activeConv && Number(newMsg.conversation_id) === activeConv.id) {
           setMessages(prev => [...prev, newMsg]);
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         }
@@ -123,13 +119,12 @@ export default function AdminChat() {
         // Cập nhật last_message cho sidebar bên trái
         setConversations(prev => {
           let updated = [...prev];
-          const idx = updated.findIndex(c => c.id === newMsg.conversation_id);
+          const idx = updated.findIndex(c => c.id === Number(newMsg.conversation_id));
           if (idx !== -1) {
             updated[idx] = { 
               ...updated[idx], 
               last_message: newMsg.content, 
               last_message_at: newMsg.created_at,
-              is_read: activeConv?.id === newMsg.conversation_id ? true : false
             };
             // Đưa hội thoại mới nhất lên đầu
             const [item] = updated.splice(idx, 1);
@@ -209,16 +204,16 @@ export default function AdminChat() {
             source={{ uri: item.customer?.avatar_url || 'https://via.placeholder.com/150' }}
             style={styles.avatar}
           />
-          {!item.is_read && <View style={[styles.unreadBadge, { backgroundColor: primaryColor }]} />}
+
         </View>
         <View style={styles.convInfo}>
           <View style={styles.convHeader}>
-            <Text style={[styles.convName, !item.is_read && styles.unreadText]} numberOfLines={1}>
+            <Text style={styles.convName} numberOfLines={1}>
               {item.customer?.full_name || 'Khách hàng'}
             </Text>
             <Text style={styles.convTime}>{timeStr}</Text>
           </View>
-          <Text style={[styles.convLastMessage, !item.is_read && styles.unreadText]} numberOfLines={1}>
+          <Text style={styles.convLastMessage} numberOfLines={1}>
             {item.last_message}
           </Text>
         </View>
@@ -228,8 +223,8 @@ export default function AdminChat() {
 
   // Render Message Bubble
   const renderMessage = ({ item }: { item: Message }) => {
-    // Nếu sender_id không phải của khách (customer_id của conv hiện tại), tức là Admin/Staff
-    const isMine = item.sender_id !== activeConv?.customer_id;
+    // Nếu sender_id không phải của khách (user_id của conv hiện tại), tức là Admin/Staff
+    const isMine = item.sender_id !== activeConv?.user_id;
 
     return (
       <View style={[styles.messageRow, isMine ? styles.messageRowRight : styles.messageRowLeft]}>
@@ -278,7 +273,7 @@ export default function AdminChat() {
         ) : (
           <FlatList
             data={conversations}
-            keyExtractor={item => item.id}
+            keyExtractor={item => String(item.id)}
             renderItem={renderConversationItem}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 20 }}
@@ -347,7 +342,7 @@ export default function AdminChat() {
               <FlatList
                 ref={flatListRef}
                 data={messages}
-                keyExtractor={item => item.id}
+                keyExtractor={item => String(item.id)}
                 renderItem={renderMessage}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.messagesList}

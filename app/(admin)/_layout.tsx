@@ -63,12 +63,7 @@ export default function AdminLayout() {
     return <Slot />;
   }
 
-  // BƯỚC 5: Bọc giao diện web với AppearanceProvider
-  return (
-    <AppearanceProvider>
-      <AdminLayoutWeb />
-    </AppearanceProvider>
-  );
+  return <AdminLayoutWeb />;
 }
 
 // ─── Giao diện Admin Web (dùng context Appearance) ────────────────────────────

@@ -1,5 +1,6 @@
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -31,6 +32,8 @@ import {
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Headset } from "lucide-react-native";
+import { useAuth } from "@/src/auth/AuthContext";
 
 const { width } = Dimensions.get("window");
 
@@ -52,6 +55,20 @@ const HomeScreen = () => {
 
   // Hide mobile header on web - WebHeader is in _layout
   const showMobileHeader = !isWeb;
+  const { session } = useAuth();
+  const router = useRouter();
+
+  const handleSupportChat = () => {
+    if (!session) {
+      if (Platform.OS === 'web') {
+        window.alert("Vui lòng đăng nhập để liên hệ hỗ trợ viên!");
+      } else {
+        Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để liên hệ hỗ trợ viên!");
+      }
+      return;
+    }
+    router.push("/(shop)/support");
+  };
 
   {
     /* ========== TOP PRODUCTS SECTION ========== */
@@ -184,7 +201,6 @@ const HomeScreen = () => {
   }
 
   const [newItems, setNewItems] = useState<any[]>([]);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchNewItems = async () => {
@@ -752,6 +768,15 @@ const HomeScreen = () => {
           )}
         </View>
       </ScrollView>
+
+      {/* Nút Chat Support (Staff) */}
+      <TouchableOpacity
+        style={styles.fabSupport}
+        activeOpacity={0.8}
+        onPress={handleSupportChat}
+      >
+        <Headset size={28} color="#FFF" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -1123,6 +1148,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     color: "#1f2937",
+  },
+  
+  // Nút Hỗ trợ khách hàng (FAB)
+  fabSupport: {
+    position: 'absolute',
+    bottom: Platform.OS === 'web' ? 100 : 156, // Nằm trên nút Chat AI (nếu có)
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#10B981', // Màu xanh ngọc
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 9998,
   },
 });
 
