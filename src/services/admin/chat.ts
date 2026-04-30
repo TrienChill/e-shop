@@ -105,12 +105,13 @@ export const chatService = {
 
   // 6. Lấy danh sách Staff để assign
   getStaffList: async () => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('user_id, profiles!inner(id, full_name, avatar_url), role')
+    // Role được lưu trực tiếp trong bảng profiles
+    const { data: staffProfiles, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url')
       .in('role', ['admin', 'staff']);
 
     if (error) throw error;
-    return data.map(d => d.profiles);
+    return staffProfiles || [];
   }
 };
