@@ -28,6 +28,8 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/auth/AuthContext';
+import { useAppearance, COLOR_MAP, DENSITY_PADDING } from '@/src/context/AppearanceContext';
+import type { ThemeMode, ColorSchemeId, DensityMode } from '@/src/context/AppearanceContext';
 import * as ImagePicker from 'expo-image-picker';
 
 // ─── Kiểu Tab ──────────────────────────────────────────────────────────────
@@ -434,29 +436,40 @@ function ProfileTab({ userId }: { userId: string }) {
 
 // ─── Tab Giao diện ────────────────────────────────────────────────────────
 function AppearanceTab() {
-  const [theme, setTheme] = useState('light');
-  const [colorScheme, setColorScheme] = useState('emerald');
-  const [density, setDensity] = useState('compact');
+  // Lấy state + setters từ context (tự động lưu localStorage và áp dụng ngay)
+  const { theme, colorScheme, density, primaryColor, setTheme, setColorScheme, setDensity } = useAppearance();
+  const [toast, setToast] = useState<ToastState>({ visible: false, type: 'success', message: '' });
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const THEMES = [
-    { id: 'light', label: 'Sáng', icon: Sun },
-    { id: 'dark', label: 'Tối', icon: Moon },
+  const showToast = (message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ visible: true, type: 'success', message });
+    toastTimer.current = setTimeout(() => setToast(p => ({ ...p, visible: false })), 2500);
+  };
+
+  const handleTheme = (t: ThemeMode) => { setTheme(t); showToast('Chủ đề đã được cập nhật'); };
+  const handleColor = (c: ColorSchemeId) => { setColorScheme(c); showToast('Bảng màu đã được cập nhật'); };
+  const handleDensity = (d: DensityMode) => { setDensity(d); showToast('Mật độ hiển thị đã được cập nhật'); };
+
+  const THEMES: { id: ThemeMode; label: string; icon: any }[] = [
+    { id: 'light',  label: 'Sáng',      icon: Sun },
+    { id: 'dark',   label: 'Tối',       icon: Moon },
     { id: 'system', label: 'Hệ thống', icon: Monitor },
   ];
 
-  const COLOR_SCHEMES = [
-    { id: 'emerald', label: 'Lục bảo', color: '#10B981' },
-    { id: 'blue', label: 'Xanh dương', color: '#3B82F6' },
-    { id: 'violet', label: 'Tím', color: '#8B5CF6' },
-    { id: 'rose', label: 'Hồng', color: '#F43F5E' },
-    { id: 'orange', label: 'Cam', color: '#F97316' },
-    { id: 'slate', label: 'Xám', color: '#64748B' },
+  const COLOR_SCHEMES: { id: ColorSchemeId; label: string; color: string }[] = [
+    { id: 'emerald', label: 'Lục bảo',     color: COLOR_MAP.emerald.primary },
+    { id: 'blue',    label: 'Xanh dương',  color: COLOR_MAP.blue.primary },
+    { id: 'violet',  label: 'Tím',         color: COLOR_MAP.violet.primary },
+    { id: 'rose',    label: 'Hồng',        color: COLOR_MAP.rose.primary },
+    { id: 'orange',  label: 'Cam',         color: COLOR_MAP.orange.primary },
+    { id: 'slate',   label: 'Xám',         color: COLOR_MAP.slate.primary },
   ];
 
-  const DENSITIES = [
-    { id: 'compact', label: 'Gọn gàng', icon: AlignJustify },
-    { id: 'comfortable', label: 'Thoải mái', icon: Maximize2 },
-    { id: 'spacious', label: 'Rộng rãi', icon: StretchHorizontal },
+  const DENSITIES: { id: DensityMode; label: string; icon: any; desc: string }[] = [
+    { id: 'compact',     label: 'Gọn gàng', icon: AlignJustify,    desc: `${DENSITY_PADDING.compact}px` },
+    { id: 'comfortable', label: 'Thoải mái', icon: Maximize2,       desc: `${DENSITY_PADDING.comfortable}px` },
+    { id: 'spacious',    label: 'Rộng rãi', icon: StretchHorizontal, desc: `${DENSITY_PADDING.spacious}px` },
   ];
 
   return (
@@ -466,22 +479,25 @@ function AppearanceTab() {
         <Text style={styles.cardSubtitle}>Tùy chỉnh giao diện và cảm nhận của bảng điều khiển</Text>
       </View>
       <View style={styles.cardDivider} />
-      
+
       <View style={{ padding: 24 }}>
+        {/* Toast */}
+        <InlineToast toast={toast} />
+
         {/* Chủ đề */}
         <Text style={appearanceStyles.sectionTitle}>Chủ đề</Text>
         <View style={appearanceStyles.grid}>
-          {THEMES.map((item) => {
+          {THEMES.map(item => {
             const isActive = theme === item.id;
             const Icon = item.icon;
             return (
               <TouchableOpacity
                 key={item.id}
-                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
-                onPress={() => setTheme(item.id)}
+                style={[appearanceStyles.card, isActive && { borderColor: primaryColor, backgroundColor: `${primaryColor}08` }]}
+                onPress={() => handleTheme(item.id)}
               >
-                <Icon size={24} color={isActive ? '#059669' : '#6B7280'} />
-                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+                <Icon size={24} color={isActive ? primaryColor : '#6B7280'} />
+                <Text style={[appearanceStyles.cardLabel, isActive && { color: primaryColor }]}>{item.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -490,16 +506,16 @@ function AppearanceTab() {
         {/* Bảng màu */}
         <Text style={[appearanceStyles.sectionTitle, { marginTop: 32 }]}>Bảng màu</Text>
         <View style={appearanceStyles.grid}>
-          {COLOR_SCHEMES.map((item) => {
+          {COLOR_SCHEMES.map(item => {
             const isActive = colorScheme === item.id;
             return (
               <TouchableOpacity
                 key={item.id}
-                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
-                onPress={() => setColorScheme(item.id)}
+                style={[appearanceStyles.card, isActive && { borderColor: item.color, backgroundColor: `${item.color}0D` }]}
+                onPress={() => handleColor(item.id)}
               >
-                <Circle size={16} color={item.color} fill={item.color} />
-                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+                <Circle size={20} color={item.color} fill={item.color} />
+                <Text style={[appearanceStyles.cardLabel, isActive && { color: item.color, fontWeight: '700' }]}>{item.label}</Text>
               </TouchableOpacity>
             );
           })}
@@ -508,17 +524,18 @@ function AppearanceTab() {
         {/* Mật độ hiển thị */}
         <Text style={[appearanceStyles.sectionTitle, { marginTop: 32 }]}>Mật độ hiển thị</Text>
         <View style={appearanceStyles.grid}>
-          {DENSITIES.map((item) => {
+          {DENSITIES.map(item => {
             const isActive = density === item.id;
             const Icon = item.icon;
             return (
               <TouchableOpacity
                 key={item.id}
-                style={[appearanceStyles.card, isActive && appearanceStyles.cardActive]}
-                onPress={() => setDensity(item.id)}
+                style={[appearanceStyles.card, isActive && { borderColor: primaryColor, backgroundColor: `${primaryColor}08` }]}
+                onPress={() => handleDensity(item.id)}
               >
-                <Icon size={24} color={isActive ? '#059669' : '#6B7280'} />
-                <Text style={[appearanceStyles.cardLabel, isActive && appearanceStyles.cardLabelActive]}>{item.label}</Text>
+                <Icon size={24} color={isActive ? primaryColor : '#6B7280'} />
+                <Text style={[appearanceStyles.cardLabel, isActive && { color: primaryColor }]}>{item.label}</Text>
+                <Text style={appearanceStyles.cardDesc}>{item.desc}</Text>
               </TouchableOpacity>
             );
           })}
@@ -816,7 +833,8 @@ const appearanceStyles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    minWidth: '30%',
+    flexBasis: '30%',
+    minWidth: 140,
     aspectRatio: 2.2,
     backgroundColor: 'white',
     borderRadius: 12,
@@ -838,7 +856,9 @@ const appearanceStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#6B7280',
   },
-  cardLabelActive: {
-    color: '#059669',
+  cardDesc: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    marginTop: -4,
   },
 });

@@ -1,4 +1,5 @@
 import { listOrders, updateOrderStatus, pushOrderToGHN } from "@/src/services/admin/orders";
+import { hexToRgba } from "@/src/context/AppearanceContext";
 import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle, Printer, ExternalLink } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -317,7 +318,7 @@ export default function AdminOrdersScreen() {
                       <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
                         <View style={StyleSheet.flatten([
                           styles.statusBadge,
-                          { backgroundColor: `${STATUS_COLORS[order.status]}20` }
+                          { backgroundColor: hexToRgba(STATUS_COLORS[order.status] ?? '#000000', 0.12) }
                         ])}>
                           <Text style={StyleSheet.flatten([
                             styles.statusText,
@@ -571,7 +572,7 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)", elevation: 8,
   },
-  scrollTopButtonHover: { backgroundColor: "#374151", transform: [{ translateY: -2 }] },
+  scrollTopButtonHover: { backgroundColor: "#374151", marginTop: -2 },
 
   // ── GHN Address Fixer ──
   fixerHeader: {

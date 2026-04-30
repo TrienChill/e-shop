@@ -1,4 +1,5 @@
 import { useAuth } from "@/src/auth/AuthContext";
+import { AppearanceProvider, useAppearance, hexToRgba } from "@/src/context/AppearanceContext";
 import { Link, Redirect, Slot, usePathname, useRouter } from "expo-router";
 import {
   Award,
@@ -62,6 +63,24 @@ export default function AdminLayout() {
     return <Slot />;
   }
 
+  // BƯỚC 5: Bọc giao diện web với AppearanceProvider
+  return (
+    <AppearanceProvider>
+      <AdminLayoutWeb />
+    </AppearanceProvider>
+  );
+}
+
+// ─── Giao diện Admin Web (dùng context Appearance) ────────────────────────────
+function AdminLayoutWeb() {
+  const { signOut } = useAuth();
+  const pathname = usePathname();
+  const router = useRouter();
+  const { primaryColor, contentPadding } = useAppearance();
+
+  const isProfileActive = pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings');
+  const isSettingsActive = pathname.startsWith('/(admin)/settings');
+
   // BƯỚC 5: Thiết lập Menu cho Admin/Staff trên Web
   const menuItems = [
     { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
@@ -84,7 +103,8 @@ export default function AdminLayout() {
       {/* SIDEBAR */}
       <View style={styles.sidebar}>
         <View style={styles.sidebarHeader}>
-          <View style={styles.logoBadge}>
+          {/* Logo badge dùng primaryColor */}
+          <View style={[styles.logoBadge, { backgroundColor: primaryColor }]}>
             <Store size={20} color="white" />
           </View>
           <Text style={styles.sidebarTitle}>E-Shop Admin</Text>
@@ -104,6 +124,7 @@ export default function AdminLayout() {
                 label={item.label}
                 icon={item.icon}
                 active={isActive}
+                primaryColor={primaryColor}
               />
             );
           })}
@@ -111,46 +132,32 @@ export default function AdminLayout() {
 
         <View style={styles.sidebarFooter}>
           {/* Profile widget — click vào avatar/tên → Hồ sơ; icon gear → Cài đặt */}
-          <View style={[
-            styles.profileWidget,
-            (pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings'))
-              && styles.profileWidgetActive,
-          ]}>
-            {/* Phần trái: Avatar + Tên — navigate tới Hồ sơ */}
-            <Pressable
-              style={styles.profileLeft}
-              onPress={() => router.push('/(admin)/profile' as any)}
-            >
-              <View style={[
-                styles.avatarCircle,
-                pathname.startsWith('/(admin)/profile') && styles.avatarCircleActive,
-              ]}>
-                <Text style={styles.avatarInitials}>AS</Text>
-              </View>
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>Admin</Text>
-                <Text style={[
-                  styles.profileRole,
-                  (pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings'))
-                    && styles.profileRoleActive,
-                ]}>Quản trị viên</Text>
-              </View>
-            </Pressable>
-
-            {/* Icon Settings — navigate tới Cài đặt */}
-            <Pressable
-              style={[
-                styles.settingsIconBtn,
-                pathname.startsWith('/(admin)/settings') && styles.settingsIconBtnActive,
-              ]}
-              onPress={() => router.push('/(admin)/settings' as any)}
-            >
-              <SlidersHorizontal
-                size={16}
-                color={pathname.startsWith('/(admin)/settings') ? '#10B981' : '#6B7280'}
-              />
-            </Pressable>
-          </View>
+            <View style={[
+              styles.profileWidget,
+              isProfileActive && { backgroundColor: hexToRgba(primaryColor, 0.08) },
+            ]}>
+              <Pressable
+                style={styles.profileLeft}
+                onPress={() => router.push('/(admin)/profile' as any)}
+              >
+                <View style={[
+                  styles.avatarCircle,
+                  pathname.startsWith('/(admin)/profile') && { backgroundColor: primaryColor, borderColor: hexToRgba(primaryColor, 0.5) },
+                ]}>
+                  <Text style={styles.avatarInitials}>AS</Text>
+                </View>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>Admin</Text>
+                  <Text style={[styles.profileRole, isProfileActive && { color: primaryColor }]}>Quản trị viên</Text>
+                </View>
+              </Pressable>
+              <Pressable
+                style={[styles.settingsIconBtn, isSettingsActive && { backgroundColor: hexToRgba(primaryColor, 0.15) }]}
+                onPress={() => router.push('/(admin)/settings' as any)}
+              >
+                <SlidersHorizontal size={16} color={isSettingsActive ? primaryColor : '#6B7280'} />
+              </Pressable>
+            </View>
 
           <Pressable style={styles.footerLink} onPress={() => signOut()}>
             <LogOut size={18} color="#9CA3AF" />
@@ -172,9 +179,8 @@ export default function AdminLayout() {
         </View>
       </View>
 
-      {/* MAIN CONTENT */}
-      <View style={styles.content}>
-        {/* Nơi nội dung của dashboard, orders, products... sẽ được render */}
+      {/* MAIN CONTENT — padding theo density */}
+      <View style={[styles.content, { padding: contentPadding }]}>
         <Slot />
       </View>
     </View>
@@ -183,19 +189,13 @@ export default function AdminLayout() {
 
 // === COMPONENT CON & STYLES ===
 function SidebarLink({
-  href,
-  label,
-  icon: Icon,
-  active,
+  href, label, icon: Icon, active, primaryColor,
 }: {
-  href: string;
-  label: string;
-  icon: any;
-  active: boolean;
+  href: string; label: string; icon: any; active: boolean; primaryColor: string;
 }) {
   return (
     <Link href={href as any} asChild>
-      <Pressable style={StyleSheet.flatten([styles.menuItem, active && styles.menuItemActive])}>
+      <Pressable style={StyleSheet.flatten([styles.menuItem, active && { backgroundColor: primaryColor }])}>
         <Icon size={20} color={active ? "#FFF" : "#9CA3AF"} />
         <Text style={StyleSheet.flatten([styles.menuItemText, active && styles.menuItemTextActive])}>
           {label}
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
-    backgroundColor: "#2563EB",
+    // backgroundColor được set bằng inline primaryColor
     justifyContent: "center",
     alignItems: "center",
   },
@@ -244,9 +244,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
   },
-  menuItemActive: {
-    backgroundColor: "#2563EB",
-  },
+  // menuItemActive: dùng inline primaryColor thay cho static
+  menuItemActive: {},
   menuItemText: {
     color: "#9CA3AF",
     fontSize: 15,
@@ -342,6 +341,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 40,
+    // padding được override bằng contentPadding từ context
+    padding: 24,
   },
 });
