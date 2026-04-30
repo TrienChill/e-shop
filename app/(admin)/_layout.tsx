@@ -84,6 +84,7 @@ function AdminLayoutWeb() {
   // BƯỚC 5: Thiết lập Menu cho Admin/Staff trên Web
   const menuItems = [
     { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+    { href: "/(admin)/chat", label: "Tin nhắn", icon: MessageSquare },
     { href: "/(admin)/orders", label: "Đơn hàng", icon: ShoppingBag },
     { href: "/(admin)/products", label: "Sản phẩm", icon: Package },
     { href: "/(admin)/categories", label: "Danh mục", icon: Layers },
