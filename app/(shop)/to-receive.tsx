@@ -130,10 +130,11 @@ export default function ToReceiveScreen() {
   }, [params.status]);
 
   const STATUS_PRIORITY: Record<string, number> = {
-    pending: 5,
-    processing: 4,
-    shipping: 3,
-    completed: 2,
+    pending: 6,
+    processing: 5,
+    shipping: 4,
+    completed: 3,
+    delivery_failed: 2,
     cancelled: 1,
   };
 
@@ -144,7 +145,7 @@ export default function ToReceiveScreen() {
     { key: "shipping", label: "Đang giao" },
     { key: "completed", label: "Đã giao" },
     { key: "cancelled", label: "Đã hủy" },
-    { key: "returns", label: "Trả hàng/Hoàn tiền" },
+    { key: "returns", label: "Giao thất bại/Hoàn hàng" },
   ];
 
   const fetchOrders = async (statusFilter = selectedStatus) => {
@@ -207,8 +208,9 @@ export default function ToReceiveScreen() {
       // Lọc theo Tab đã chọn
       if (statusFilter !== "all") {
         if (statusFilter === "returns") {
-          // Gộp 4 trạng thái return vào Tab "Trả hàng/Hoàn tiền"
+          // Gộp trạng thái giao thất bại và trả hàng vào chung 1 Tab
           query = query.in("status", [
+            "delivery_failed",
             "return_requested",
             "returning",
             "returned",
@@ -253,6 +255,7 @@ export default function ToReceiveScreen() {
           shipping: "Đang giao",
           completed: "Đã giao",
           cancelled: "Đã hủy",
+          delivery_failed: "Giao hàng thất bại",
           return_requested: "Yêu cầu trả hàng",
           returning: "Đang hoàn hàng",
           returned: "Đã trả hàng",

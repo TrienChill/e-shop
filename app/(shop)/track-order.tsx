@@ -28,6 +28,8 @@ const COLOR = {
   dark: "#1A1A1A",
   grayBadge: "#F0F0F0",
   success: "#10B981", // Xanh lá cho trạng thái hoàn thành
+  warning: "#F97316",
+  warningLight: "#FFEDD5",
 };
 
 export default function TrackOrderScreen() {
@@ -49,6 +51,7 @@ export default function TrackOrderScreen() {
     processing: "Đang lấy hàng",
     shipping: "Đang giao hàng",
     completed: "Đã giao thành công",
+    delivery_failed: "Giao hàng không thành công",
     cancelled: "Đã hủy",
     return_requested: "Yêu cầu trả hàng",
     returning: "Đang trả hàng về",
@@ -120,11 +123,12 @@ export default function TrackOrderScreen() {
       return timeline.reverse(); // Đảo ngược để sự kiện mới nhất lên đầu
     }
 
-    // Luồng: Bình thường (Đang xử lý -> Giao hàng -> Hoàn thành)
+    // Luồng: Bình thường (Đang xử lý -> Giao hàng -> Hoàn thành / Giao thất bại)
     const normalFlow = [
       "processing",
       "shipping",
       "completed",
+      "delivery_failed",
       "return_requested",
       "returning",
       "returned",
@@ -146,6 +150,7 @@ export default function TrackOrderScreen() {
       [
         "shipping",
         "completed",
+        "delivery_failed",
         "return_requested",
         "returning",
         "returned",
@@ -159,6 +164,17 @@ export default function TrackOrderScreen() {
         description: "Shipper đang mang kiện hàng đến địa chỉ của bạn.",
         isCompleted: true,
         isError: false,
+      });
+    }
+
+    if (status === "delivery_failed") {
+      timeline.push({
+        id: 4,
+        title: "Giao hàng không thành công",
+        time: formatDate(order.delivery_failed_at) || updatedTime,
+        description: "Sự cố trong quá trình giao hàng.",
+        isCompleted: false,
+        isError: true,
       });
     }
 
@@ -239,6 +255,7 @@ export default function TrackOrderScreen() {
     if (s === "processing") return 50;
     if (s === "shipping") return 75;
     if (s === "completed") return 100;
+    if (s === "delivery_failed") return 100;
     if (["return_requested", "returning", "returned", "refunded"].includes(s))
       return 100; // Đã giao thì mới trả được
     return 0; // cancelled
@@ -271,11 +288,43 @@ export default function TrackOrderScreen() {
       />
 
       <View style={styles.headerContent}>
+        {order?.status === "delivery_failed" && (
+          <>
+            <View style={styles.warningBanner}>
+              <Text style={styles.warningBannerText}>
+                Rất tiếc! Đơn hàng đã giao không thành công.
+              </Text>
+            </View>
+            <View style={styles.reasonCard}>
+              <Text style={styles.reasonLabel}>Lý do:</Text>
+              <Text style={styles.reasonText}>
+                {order?.cancel_reason ||
+                  "Không có lý do cụ thể từ đơn vị vận chuyển"}
+              </Text>
+              <TouchableOpacity
+                style={styles.contactSupportButton}
+                onPress={() => router.push("/(shop)/support")}
+              >
+                <Text style={styles.contactSupportButtonText}>
+                  Liên hệ hỗ trợ ngay
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {/* 4. THANH PROGRESS BAR ĐỘNG */}
         <View style={styles.progressSection}>
           <View style={styles.progressBarBackground}>
             <LinearGradient
-              colors={[COLOR.blue, progress >= 100 ? COLOR.success : "#C084FC"]}
+              colors={[
+                COLOR.blue,
+                progress >= 100
+                  ? order?.status === "delivery_failed"
+                    ? COLOR.warning
+                    : COLOR.success
+                  : "#C084FC",
+              ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.progressBarFill, { width: `${progress}%` }]}
@@ -308,6 +357,8 @@ export default function TrackOrderScreen() {
                     progress >= 100
                       ? order?.status === "completed"
                         ? COLOR.blue
+                        : order?.status === "delivery_failed"
+                        ? COLOR.warning
                         : COLOR.success
                       : "#E5E7EB",
                 },
@@ -334,6 +385,7 @@ export default function TrackOrderScreen() {
               style={[
                 styles.trackingValue,
                 order?.status === "cancelled" && { color: COLOR.red },
+                order?.status === "delivery_failed" && { color: COLOR.warning },
               ]}
             >
               {loading
@@ -736,5 +788,54 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLOR.textSecondary,
     fontWeight: "500",
+  },
+  warningBanner: {
+    backgroundColor: COLOR.warningLight,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  warningBannerText: {
+    color: COLOR.warning,
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  reasonCard: {
+    backgroundColor: COLOR.white,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: COLOR.warningLight,
+    shadowColor: COLOR.warning,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  reasonLabel: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: COLOR.dark,
+    marginBottom: 6,
+  },
+  reasonText: {
+    fontSize: 14,
+    color: COLOR.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  contactSupportButton: {
+    backgroundColor: COLOR.warning,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  contactSupportButtonText: {
+    color: COLOR.white,
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
