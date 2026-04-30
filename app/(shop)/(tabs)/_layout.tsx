@@ -13,10 +13,13 @@ import { supabase } from "@/src/lib/supabase";
 import WebHeader from "@/src/components/web/WebHeader";
 import WebFooter from "@/src/components/web/WebFooter";
 import { ScrollView } from "react-native";
+import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: STATIC_WIDTH } = Dimensions.get("window");
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
   if (Platform.OS === "web") return null;
 
   if (state.routes[state.index].name === "cart") return null;
@@ -35,66 +38,69 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
   const activeIndex = state.index;
   const routes = ["index", "categories", "wishlist", "profile"];
+  const bottomPadding = Math.max(insets.bottom, 16);
 
   return (
-    <View style={styles.bottomNavContainer}>
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onTabPress(routes[0], state.routeNames[activeIndex] === routes[0])}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[0] && styles.navIconActive]}>
-            <MaterialIcons
-              name="home"
-              size={26}
-              color={state.routeNames[activeIndex] === routes[0] ? "#0055FF" : "#9ca3af"}
-            />
-          </View>
-        </TouchableOpacity>
+    <View style={[styles.bottomNavContainer, { bottom: bottomPadding }]}>
+      <BlurView intensity={80} tint="light" style={styles.blurContainer}>
+        <View style={styles.bottomNav}>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => onTabPress(routes[0], state.routeNames[activeIndex] === routes[0])}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[0] && styles.navIconActive]}>
+              <MaterialIcons
+                name="home"
+                size={26}
+                color={state.routeNames[activeIndex] === routes[0] ? "#0055FF" : "#9ca3af"}
+              />
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onTabPress(routes[1], state.routeNames[activeIndex] === routes[1])}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[1] && styles.navIconActive]}>
-            <MaterialIcons
-              name="grid-view"
-              size={26}
-              color={state.routeNames[activeIndex] === routes[1] ? "#0055FF" : "#9ca3af"}
-            />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => onTabPress(routes[1], state.routeNames[activeIndex] === routes[1])}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[1] && styles.navIconActive]}>
+              <MaterialIcons
+                name="grid-view"
+                size={26}
+                color={state.routeNames[activeIndex] === routes[1] ? "#0055FF" : "#9ca3af"}
+              />
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onTabPress(routes[2], state.routeNames[activeIndex] === routes[2])}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[2] && styles.navIconActive]}>
-            <MaterialIcons
-              name="favorite-border"
-              size={26}
-              color={state.routeNames[activeIndex] === routes[2] ? "#0055FF" : "#9ca3af"}
-            />
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => onTabPress(routes[2], state.routeNames[activeIndex] === routes[2])}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[2] && styles.navIconActive]}>
+              <MaterialIcons
+                name="favorite-border"
+                size={26}
+                color={state.routeNames[activeIndex] === routes[2] ? "#0055FF" : "#9ca3af"}
+              />
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => onTabPress(routes[3], state.routeNames[activeIndex] === routes[3])}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[3] && styles.navIconActive]}>
-            <MaterialIcons
-              name="person-outline"
-              size={26}
-              color={state.routeNames[activeIndex] === routes[3] ? "#0055FF" : "#9ca3af"}
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.navItem}
+            onPress={() => onTabPress(routes[3], state.routeNames[activeIndex] === routes[3])}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.navIconWrapper, state.routeNames[activeIndex] === routes[3] && styles.navIconActive]}>
+              <MaterialIcons
+                name="person-outline"
+                size={26}
+                color={state.routeNames[activeIndex] === routes[3] ? "#0055FF" : "#9ca3af"}
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
     </View>
   );
 }
@@ -188,28 +194,28 @@ const styles = StyleSheet.create({
   },
   bottomNavContainer: {
     position: "absolute",
-    bottom: 24,
-    left: 0,
-    right: 0,
-    alignItems: "center",
+    left: 20,
+    right: 20,
     zIndex: 100,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  blurContainer: {
+    borderRadius: 35,
+    overflow: "hidden",
+    borderWidth: 0.5,
+    borderColor: "rgba(255, 255, 255, 0.8)",
   },
   bottomNav: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 35,
-    paddingHorizontal: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.6)",
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    marginHorizontal: 16,
     justifyContent: "space-between",
     alignItems: "center",
-    shadowColor: "#0055FF",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 25,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.03)",
   },
   navItem: {
     flex: 1,
@@ -225,6 +231,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   navIconActive: {
-    backgroundColor: "rgba(0, 85, 255, 0.1)",
+    backgroundColor: "rgba(0, 85, 255, 0.15)",
   },
 });
