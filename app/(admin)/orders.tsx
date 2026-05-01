@@ -2,8 +2,9 @@ import { InvoiceOrderData, InvoiceTemplate } from "@/src/components/admin/Invoic
 import { hexToRgba } from "@/src/context/AppearanceContext";
 import { supabase } from "@/src/lib/supabase";
 import { listOrders, pushOrderToGHN, updateOrderStatus, deleteOrders } from "@/src/services/admin/orders";
-import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download, ExternalLink, Package, Search, Settings, Settings2, Trash2, Truck, XCircle } from "lucide-react-native";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download, ExternalLink, Package, Plus, Search, Settings, Settings2, Trash2, Truck, XCircle } from "lucide-react-native";
 import * as XLSX from 'xlsx';
+import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -53,6 +54,7 @@ const STATUS_TABS = [
 // Main Screen
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AdminOrdersScreen() {
+  const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
@@ -473,6 +475,14 @@ export default function AdminOrdersScreen() {
               <Pressable style={styles.toolbarButton} onPress={handleExportExcel}>
                 <Download size={18} color="#374151" />
                 <Text style={styles.toolbarButtonText}>Xuất Excel</Text>
+              </Pressable>
+
+              <Pressable 
+                style={StyleSheet.flatten([styles.toolbarButton, styles.toolbarButtonPrimary])} 
+                onPress={() => router.push('/(admin)/orders/create')}
+              >
+                <Plus size={18} color="white" />
+                <Text style={styles.toolbarButtonPrimaryText}>Tạo đơn hàng</Text>
               </Pressable>
 
               {selectedOrders.length > 0 && (
@@ -1114,6 +1124,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#EF4444",
+  },
+  toolbarButtonPrimary: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  toolbarButtonPrimaryText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "white",
   },
   columnCheck: { width: 40, alignItems: "center" },
   checkbox: {

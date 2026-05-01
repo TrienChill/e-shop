@@ -32,6 +32,7 @@ export async function listOrders(params?: {
       phone_contact,
       shipping_address,
       shipping_fee,
+      payment_method,
       ghn_order_code,
       address_id,
       shipping_district_id,
@@ -203,20 +204,34 @@ export async function pushOrderToGHN(order: any): Promise<string> {
   );
 
   // --- Gọi GHN Create Order API ---
-  const ghnData = await createGHNOrder({
-    to_name:        order.receiver_name  ?? "Khách hàng",
-    to_phone:       order.phone_contact  ?? "",
-    to_address:     order.shipping_address ?? "",
+  const ghnPayload = {
+    to_name:        (order.receiver_name ?? "Kh\u00e1ch h\u00e0ng").trim(),
+    to_phone:       (order.phone_contact ?? "").trim().replace(/\s+/g, ""),
+    to_address:     (order.shipping_address ?? "Kh\u00f4ng c\u00f3 ?a ch\u1ec9").trim(),
     to_ward_code:   wardCode,
     to_district_id: districtId,
     weight:         totalWeight,
-    service_type_id: 2,    // 2 = Giao Hàng Chuẩn (mặc định)
-    payment_type_id: 1,    // 1 = Shop trả phí (vì tổng COD đã cộng sẵn phí ship trong app)
-    required_note:  "CHOTHUHANG", // Cho thử hàng
-    cod_amount:     Math.round(order.total_amount ?? 0),
+    service_type_id: 2,
+    payment_type_id: 1,
+    required_note:  "CHOTHUHANG",
+    cod_amount:     order.payment_method?.toLowerCase() === 'cod'
+      ? Math.round(order.total_amount ?? 0)
+      : 0,
     insurance_value: Math.round(order.total_amount ?? 0),
     items,
-  });
+  };
+
+  // Validation tr\u01b0\u1edbc khi g\u1ecdi API
+  if (!ghnPayload.to_phone || ghnPayload.to_phone.length < 9) {
+    throw new Error(`S\u1ed1 \u0111i\u1ec7n tho\u1ea1i ng\u01b0\u1eddi nh\u1eadn kh\u00f4ng h\u1ee3p l\u1ec7: "${ghnPayload.to_phone}". Vui l\u00f2ng c\u1eadp nh\u1eadt \u0111\u01a1n h\u00e0ng.`);
+  }
+  if (!ghnPayload.to_address || ghnPayload.to_address.length < 5) {
+    throw new Error(`\u0110\u1ecba ch\u1ec9 giao h\u00e0ng kh\u00f4ng h\u1ee3p l\u1ec7: "${ghnPayload.to_address}".`);
+  }
+
+  console.log("[GHN] Payload g\u1eedi l\u00ean:", JSON.stringify(ghnPayload, null, 2));
+
+  const ghnData = await createGHNOrder(ghnPayload);
 
   if (!ghnData?.order_code) {
     throw new Error("GHN không trả về mã vận đơn. Vui lòng thử lại.");

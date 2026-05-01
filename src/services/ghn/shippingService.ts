@@ -192,14 +192,25 @@ export interface GHNCreateOrderResponse {
 export const createGHNOrder = async (
   payload: GHNCreateOrderRequest
 ): Promise<GHNCreateOrderResponse["data"]> => {
-  const response = await ghnApi.post<GHNCreateOrderResponse>(
-    "/shipping-order/create",
-    payload
-  );
+  try {
+    const response = await ghnApi.post<GHNCreateOrderResponse>(
+      "/shipping-order/create",
+      payload
+    );
 
-  if (response.data.code === 200 && response.data.data) {
-    return response.data.data;
+    if (response.data.code === 200 && response.data.data) {
+      return response.data.data;
+    }
+
+    throw new Error(`GHN API lỗi [${response.data.code}]: ${response.data.message}`);
+  } catch (err: any) {
+    // Extract GHN error message from Axios error response body
+    if (err.response?.data) {
+      const ghErr = err.response.data;
+      throw new Error(
+        `GHN API lỗi [${ghErr.code ?? err.response.status}]: ${ghErr.message ?? JSON.stringify(ghErr)}`
+      );
+    }
+    throw err;
   }
-
-  throw new Error(`GHN API lỗi [${response.data.code}]: ${response.data.message}`);
 };
