@@ -1,10 +1,10 @@
-import { listOrders, updateOrderStatus, pushOrderToGHN } from "@/src/services/admin/orders";
-import { supabase } from "@/src/lib/supabase";
+import { InvoiceOrderData, InvoiceTemplate } from "@/src/components/admin/InvoiceTemplate";
 import { hexToRgba } from "@/src/context/AppearanceContext";
-import { ArrowUp, Check, Clock, Package, Search, Settings, Truck, XCircle, Printer, ExternalLink, AlertTriangle } from "lucide-react-native";
+import { supabase } from "@/src/lib/supabase";
+import { listOrders, pushOrderToGHN, updateOrderStatus, deleteOrders } from "@/src/services/admin/orders";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download, ExternalLink, Package, Search, Settings, Settings2, Trash2, Truck, XCircle } from "lucide-react-native";
+import * as XLSX from 'xlsx';
 import React, { useEffect, useRef, useState } from "react";
-import { useReactToPrint } from "react-to-print";
-import { InvoiceTemplate, InvoiceOrderData } from "@/src/components/admin/InvoiceTemplate";
 import {
   ActivityIndicator,
   Modal,
@@ -18,6 +18,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useReactToPrint } from "react-to-print";
 
 const STATUS_LABELS: any = {
   pending: "Chờ xử lý",
@@ -59,6 +60,39 @@ export default function AdminOrdersScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  // Selection State
+  const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
+
+  // Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    id: true,
+    date: true,
+    customer: true,
+    phone: true,
+    amount: true,
+    tracking: true,
+    status: true,
+    actions: true,
+  });
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+  const [showPageSizeDropdown, setShowPageSizeDropdown] = useState(false);
+
+  // Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string | null, direction: 'asc' | 'desc' | null }>({
+    key: 'created_at',
+    direction: 'desc'
+  });
+
+  const togglePageSize = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    setShowPageSizeDropdown(false);
+  };
+
   // Per-order loading state
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
 
@@ -76,6 +110,55 @@ export default function AdminOrdersScreen() {
     orderId: string | null;
     reason: string;
   }>({ visible: false, orderId: null, reason: "" });
+
+  const handleExportExcel = () => {
+    if (sortedOrders.length === 0) {
+      alert("Không có dữ liệu để xuất.");
+      return;
+    }
+
+    // Prepare data for XLSX
+    const data = sortedOrders.map(order => ({
+      "Mã đơn": `#${String(order.id).slice(-8)}`,
+      "Ngày đặt": new Date(order.created_at).toLocaleString("vi-VN"),
+      "Tên khách": order.receiver_name || "N/A",
+      "Số điện thoại": order.phone_contact || "",
+      "Tổng tiền": order.total_amount || 0,
+      "Mã vận đơn GHN": order.ghn_order_code || "N/A",
+      "Trạng thái": STATUS_LABELS[order.status] || order.status
+    }));
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Danh sách đơn hàng");
+
+    // Write file and trigger download
+    XLSX.writeFile(wb, `Danh_sach_don_hang_${new Date().getTime()}.xlsx`);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedOrders.length === 0) return;
+
+    if (typeof window !== "undefined") {
+      const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa ${selectedOrders.length} đơn hàng đã chọn? Hành động này không thể hoàn tác.`);
+      if (!confirmDelete) return;
+    }
+
+    try {
+      setLoading(true);
+      await deleteOrders(selectedOrders);
+      setSelectedOrders([]);
+      await fetchOrders(); // Refresh list
+      alert("Đã xóa thành công!");
+    } catch (err: any) {
+      alert("Lỗi khi xóa đơn hàng: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -201,7 +284,7 @@ export default function AdminOrdersScreen() {
         .eq("id", orderId);
 
       if (error) throw error;
-      
+
       alert("Đã cập nhật trạng thái giao thất bại!");
       await fetchOrders();
     } catch (e: any) {
@@ -222,14 +305,72 @@ export default function AdminOrdersScreen() {
 
   const filteredOrders = orders.filter((order) => {
     const query = searchQuery.toLowerCase();
-    const matchId    = String(order.id               || "").toLowerCase().includes(query);
-    const matchName  = String(order.receiver_name    || "").toLowerCase().includes(query);
-    const matchPhone = String(order.phone_contact    || "").toLowerCase().includes(query);
-    const matchGHN   = String(order.ghn_order_code   || "").toLowerCase().includes(query);
+    const matchId = String(order.id || "").toLowerCase().includes(query);
+    const matchName = String(order.receiver_name || "").toLowerCase().includes(query);
+    const matchPhone = String(order.phone_contact || "").toLowerCase().includes(query);
+    const matchGHN = String(order.ghn_order_code || "").toLowerCase().includes(query);
     const matchesSearch = matchId || matchName || matchPhone || matchGHN;
-    const matchesTab    = activeTab === "all" || order.status === activeTab;
+    const matchesTab = activeTab === "all" || order.status === activeTab;
     return matchesTab && matchesSearch;
   });
+
+  // Sorting Logic
+  const sortedOrders = React.useMemo(() => {
+    if (!sortConfig.key || !sortConfig.direction) return filteredOrders;
+
+    return [...filteredOrders].sort((a, b) => {
+      let aValue = a[sortConfig.key as keyof typeof a];
+      let bValue = b[sortConfig.key as keyof typeof b];
+
+      // Handle null/undefined
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  }, [filteredOrders, sortConfig]);
+
+  // Pagination Logic
+  const totalItems = sortedOrders.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const paginatedOrders = sortedOrders.slice(startIndex, endIndex);
+
+  const toggleSort = (key: string) => {
+    setSortConfig((prev) => {
+      // If same key
+      if (prev.key === key) {
+        if (prev.direction === 'desc') return { key, direction: 'asc' };
+        if (prev.direction === 'asc') return { key: null, direction: null };
+      }
+      // If new key or currently none
+      return { key, direction: 'desc' };
+    });
+  };
+
+  const SortIndicator = ({ columnKey }: { columnKey: string }) => {
+    if (sortConfig.key !== columnKey) return (
+      <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+        <ArrowUp size={8} color="#D1D5DB" />
+        <ArrowDown size={8} color="#D1D5DB" style={{ marginTop: -2 }} />
+      </View>
+    );
+    return sortConfig.direction === 'asc' ?
+      <ArrowUp size={14} color="#2563EB" /> :
+      <ArrowDown size={14} color="#2563EB" />;
+  };
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activeTab, pageSize]);
 
   if (Platform.OS !== "web") {
     return (
@@ -241,29 +382,14 @@ export default function AdminOrdersScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* HEADER */}
+      {/* FIXED HEADER SECTION */}
+      <View style={styles.fixedHeaderSection}>
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>Quản lý Đơn hàng</Text>
             <Text style={styles.subtitle}>
               Duyệt đơn hàng để tự động đẩy lên GHN và lấy mã vận đơn.
             </Text>
-          </View>
-          <View style={styles.searchContainer}>
-            <Search size={20} color="#9CA3AF" />
-            <TextInput
-              placeholder="Tìm theo ID, tên, SĐT hoặc mã vận đơn..."
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
           </View>
         </View>
 
@@ -284,153 +410,462 @@ export default function AdminOrdersScreen() {
             ))}
           </ScrollView>
         </View>
+      </View>
 
-        {/* CONTENT */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2563EB" />
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <XCircle size={48} color="#EF4444" />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : (
-          <View style={styles.tableCard}>
-            {/* TABLE HEADER */}
-            <View style={styles.tableHeader}>
-              <Text style={StyleSheet.flatten([styles.columnId, styles.headerText])}>ID & Ngày</Text>
-              <Text style={StyleSheet.flatten([styles.columnCustomer, styles.headerText])}>Khách hàng</Text>
-              <Text style={StyleSheet.flatten([styles.columnAmount, styles.headerText, styles.textRight])}>Tổng tiền</Text>
-              <Text style={StyleSheet.flatten([styles.columnTracking, styles.headerText, styles.textCenter])}>Mã vận đơn GHN</Text>
-              <Text style={StyleSheet.flatten([styles.columnStatus, styles.headerText, styles.textCenter])}>Trạng thái</Text>
-              <Text style={StyleSheet.flatten([styles.columnActions, styles.headerText, styles.textRight])}>Hành động</Text>
+      {/* TABLE CONTENT AREA */}
+      <View style={styles.tableArea}>
+        <View style={styles.tableCard}>
+          {/* TOOLBAR */}
+          <View style={styles.toolbar}>
+            <View style={styles.toolbarSearch}>
+              <Search size={18} color="#9CA3AF" />
+              <TextInput
+                placeholder="Tìm theo ID, tên, SĐT hoặc mã vận đơn..."
+                style={styles.toolbarSearchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
             </View>
+            <View style={styles.toolbarActions}>
+              <View style={{ position: 'relative' }}>
+                {showColumnDropdown && (
+                  <Pressable
+                    style={styles.dropdownOverlay}
+                    onPress={() => setShowColumnDropdown(false)}
+                  />
+                )}
+                <Pressable
+                  style={styles.toolbarButton}
+                  onPress={() => setShowColumnDropdown(!showColumnDropdown)}
+                >
+                  <Settings2 size={18} color="#374151" />
+                  <Text style={styles.toolbarButtonText}>Hiển thị cột</Text>
+                </Pressable>
 
-            {/* TABLE BODY */}
-            <View>
-              {filteredOrders.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
-                </View>
-              ) : (
-                filteredOrders.map((order) => {
-                  const isProcessingThis = processingOrderId === order.id;
-                  return (
-                    <View key={order.id} style={styles.row}>
-                      {/* ID & Ngày */}
-                      <View style={styles.columnId}>
-                        <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
-                        <Text style={styles.orderDate}>
-                          {new Date(order.created_at).toLocaleString("vi-VN")}
-                        </Text>
-                      </View>
-
-                      {/* Khách hàng */}
-                      <View style={styles.columnCustomer}>
-                        <Text style={styles.customerName}>{order.receiver_name || "N/A"}</Text>
-                        <Text style={styles.customerPhone}>{order.phone_contact}</Text>
-                      </View>
-
-                      {/* Tổng tiền */}
-                      <View style={styles.columnAmount}>
-                        <Text style={styles.amountText}>
-                          {order.total_amount?.toLocaleString("vi-VN")}₫
-                        </Text>
-                      </View>
-
-                      {/* Mã vận đơn GHN */}
-                      <View style={StyleSheet.flatten([styles.columnTracking, styles.itemsCenter])}>
-                        {order.ghn_order_code ? (
-                          <View style={styles.trackingContainer}>
-                            <Text style={styles.trackingCode}>{order.ghn_order_code}</Text>
-                            <Pressable
-                              onPress={() => {
-                                const url = `https://tracking.ghn.dev/?order_code=${order.ghn_order_code}`;
-                                if (typeof window !== "undefined") window.open(url, "_blank");
-                              }}
-                              style={styles.trackingLink}
-                            >
-                              <ExternalLink size={12} color="#2563EB" />
-                            </Pressable>
-                          </View>
-                        ) : (
-                          <Text style={styles.noTracking}>—</Text>
-                        )}
-                      </View>
-
-                      {/* Trạng thái */}
-                      <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
-                        <View style={StyleSheet.flatten([
-                          styles.statusBadge,
-                          { backgroundColor: hexToRgba(STATUS_COLORS[order.status] ?? '#000000', 0.12) }
-                        ])}>
-                          <Text style={StyleSheet.flatten([
-                            styles.statusText,
-                            { color: STATUS_COLORS[order.status] }
-                          ])}>
-                            {STATUS_LABELS[order.status] || order.status}
-                          </Text>
+                {showColumnDropdown && (
+                  <View style={styles.columnDropdown}>
+                    <Text style={styles.dropdownTitle}>Tùy chỉnh cột</Text>
+                    {[
+                      { id: 'id', label: 'Mã đơn' },
+                      { id: 'date', label: 'Ngày đặt' },
+                      { id: 'customer', label: 'Tên khách' },
+                      { id: 'phone', label: 'Số điện thoại' },
+                      { id: 'amount', label: 'Tổng tiền' },
+                      { id: 'tracking', label: 'Mã vận đơn' },
+                      { id: 'status', label: 'Trạng thái' },
+                      { id: 'actions', label: 'Thao tác' },
+                    ].map(col => (
+                      <Pressable
+                        key={col.id}
+                        style={styles.dropdownItem}
+                        onPress={() => setVisibleColumns(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
+                      >
+                        <View style={StyleSheet.flatten([styles.checkboxSmall, visibleColumns[col.id] && styles.checkboxSelected])}>
+                          {visibleColumns[col.id] && <Check size={10} color="white" />}
                         </View>
-                      </View>
+                        <Text style={styles.dropdownItemText}>{col.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
 
-                      {/* Hành động */}
-                      <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
-                        {isProcessingThis ? (
-                          <View style={styles.buttonLoading}>
-                            <ActivityIndicator size="small" color="#2563EB" />
-                            <Text style={styles.buttonLoadingText}>Đang xử lý...</Text>
-                          </View>
-                        ) : (
-                          <>
-                            <ActionButton onPress={() => handlePrintDraft(order)} label="In HĐ" color="#1F2937" />
-                            {order.status === "pending" && (
-                              <ActionButton
-                                onPress={() => handleUpdateStatus(order, "processing")}
-                                label="Duyệt →GHN"
-                                color="#2563EB"
-                              />
-                            )}
-                            {order.status === "processing" && (
-                              <ActionButton
-                                onPress={() => handleUpdateStatus(order, "shipping")}
-                                label="Giao"
-                                color="#8B5CF6"
-                              />
-                            )}
-                            {order.status === "shipping" && (
-                              <>
-                                <ActionButton
-                                  onPress={() => handleUpdateStatus(order, "completed")}
-                                  label="Xong"
-                                  color="#10B981"
-                                />
-                                <ActionButton
-                                  onPress={() => promptDeliveryFailed(order)}
-                                  label="Giao thất bại"
-                                  color="#F97316"
-                                />
-                              </>
-                            )}
-                            {["pending", "processing"].includes(order.status) && (
-                              <ActionButton
-                                onPress={() => handleUpdateStatus(order, "cancelled")}
-                                label="Hủy"
-                                color="#EF4444"
-                                outline
-                              />
-                            )}
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })
+              <Pressable style={styles.toolbarButton} onPress={handleExportExcel}>
+                <Download size={18} color="#374151" />
+                <Text style={styles.toolbarButtonText}>Xuất Excel</Text>
+              </Pressable>
+
+              {selectedOrders.length > 0 && (
+                <Pressable 
+                  style={StyleSheet.flatten([styles.toolbarButton, styles.toolbarButtonDelete])} 
+                  onPress={handleDeleteSelected}
+                >
+                  <Trash2 size={18} color="#EF4444" />
+                  <Text style={styles.toolbarButtonDeleteText}>Xóa đơn đã chọn ({selectedOrders.length})</Text>
+                </Pressable>
               )}
             </View>
           </View>
-        )}
-      </ScrollView>
+
+          {/* FIXED TABLE HEADER */}
+          <View style={styles.tableHeader}>
+            <View style={styles.columnCheck}>
+              <Pressable
+                onPress={() => {
+                  if (selectedOrders.length === paginatedOrders.length) setSelectedOrders([]);
+                  else setSelectedOrders(paginatedOrders.map(o => o.id));
+                }}
+                style={({ pressed }) => [
+                  styles.checkbox,
+                  selectedOrders.length === paginatedOrders.length && selectedOrders.length > 0 && styles.checkboxSelected,
+                  pressed && { transform: [{ scale: 0.9 }] }
+                ]}
+              >
+                {selectedOrders.length === paginatedOrders.length && selectedOrders.length > 0 && <Check size={12} color="white" />}
+              </Pressable>
+            </View>
+
+            {visibleColumns.id && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnId, styles.headerSortable])}
+                onPress={() => toggleSort('id')}
+              >
+                <Text style={styles.headerText}>MÃ ĐƠN</Text>
+                <SortIndicator columnKey="id" />
+              </Pressable>
+            )}
+
+            {visibleColumns.date && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnDate, styles.headerSortable])}
+                onPress={() => toggleSort('created_at')}
+              >
+                <Text style={styles.headerText}>NGÀY ĐẶT</Text>
+                <SortIndicator columnKey="created_at" />
+              </Pressable>
+            )}
+
+            {visibleColumns.customer && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnCustomer, styles.headerSortable])}
+                onPress={() => toggleSort('receiver_name')}
+              >
+                <Text style={styles.headerText}>TÊN KHÁCH</Text>
+                <SortIndicator columnKey="receiver_name" />
+              </Pressable>
+            )}
+
+            {visibleColumns.phone && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnPhone, styles.headerSortable])}
+                onPress={() => toggleSort('phone_contact')}
+              >
+                <Text style={styles.headerText}>SỐ ĐIỆN THOẠI</Text>
+                <SortIndicator columnKey="phone_contact" />
+              </Pressable>
+            )}
+
+            {visibleColumns.amount && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnAmount, styles.headerSortable, styles.justifyEnd])}
+                onPress={() => toggleSort('total_amount')}
+              >
+                <Text style={StyleSheet.flatten([styles.headerText, styles.textRight])}>TỔNG TIỀN</Text>
+                <SortIndicator columnKey="total_amount" />
+              </Pressable>
+            )}
+
+            {visibleColumns.tracking && (
+              <View style={styles.columnTracking}>
+                <Text style={StyleSheet.flatten([styles.headerText, styles.textCenter])}>MÃ VẬN ĐƠN GHN</Text>
+              </View>
+            )}
+
+            {visibleColumns.status && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnStatus, styles.headerSortable, styles.justifyCenter])}
+                onPress={() => toggleSort('status')}
+              >
+                <Text style={StyleSheet.flatten([styles.headerText, styles.textCenter])}>TRẠNG THÁI</Text>
+                <SortIndicator columnKey="status" />
+              </Pressable>
+            )}
+
+            {visibleColumns.actions && (
+              <View style={styles.columnActions}>
+                <Text style={StyleSheet.flatten([styles.headerText, styles.textRight])}>THAO TÁC</Text>
+              </View>
+            )}
+          </View>
+
+          {/* SCROLLABLE TABLE BODY */}
+          <View style={styles.tableBodyContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2563EB" />
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <XCircle size={48} color="#EF4444" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : (
+              <ScrollView
+                ref={scrollRef}
+                showsVerticalScrollIndicator={true}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                contentContainerStyle={styles.tableScrollContent}
+              >
+                {paginatedOrders.length === 0 ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
+                  </View>
+                ) : (
+                  paginatedOrders.map((order) => {
+                    const isProcessingThis = processingOrderId === order.id;
+                    return (
+                      <Pressable 
+                        key={order.id} 
+                        style={({ pressed, hovered }: any) => [
+                          styles.row,
+                          (pressed || hovered || selectedOrders.includes(order.id)) && { backgroundColor: '#F3F4F6' }
+                        ]}
+                      >
+                        {/* Checkbox */}
+                        <View style={styles.columnCheck}>
+                          <Pressable
+                            onPress={() => {
+                              setSelectedOrders(prev =>
+                                prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
+                              );
+                            }}
+                            style={({ pressed }) => [
+                              styles.checkbox,
+                              selectedOrders.includes(order.id) && styles.checkboxSelected,
+                              pressed && { transform: [{ scale: 0.9 }] }
+                            ]}
+                          >
+                            {selectedOrders.includes(order.id) && <Check size={12} color="white" />}
+                          </Pressable>
+                        </View>
+
+                        {/* Mã đơn */}
+                        {visibleColumns.id && (
+                          <View style={styles.columnId}>
+                            <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
+                          </View>
+                        )}
+
+                        {visibleColumns.date && (
+                          <View style={styles.columnDate}>
+                            <Text style={styles.orderDate}>
+                              {new Date(order.created_at).toLocaleString("vi-VN")}
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Tên khách */}
+                        {visibleColumns.customer && (
+                          <View style={styles.columnCustomer}>
+                            <Text style={styles.customerName}>{order.receiver_name || "N/A"}</Text>
+                          </View>
+                        )}
+
+                        {/* Số điện thoại */}
+                        {visibleColumns.phone && (
+                          <View style={styles.columnPhone}>
+                            <Text style={styles.customerPhone}>{order.phone_contact}</Text>
+                          </View>
+                        )}
+
+                        {/* Tổng tiền */}
+                        {visibleColumns.amount && (
+                          <View style={styles.columnAmount}>
+                            <Text style={styles.amountText}>
+                              {order.total_amount?.toLocaleString("vi-VN")}₫
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* Mã vận đơn GHN */}
+                        {visibleColumns.tracking && (
+                          <View style={StyleSheet.flatten([styles.columnTracking, styles.itemsCenter])}>
+                            {order.ghn_order_code ? (
+                              <View style={styles.trackingContainer}>
+                                <Text style={styles.trackingCode}>{order.ghn_order_code}</Text>
+                                <Pressable
+                                  onPress={() => {
+                                    const url = `https://tracking.ghn.dev/?order_code=${order.ghn_order_code}`;
+                                    if (typeof window !== "undefined") window.open(url, "_blank");
+                                  }}
+                                  style={styles.trackingLink}
+                                >
+                                  <ExternalLink size={12} color="#2563EB" />
+                                </Pressable>
+                              </View>
+                            ) : (
+                              <Text style={styles.noTracking}>—</Text>
+                            )}
+                          </View>
+                        )}
+
+                        {/* Trạng thái */}
+                        {visibleColumns.status && (
+                          <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
+                            <View style={StyleSheet.flatten([
+                              styles.statusBadge,
+                              { backgroundColor: hexToRgba(STATUS_COLORS[order.status] ?? '#000000', 0.12) }
+                            ])}>
+                              <Text style={StyleSheet.flatten([
+                                styles.statusText,
+                                { color: STATUS_COLORS[order.status] }
+                              ])}>
+                                {STATUS_LABELS[order.status] || order.status}
+                              </Text>
+                            </View>
+                          </View>
+                        )}
+
+                        {/* Hành động */}
+                        {visibleColumns.actions && (
+                          <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
+                            {isProcessingThis ? (
+                              <View style={styles.buttonLoading}>
+                                <ActivityIndicator size="small" color="#2563EB" />
+                                <Text style={styles.buttonLoadingText}>Đang xử lý...</Text>
+                              </View>
+                            ) : (
+                              <>
+                                <ActionButton onPress={() => handlePrintDraft(order)} label="In HĐ" color="#1F2937" />
+                                {order.status === "pending" && (
+                                  <ActionButton
+                                    onPress={() => handleUpdateStatus(order, "processing")}
+                                    label="Duyệt →GHN"
+                                    color="#2563EB"
+                                  />
+                                )}
+                                {order.status === "processing" && (
+                                  <ActionButton
+                                    onPress={() => handleUpdateStatus(order, "shipping")}
+                                    label="Giao"
+                                    color="#8B5CF6"
+                                  />
+                                )}
+                                {order.status === "shipping" && (
+                                  <>
+                                    <ActionButton
+                                      onPress={() => handleUpdateStatus(order, "completed")}
+                                      label="Xong"
+                                      color="#10B981"
+                                    />
+                                    <ActionButton
+                                      onPress={() => promptDeliveryFailed(order)}
+                                      label="Giao thất bại"
+                                      color="#F97316"
+                                    />
+                                  </>
+                                )}
+                                {["pending", "processing"].includes(order.status) && (
+                                  <ActionButton
+                                    onPress={() => handleUpdateStatus(order, "cancelled")}
+                                    label="Hủy"
+                                    color="#EF4444"
+                                    outline
+                                  />
+                                )}
+                              </>
+                            )}
+                          </View>
+                        )}
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
+            )}
+          </View>
+
+          {/* FIXED PAGINATION FOOTER */}
+          <View style={styles.paginationContainer}>
+            <View style={styles.paginationLeft}>
+              <Text style={styles.paginationText}>
+                Hiển thị <Text style={styles.paginationTextBold}>{totalItems === 0 ? 0 : startIndex + 1}-{endIndex}</Text> trong tổng số <Text style={styles.paginationTextBold}>{totalItems}</Text> kết quả
+              </Text>
+            </View>
+
+            <View style={styles.paginationRight}>
+              <View style={styles.pageSizeContainer}>
+                <Text style={styles.pageSizeLabel}>Hàng mỗi trang:</Text>
+                <View style={{ position: 'relative' }}>
+                  {showPageSizeDropdown && (
+                    <Pressable
+                      style={styles.dropdownOverlay}
+                      onPress={() => setShowPageSizeDropdown(false)}
+                    />
+                  )}
+                  <Pressable
+                    style={styles.pageSizeSelector}
+                    onPress={() => setShowPageSizeDropdown(!showPageSizeDropdown)}
+                  >
+                    <Text style={styles.pageSizeValue}>{pageSize}</Text>
+                    <ChevronDown size={14} color="#6B7280" />
+                  </Pressable>
+
+                  {showPageSizeDropdown && (
+                    <View style={styles.pageSizeDropdown}>
+                      {[20, 50, 100].map(size => (
+                        <Pressable
+                          key={size}
+                          style={StyleSheet.flatten([
+                            styles.pageSizeItem,
+                            pageSize === size && styles.pageSizeItemActive
+                          ])}
+                          onPress={() => togglePageSize(size)}
+                        >
+                          <Text style={StyleSheet.flatten([
+                            styles.pageSizeItemText,
+                            pageSize === size && styles.pageSizeItemTextActive
+                          ])}>
+                            {size} hàng
+                          </Text>
+                          {pageSize === size && <Check size={14} color="#2563EB" />}
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.pageButtons}>
+                <Pressable
+                  style={StyleSheet.flatten([styles.pageButton, currentPage === 1 && styles.pageButtonDisabled])}
+                  onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <Text style={StyleSheet.flatten([styles.pageButtonText, currentPage === 1 && styles.pageButtonTextDisabled])}>Trước</Text>
+                </Pressable>
+
+                {[...Array(totalPages)].map((_, i) => {
+                  const pageNum = i + 1;
+                  if (totalPages > 7 && (pageNum < currentPage - 2 || pageNum > currentPage + 2) && pageNum !== 1 && pageNum !== totalPages) {
+                    if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
+                      return <Text key={pageNum} style={styles.paginationEllipsis}>...</Text>;
+                    }
+                    return null;
+                  }
+
+                  return (
+                    <Pressable
+                      key={pageNum}
+                      onPress={() => setCurrentPage(pageNum)}
+                      style={StyleSheet.flatten([
+                        styles.pageNumberButton,
+                        currentPage === pageNum && styles.pageNumberButtonActive
+                      ])}
+                    >
+                      <Text style={StyleSheet.flatten([
+                        styles.pageNumberText,
+                        currentPage === pageNum && styles.pageNumberTextActive
+                      ])}>
+                        {pageNum}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+
+                <Pressable
+                  style={StyleSheet.flatten([styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled])}
+                  onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages || totalPages === 0}
+                >
+                  <Text style={StyleSheet.flatten([styles.pageButtonText, (currentPage === totalPages || totalPages === 0) && styles.pageButtonTextDisabled])}>Tiếp</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
 
       {/* SCROLL TOP */}
       {showScrollTop && (
@@ -522,7 +957,7 @@ export default function AdminOrdersScreen() {
             </View>
             <Text style={styles.modalTitle}>Khách không nhận hàng</Text>
             <Text style={styles.modalSubtitle}>Vui lòng nhập lý do giao thất bại (VD: Khách thuê bao, sai địa chỉ...)</Text>
-            
+
             <TextInput
               style={{ width: "100%", height: 100, marginBottom: 20, textAlignVertical: "top", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB", outlineStyle: "none" as any }}
               placeholder="Nhập lý do (ít nhất 5 ký tự)..."
@@ -568,20 +1003,39 @@ function ActionButton({ onPress, label, color, outline = false }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
-  scrollContent: { padding: 40 },
+  fixedHeaderSection: {
+    paddingHorizontal: 40,
+    paddingTop: 0,
+    backgroundColor: "#F9FAFB",
+    zIndex: 10,
+  },
+  tableArea: {
+    flex: 1,
+    paddingHorizontal: 40,
+    paddingBottom: 0,
+  },
+  tableCard: {
+    flex: 1,
+    backgroundColor: "white",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
+    elevation: 2,
+  },
+  tableBodyContainer: {
+    flex: 1,
+  },
+  tableScrollContent: {
+    flexGrow: 1,
+  },
   header: {
     flexDirection: "row", alignItems: "center",
     justifyContent: "space-between", marginBottom: 32,
   },
   title: { fontSize: 30, fontWeight: "800", color: "#111827", letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: "#6B7280", marginTop: 4 },
-  searchContainer: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "white",
-    borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB",
-    paddingHorizontal: 16, height: 48, width: 380,
-    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)", elevation: 2,
-  },
-  searchInput: { flex: 1, marginLeft: 12, fontSize: 14, outlineStyle: "none" as any },
   tabsContainer: { marginBottom: 24 },
   tabsScroll: { gap: 12 },
   tab: {
@@ -595,26 +1049,156 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 },
   errorContainer: { padding: 40, alignItems: "center" },
   errorText: { color: "#EF4444", marginTop: 16, fontWeight: "700" },
-  tableCard: {
-    backgroundColor: "white", borderRadius: 16, borderWidth: 1,
-    borderColor: "#E5E7EB", overflow: "hidden",
-    boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)", elevation: 2,
-  },
   tableHeader: {
     flexDirection: "row", backgroundColor: "#F9FAFB",
     borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
     paddingHorizontal: 24, paddingVertical: 16,
   },
-  headerText: { fontWeight: "700", color: "#4B5563", fontSize: 13 },
+  headerText: { fontWeight: "700", color: "#4B5563", fontSize: 12, textTransform: "uppercase" },
+  headerSortable: { flexDirection: "row", alignItems: "center", gap: 4 },
+  justifyEnd: { justifyContent: "flex-end" },
+  justifyCenter: { justifyContent: "center" },
+  toolbar: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    zIndex: 100,
+  },
+  toolbarActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  toolbarSearch: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 12,
+    height: 40,
+    width: 320,
+  },
+  toolbarSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#374151",
+    outlineStyle: "none" as any,
+  },
+  toolbarButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+  },
+  toolbarButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  toolbarButtonDelete: {
+    borderColor: "#FEE2E2",
+    backgroundColor: "#FEF2F2",
+  },
+  toolbarButtonDeleteText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#EF4444",
+  },
+  columnCheck: { width: 40, alignItems: "center" },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxSelected: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  dropdownOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "transparent",
+    zIndex: 998,
+  },
+  columnDropdown: {
+    position: "absolute",
+    top: "100%",
+    right: 0,
+    marginTop: 8,
+    width: 200,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 12,
+    zIndex: 999,
+    ...Platform.select({
+      web: {
+        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)",
+      },
+      default: {
+        elevation: 5,
+      }
+    }),
+  },
+  dropdownTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "500",
+  },
+  checkboxSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   row: {
     flexDirection: "row", alignItems: "center",
     borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
     paddingHorizontal: 24, paddingVertical: 20,
   },
-  columnId: { flex: 1.5 },
-  columnCustomer: { flex: 2 },
-  columnAmount: { flex: 1 },
-  columnTracking: { flex: 1.8 },
+  columnId: { flex: 0.8 },
+  columnDate: { flex: 1.1 },
+  columnCustomer: { flex: 1.5 },
+  columnPhone: { flex: 1.1 },
+  columnAmount: { flex: 0.8 },
+  columnTracking: { flex: 1.5 },
   columnStatus: { flex: 1 },
   columnActions: { flex: 2 },
   textRight: { textAlign: "right" },
@@ -755,4 +1339,146 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, paddingVertical: 14, width: "100%", alignItems: "center",
   },
   modalBtnOutlineText: { color: "#374151", fontWeight: "600", fontSize: 15 },
+
+  // ── Pagination Styles ──
+  paginationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    backgroundColor: "white",
+  },
+  paginationLeft: {
+    flex: 1,
+  },
+  paginationText: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  paginationTextBold: {
+    fontWeight: "600",
+    color: "#374151",
+  },
+  paginationRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 24,
+  },
+  pageSizeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pageSizeLabel: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+  pageSizeSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 60,
+    justifyContent: "space-between",
+  },
+  pageSizeValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  pageSizeDropdown: {
+    position: "absolute",
+    bottom: "100%",
+    right: 0,
+    marginBottom: 8,
+    width: 120,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 6,
+    zIndex: 1000,
+    ...Platform.select({
+      web: { boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" },
+      default: { elevation: 5 }
+    }),
+  },
+  pageSizeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
+  pageSizeItemActive: {
+    backgroundColor: "#EFF6FF",
+  },
+  pageSizeItemText: {
+    fontSize: 13,
+    color: "#4B5563",
+  },
+  pageSizeItemTextActive: {
+    color: "#2563EB",
+    fontWeight: "600",
+  },
+  pageButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "white",
+  },
+  pageButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: "#F9FAFB",
+  },
+  pageButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#374151",
+  },
+  pageButtonTextDisabled: {
+    color: "#3c3f45ff",
+  },
+  pageNumberButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  pageNumberButtonActive: {
+    backgroundColor: "#10B981", // Green matching the image
+    borderColor: "#10B981",
+  },
+  pageNumberText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  pageNumberTextActive: {
+    color: "white",
+  },
+  paginationEllipsis: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    marginHorizontal: 2,
+  },
 });

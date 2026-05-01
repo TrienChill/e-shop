@@ -235,3 +235,12 @@ export async function pushOrderToGHN(order: any): Promise<string> {
 
   return ghnData.order_code;
 }
+
+export async function deleteOrders(orderIds: number[]) {
+  const { error } = await supabase
+    .from("orders")
+    .delete()
+    .in("id", orderIds);
+
+  if (error) throw error;
+}
