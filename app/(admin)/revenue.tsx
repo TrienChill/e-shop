@@ -23,11 +23,20 @@ import {
   CreditCard,
   ChevronUp,
   ChevronDown,
+  Sparkles,
+  Bot,
+  X,
+  BookMarked,
+  Trash2,
+  Clock,
+  Save,
 } from "lucide-react-native";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -50,6 +59,23 @@ interface FilterState {
   startDate: Date;
   endDate: Date;
 }
+
+interface SavedReport {
+  id: string;
+  title: string;
+  period: string;
+  savedAt: string;
+  content: string;
+  kpis: {
+    revenueIn: number;
+    revenueOut: number;
+    totalOrders: number;
+    aovValue: number;
+  };
+}
+
+const SAVED_REPORTS_KEY = "@ai_revenue_reports";
+const MAX_SAVED_REPORTS = 5;
 
 // ─────────────────────────────────────────────
 // Date-fns helpers
@@ -256,11 +282,113 @@ export default function AdminRevenueScreen() {
   });
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── AI Insight state ──
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
+  const [showAiModal, setShowAiModal] = useState(false);
+
+  // ── Saved Reports state ──
+  const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
+
   const showToast = (message: string, type: "info" | "success" | "error" = "info", duration = 2800) => {
     if (toastTimeout.current) clearTimeout(toastTimeout.current);
     setToast({ visible: true, message, type });
     toastTimeout.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration);
   };
+
+  // ── Load saved reports từ AsyncStorage ──
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_REPORTS_KEY).then((raw) => {
+      if (raw) setSavedReports(JSON.parse(raw));
+    }).catch(() => {});
+  }, []);
+
+  // ── Lưu báo cáo AI ──
+  const handleSaveReport = useCallback(async () => {
+    if (!aiInsight) return;
+    if (savedReports.length >= MAX_SAVED_REPORTS) {
+      showToast(`Đã đạt giới hạn ${MAX_SAVED_REPORTS} báo cáo. Vui lòng xóa bớt trước khi lưu thêm.`, "error", 3500);
+      return;
+    }
+    setSavingReport(true);
+    try {
+      const newReport: SavedReport = {
+        id: Date.now().toString(),
+        title: `Báo cáo ${format(filter.startDate, "dd/MM")} - ${format(filter.endDate, "dd/MM/yyyy")}`,
+        period: `${format(filter.startDate, "dd/MM/yyyy")} → ${format(filter.endDate, "dd/MM/yyyy")}`,
+        savedAt: format(new Date(), "HH:mm dd/MM/yyyy"),
+        content: aiInsight,
+        kpis: { revenueIn, revenueOut, totalOrders, aovValue },
+      };
+      const updated = [newReport, ...savedReports];
+      await AsyncStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(updated));
+      setSavedReports(updated);
+      showToast("✓ Đã lưu báo cáo AI thành công!", "success");
+    } catch {
+      showToast("Lưu thất bại, vui lòng thử lại.", "error");
+    } finally {
+      setSavingReport(false);
+    }
+  }, [aiInsight, savedReports, filter, revenueIn, revenueOut, totalOrders, aovValue]);
+
+  // ── Xóa báo cáo đã lưu ──
+  const handleDeleteReport = useCallback(async (id: string) => {
+    const updated = savedReports.filter((r) => r.id !== id);
+    await AsyncStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(updated));
+    setSavedReports(updated);
+    if (selectedReport?.id === id) setSelectedReport(null);
+    showToast("Đã xóa báo cáo.", "info");
+  }, [savedReports, selectedReport]);
+
+  // ── AI Insight ──
+  const handleGenerateAIInsight = useCallback(async () => {
+    if (!reportData) {
+      showToast("Chưa có dữ liệu để phân tích.", "error");
+      return;
+    }
+    setAiLoading(true);
+    setAiInsight(null);
+    try {
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Không tìm thấy Gemini API Key.");
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const startStr = format(filter.startDate, "dd/MM/yyyy");
+      const endStr   = format(filter.endDate,   "dd/MM/yyyy");
+      const top3 = topProducts.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} — ${formatCurrency(p.revenue)}`).join("\n");
+      const cancelRate = revenueIn > 0 ? ((revenueOut / revenueIn) * 100).toFixed(1) : "0";
+
+      const prompt = `Bạn là chuyên gia phân tích tài chính thương mại điện tử.
+Dưới đây là dữ liệu bán hàng từ ${startStr} đến ${endStr}:
+
+- Tổng doanh thu (tiền vào): ${formatCurrency(revenueIn)}
+- Tiền hoàn trả/hủy đơn: ${formatCurrency(revenueOut)}
+- Tỷ lệ hủy đơn quy đổi: ${cancelRate}%
+- Tổng số đơn hàng hoàn thành: ${totalOrders} đơn
+- Giá trị trung bình mỗi đơn (AOV): ${formatCurrency(aovValue)}
+- Top 3 sản phẩm doanh thu cao nhất:
+${top3 || "Không có dữ liệu"}
+
+Hãy viết một báo cáo ngắn gọn theo 2 phần:
+1. **Đánh giá hiệu suất**: Nhận xét về tình hình kinh doanh trong kỳ (tăng trưởng, điểm mạnh, điểm yếu). Đặc biệt lưu ý nếu tỷ lệ hủy đơn cao.
+2. **Đề xuất hành động**: Đưa ra 3-4 hành động kinh doanh cụ thể, thực tế mà admin nên thực hiện ngay để cải thiện doanh thu.
+
+Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn đề. Không dùng markdown code block, chỉ dùng **in đậm** cho tiêu đề và dấu - cho danh sách.`;
+
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      setAiInsight(text);
+    } catch (err: any) {
+      setAiInsight(`Đã xảy ra lỗi khi phân tích: ${err.message ?? "Lỗi không xác định"}`);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [reportData, filter, revenueIn, revenueOut, totalOrders, aovValue, topProducts]);
 
   // ── Excel Export ──
   const handleExportExcel = useCallback(async () => {
@@ -755,20 +883,234 @@ export default function AdminRevenueScreen() {
           <Text style={styles.headerSub}>Hệ thống quản trị</Text>
           <Text style={styles.headerTitle}>Quản lý Doanh thu</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
-          activeOpacity={0.8}
-          onPress={handleExportExcel}
-          disabled={exporting}
-        >
-          {exporting
-            ? <ActivityIndicator size="small" color="#6366F1" />
-            : <Download size={16} color="#6366F1" />}
-          <Text style={styles.exportBtnText}>
-            {exporting ? "Đang xuất..." : "Xuất Excel"}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
+          <TouchableOpacity
+            style={[styles.exportBtn, { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" }]}
+            activeOpacity={0.8}
+            onPress={() => setShowHistoryModal(true)}
+          >
+            <BookMarked size={16} color="#059669" />
+            <Text style={[styles.exportBtnText, { color: "#059669" }]}>
+              Đã lưu ({savedReports.length}/{MAX_SAVED_REPORTS})
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.exportBtn, { backgroundColor: "#F5F0FF", borderColor: "#DDD6FE" }]}
+            activeOpacity={0.8}
+            onPress={() => {
+              setShowAiModal(true);
+              if (!aiInsight) handleGenerateAIInsight();
+            }}
+          >
+            <Sparkles size={16} color="#7C3AED" />
+            <Text style={[styles.exportBtnText, { color: "#7C3AED" }]}>Phân tích AI</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
+            activeOpacity={0.8}
+            onPress={handleExportExcel}
+            disabled={exporting}
+          >
+            {exporting
+              ? <ActivityIndicator size="small" color="#6366F1" />
+              : <Download size={16} color="#6366F1" />}
+            <Text style={styles.exportBtnText}>
+              {exporting ? "Đang xuất..." : "Xuất Excel"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* ── AI Insight Modal ── */}
+      <Modal
+        visible={showAiModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAiModal(false)}
+      >
+        <View style={styles.aiOverlay}>
+          <View style={styles.aiModal}>
+            {/* Modal Header */}
+            <View style={styles.aiModalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={styles.aiModalIconWrap}>
+                  <Bot size={20} color="#7C3AED" />
+                </View>
+                <View>
+                  <Text style={styles.aiModalTitle}>AI Phân tích Kinh doanh</Text>
+                  <Text style={styles.aiModalSubtitle}>
+                    {format(filter.startDate, "dd/MM/yyyy")} → {format(filter.endDate, "dd/MM/yyyy")}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                {!aiLoading && aiInsight && (
+                  <TouchableOpacity
+                    style={[styles.aiRefreshBtn, { backgroundColor: "#D1FAE5", gap: 4 }]}
+                    onPress={handleSaveReport}
+                    disabled={savingReport}
+                  >
+                    {savingReport
+                      ? <ActivityIndicator size="small" color="#059669" />
+                      : <Save size={13} color="#059669" />}
+                    <Text style={[styles.aiRefreshBtnText, { color: "#059669" }]}>Lưu</Text>
+                  </TouchableOpacity>
+                )}
+                {!aiLoading && (
+                  <TouchableOpacity
+                    style={styles.aiRefreshBtn}
+                    onPress={handleGenerateAIInsight}
+                  >
+                    <Sparkles size={14} color="#7C3AED" />
+                    <Text style={styles.aiRefreshBtnText}>Tạo lại</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.aiCloseBtn}
+                  onPress={() => setShowAiModal(false)}
+                >
+                  <X size={18} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Modal Body */}
+            <ScrollView style={styles.aiModalBody} showsVerticalScrollIndicator={false}>
+              {aiLoading ? (
+                <View style={styles.aiLoadingWrap}>
+                  <View style={styles.aiLoadingSpinner}>
+                    <ActivityIndicator size="large" color="#7C3AED" />
+                  </View>
+                  <Text style={styles.aiLoadingTitle}>AI đang đọc báo cáo tài chính...</Text>
+                  <Text style={styles.aiLoadingSubtitle}>Gemini đang phân tích dữ liệu và soạn nhận xét chuyên sâu</Text>
+                </View>
+              ) : aiInsight ? (
+                <View style={styles.aiInsightWrap}>
+                  <Text style={styles.aiInsightText}>{aiInsight}</Text>
+                </View>
+              ) : (
+                <View style={styles.aiLoadingWrap}>
+                  <Text style={styles.aiLoadingSubtitle}>Chưa có kết quả phân tích.</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Saved Reports History Modal ── */}
+      <Modal
+        visible={showHistoryModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowHistoryModal(false); setSelectedReport(null); }}
+      >
+        <View style={styles.aiOverlay}>
+          <View style={[styles.aiModal, { maxWidth: 640 }]}>
+            {/* Header */}
+            <View style={styles.aiModalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={[styles.aiModalIconWrap, { backgroundColor: "#D1FAE5" }]}>
+                  <BookMarked size={20} color="#059669" />
+                </View>
+                <View>
+                  <Text style={styles.aiModalTitle}>Lịch sử Báo cáo AI</Text>
+                  <Text style={styles.aiModalSubtitle}>
+                    {savedReports.length}/{MAX_SAVED_REPORTS} báo cáo đã lưu
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={styles.aiCloseBtn}
+                onPress={() => { setShowHistoryModal(false); setSelectedReport(null); }}
+              >
+                <X size={18} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Body: 2 cột nếu có selectedReport */}
+            <View style={{ flexDirection: selectedReport ? "row" : "column", maxHeight: 480 }}>
+              {/* Danh sách báo cáo */}
+              <ScrollView
+                style={[
+                  styles.historyList,
+                  selectedReport && { width: 220, borderRightWidth: 1, borderRightColor: "#F3F4F6" }
+                ]}
+                showsVerticalScrollIndicator={false}
+              >
+                {savedReports.length === 0 ? (
+                  <View style={styles.aiLoadingWrap}>
+                    <BookMarked size={36} color="#D1D5DB" />
+                    <Text style={styles.aiLoadingTitle}>Chưa có báo cáo nào</Text>
+                    <Text style={styles.aiLoadingSubtitle}>
+                      Tạo phân tích AI rồi nhấn nút "Lưu" để lưu lại
+                    </Text>
+                  </View>
+                ) : (
+                  savedReports.map((rpt) => (
+                    <TouchableOpacity
+                      key={rpt.id}
+                      style={[
+                        styles.historyItem,
+                        selectedReport?.id === rpt.id && styles.historyItemActive,
+                      ]}
+                      onPress={() => setSelectedReport(rpt)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.historyItemTitle} numberOfLines={1}>{rpt.title}</Text>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+                          <Clock size={10} color="#9CA3AF" />
+                          <Text style={styles.historyItemDate}>{rpt.savedAt}</Text>
+                        </View>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                          <View style={styles.historyKpiBadge}>
+                            <Text style={styles.historyKpiText}>{formatCurrency(rpt.kpis.revenueIn)}</Text>
+                          </View>
+                          <View style={[styles.historyKpiBadge, { backgroundColor: "#D1FAE5" }]}>
+                            <Text style={[styles.historyKpiText, { color: "#065F46" }]}>{rpt.kpis.totalOrders} đơn</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteReport(rpt.id)}
+                        style={styles.historyDeleteBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Trash2 size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Nội dung chi tiết báo cáo được chọn */}
+              {selectedReport && (
+                <ScrollView style={styles.historyDetail} showsVerticalScrollIndicator={false}>
+                  <Text style={styles.historyDetailPeriod}>{selectedReport.period}</Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    <View style={[styles.historyKpiBadge, { paddingHorizontal: 10, paddingVertical: 5 }]}>
+                      <Text style={[styles.historyKpiText, { fontSize: 11 }]}>Doanh thu: {formatCurrency(selectedReport.kpis.revenueIn)}</Text>
+                    </View>
+                    <View style={[styles.historyKpiBadge, { backgroundColor: "#FEE2E2", paddingHorizontal: 10, paddingVertical: 5 }]}>
+                      <Text style={[styles.historyKpiText, { color: "#991B1B", fontSize: 11 }]}>Hoàn/Hủy: {formatCurrency(selectedReport.kpis.revenueOut)}</Text>
+                    </View>
+                    <View style={[styles.historyKpiBadge, { backgroundColor: "#D1FAE5", paddingHorizontal: 10, paddingVertical: 5 }]}>
+                      <Text style={[styles.historyKpiText, { color: "#065F46", fontSize: 11 }]}>{selectedReport.kpis.totalOrders} đơn</Text>
+                    </View>
+                    <View style={[styles.historyKpiBadge, { backgroundColor: "#FEF3C7", paddingHorizontal: 10, paddingVertical: 5 }]}>
+                      <Text style={[styles.historyKpiText, { color: "#92400E", fontSize: 11 }]}>AOV: {formatCurrency(selectedReport.kpis.aovValue)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.aiInsightWrap}>
+                    <Text style={styles.aiInsightText}>{selectedReport.content}</Text>
+                  </View>
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Filter Panel ── */}
       <View style={styles.filterPanel}>
@@ -1126,6 +1468,153 @@ const styles = StyleSheet.create({
 
   // Export button disabled
   exportBtnDisabled: { opacity: 0.6 },
+
+  // AI Modal
+  aiOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  aiModal: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    width: "100%",
+    maxWidth: 580,
+    maxHeight: "80%",
+    shadowColor: "#7C3AED",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+    overflow: "hidden",
+  },
+  aiModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3E8FF",
+    backgroundColor: "#FDFAFF",
+  },
+  aiModalIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiModalTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
+  aiModalSubtitle: { fontSize: 12, color: "#9CA3AF", fontWeight: "500", marginTop: 2 },
+  aiCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiRefreshBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#EDE9FE",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+  },
+  aiRefreshBtnText: { fontSize: 12, fontWeight: "700", color: "#7C3AED" },
+  aiModalBody: {
+    padding: 20,
+    maxHeight: 480,
+  },
+  aiLoadingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 48,
+    gap: 16,
+  },
+  aiLoadingSpinner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  aiLoadingTitle: { fontSize: 16, fontWeight: "700", color: "#111827", textAlign: "center" },
+  aiLoadingSubtitle: { fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 20 },
+  aiInsightWrap: {
+    backgroundColor: "#FDFAFF",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#EDE9FE",
+  },
+  aiInsightText: {
+    fontSize: 14,
+    color: "#374151",
+    lineHeight: 24,
+    fontWeight: "400",
+  },
+
+  // History Modal
+  historyList: {
+    flex: 1,
+    padding: 12,
+  },
+  historyItem: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FAFAFA",
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  historyItemActive: {
+    backgroundColor: "#F5F0FF",
+    borderColor: "#DDD6FE",
+  },
+  historyItemTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  historyItemDate: {
+    fontSize: 10,
+    color: "#9CA3AF",
+  },
+  historyKpiBadge: {
+    backgroundColor: "#EEF2FF",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  historyKpiText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#3730A3",
+  },
+  historyDeleteBtn: {
+    padding: 4,
+    marginTop: 2,
+  },
+  historyDetail: {
+    flex: 1,
+    padding: 14,
+  },
+  historyDetailPeriod: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 8,
+  },
 
   // Toast
   toast: {
