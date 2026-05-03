@@ -1,4 +1,4 @@
-import { supabase } from "@/src/lib/supabase";
+import { supabase, supabaseAdmin } from "@/src/lib/supabase";
 import { createGHNOrder, fetchProvinces, fetchDistricts, fetchWards } from "@/src/services/ghn/shippingService";
 
 export type AdminOrder = {
@@ -251,8 +251,18 @@ export async function pushOrderToGHN(order: any): Promise<string> {
   return ghnData.order_code;
 }
 
-export async function deleteOrders(orderIds: number[]) {
-  const { error } = await supabase
+export async function deleteOrders(orderIds: string[]) {
+  const client = supabaseAdmin ?? supabase;
+
+  // Must delete child records first due to FK constraint
+  const { error: itemsError } = await client
+    .from("order_items")
+    .delete()
+    .in("order_id", orderIds);
+
+  if (itemsError) throw itemsError;
+
+  const { error } = await client
     .from("orders")
     .delete()
     .in("id", orderIds);

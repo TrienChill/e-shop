@@ -67,7 +67,7 @@ export default function AdminOrdersScreen() {
   const [pageSize, setPageSize] = useState(50);
 
   // Selection State
-  const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
   // Column Visibility State
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
@@ -617,6 +617,7 @@ export default function AdminOrdersScreen() {
                     return (
                       <Pressable 
                         key={order.id} 
+                        onPress={() => router.push(`/(admin)/orders/${order.id}` as any)}
                         style={({ pressed, hovered }: any) => [
                           styles.row,
                           (pressed || hovered || selectedOrders.includes(order.id)) && { backgroundColor: '#F3F4F6' }
