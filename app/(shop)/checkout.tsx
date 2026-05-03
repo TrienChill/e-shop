@@ -24,12 +24,14 @@ import {
   ShoppingBag,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
+  KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -190,7 +192,12 @@ export default function CheckoutScreen() {
   const [showVNPayModal, setShowVNPayModal] = useState(false);
   const [vnpayUrl, setVnpayUrl] = useState("");
 
+  const isProcessingReturn = useRef(false);
+
   const handleVNPayReturn = async (url: string) => {
+    if (isProcessingReturn.current) return;
+    isProcessingReturn.current = true;
+
     setShowVNPayModal(false);
     setPaymentStatus("processing");
 
@@ -219,6 +226,10 @@ export default function CheckoutScreen() {
           transaction_id: transactionNo,
           status: "processing",
         }).eq("id", orderId);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        await finalizeSuccessfulOrder(orderId, user?.id);
+
         setPaymentStatus("success");
       } else {
         if (orderId) {
@@ -232,6 +243,11 @@ export default function CheckoutScreen() {
     } catch (e) {
       setErrorMessage("Lỗi xử lý phản hồi từ VNPay");
       setPaymentStatus("error");
+    } finally {
+      // Allow retry if it failed (not success)
+      setTimeout(() => {
+        isProcessingReturn.current = false;
+      }, 2000);
     }
   };
 
@@ -472,14 +488,6 @@ export default function CheckoutScreen() {
   const totalDiscount = finalDiscount + membershipDiscount;
   const finalTotal = productsTotal + shippingFee - totalDiscount;
 
-  useEffect(() => {
-    if (paymentStatus === "processing") {
-      const timer = setTimeout(() => {
-        setPaymentStatus("success");
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [paymentStatus]);
 
   useEffect(() => {
     const fetchCheckoutInfo = async () => {
@@ -683,6 +691,100 @@ export default function CheckoutScreen() {
     fetchCheckoutInfo();
   }, [refreshTrigger]);
 
+  const finalizeSuccessfulOrder = async (orderId: number, userId: string | undefined) => {
+    try {
+      // ── Decrement stock ────────────────────────────────────────────────────────
+      for (const item of activeCart) {
+        try {
+          let query = supabase
+            .from("product_variants")
+            .select("id, stock")
+            .eq("product_id", item.product_id);
+
+          if (item.rawColor) query = query.eq("color", item.rawColor);
+          else query = query.is("color", null);
+
+          if (item.rawSize) query = query.eq("size", item.rawSize);
+          else query = query.is("size", null);
+
+          const { data: variant, error: vError } = await query.maybeSingle();
+
+          if (vError) {
+            console.error("[STOCK_CHECK] Lỗi tìm variant:", vError);
+            continue;
+          }
+
+          if (variant) {
+            const { error: rpcError } = await supabase.rpc("buy_product", {
+              variant_id: variant.id,
+              quantity_to_buy: item.quantity,
+            });
+
+            if (rpcError) {
+              console.error(
+                `[STOCK_CHECK] Lỗi RPC buy_product cho ${item.name}:`,
+                rpcError.message,
+              );
+              throw rpcError;
+            }
+          } else {
+            console.warn(
+              `[STOCK_CHECK] KHÔNG tìm thấy variant cho sản phẩm: ${item.name}`,
+            );
+          }
+        } catch (stockErr: any) {
+          console.error(
+            "[STOCK_CHECK] Exception khi xử lý stock:",
+            stockErr.message,
+          );
+          throw stockErr;
+        }
+      }
+
+      // ── Authenticated-only cleanup ──────────────────────────────────────────────
+      if (!isGuest && selectedVoucher?.user_voucher_id) {
+        await supabase
+          .from("user_vouchers")
+          .update({
+            is_used: true,
+            used_at: new Date().toISOString(),
+            order_id: orderId,
+          })
+          .eq("id", selectedVoucher.user_voucher_id);
+
+        try {
+          const { data: vData } = await supabase
+            .from("vouchers")
+            .select("used_count")
+            .eq("id", selectedVoucher.id)
+            .single();
+
+          if (vData) {
+            await supabase
+              .from("vouchers")
+              .update({ used_count: (vData.used_count || 0) + 1 })
+              .eq("id", selectedVoucher.id);
+          }
+        } catch (e) {
+          console.error("Lỗi tăng used_count cho vouchers", e);
+        }
+      }
+
+      // ── Cleanup Cart for BOTH Guest & Authenticated ───────────────────────────
+      if (userId) {
+        const { error: deleteCartError } = await supabase
+          .from("cart_items")
+          .delete()
+          .eq("user_id", userId)
+          .eq("is_selected", true);
+
+        if (deleteCartError) throw deleteCartError;
+      }
+    } catch (error) {
+      console.error("Lỗi khi finalize order:", error);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     // ── Guest validation ──────────────────────────────────────────────────────────
     if (isGuest) {
@@ -807,97 +909,9 @@ export default function CheckoutScreen() {
 
       if (itemsError) throw itemsError;
 
-      // ── Decrement stock ────────────────────────────────────────────────────────
-      for (const item of activeCart) {
-        try {
-          let query = supabase
-            .from("product_variants")
-            .select("id, stock")
-            .eq("product_id", item.product_id);
-
-          if (item.rawColor) query = query.eq("color", item.rawColor);
-          else query = query.is("color", null);
-
-          if (item.rawSize) query = query.eq("size", item.rawSize);
-          else query = query.is("size", null);
-
-          const { data: variant, error: vError } = await query.maybeSingle();
-
-          if (vError) {
-            console.error("[STOCK_CHECK] Lỗi tìm variant:", vError);
-            continue;
-          }
-
-          if (variant) {
-            const { error: rpcError } = await supabase.rpc("buy_product", {
-              variant_id: variant.id,
-              quantity_to_buy: item.quantity,
-            });
-
-            if (rpcError) {
-              console.error(
-                `[STOCK_CHECK] Lỗi RPC buy_product cho ${item.name}:`,
-                rpcError.message,
-              );
-              throw rpcError;
-            }
-          } else {
-            console.warn(
-              `[STOCK_CHECK] KHÔNG tìm thấy variant cho sản phẩm: ${item.name}`,
-            );
-          }
-        } catch (stockErr: any) {
-          console.error(
-            "[STOCK_CHECK] Exception khi xử lý stock:",
-            stockErr.message,
-          );
-          throw stockErr;
-        }
-      }
-
-      // ── Authenticated-only cleanup ──────────────────────────────────────────────
-      if (!isGuest && selectedVoucher?.user_voucher_id) {
-        await supabase
-          .from("user_vouchers")
-          .update({
-            is_used: true,
-            used_at: new Date().toISOString(),
-            order_id: orderData.id,
-          })
-          .eq("id", selectedVoucher.user_voucher_id);
-
-        try {
-          const { data: vData } = await supabase
-            .from("vouchers")
-            .select("used_count")
-            .eq("id", selectedVoucher.id)
-            .single();
-
-          if (vData) {
-            await supabase
-              .from("vouchers")
-              .update({ used_count: (vData.used_count || 0) + 1 })
-              .eq("id", selectedVoucher.id);
-          }
-        } catch (e) {
-          console.error("Lỗi tăng used_count cho vouchers", e);
-        }
-      }
-
-      // ── Cleanup Cart for BOTH Guest & Authenticated ───────────────────────────
-      if (user) {
-        const { error: deleteCartError } = await supabase
-          .from("cart_items")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("is_selected", true);
-
-        if (deleteCartError) throw deleteCartError;
-      }
-
       if (selectedPaymentId === "vnpay") {
         const { data: vnpayData, error: vnpayError } = await supabase.functions.invoke('vnpay-create-url', {
-          body: { orderId: orderData.id, amount: finalTotal, returnUrl: 'eshop://vnpay-return' }
+          body: { orderId: orderData.id, amount: finalTotal, returnUrl: 'https://e-shop.vnpay-return.com/return' }
         });
 
         if (vnpayError) {
@@ -916,9 +930,10 @@ export default function CheckoutScreen() {
         } else {
           throw new Error("Không thể tạo URL thanh toán");
         }
+      } else {
+        await finalizeSuccessfulOrder(orderData.id, user?.id);
+        setPaymentStatus("success");
       }
-
-      setPaymentStatus("success");
     } catch (error: any) {
       console.error("Lỗi đặt hàng:", error.message);
       setErrorMessage(error.message || "Đã có lỗi xảy ra");
@@ -1569,27 +1584,77 @@ export default function CheckoutScreen() {
       {/* VNPay Modal */}
       <Modal visible={showVNPayModal} animationType="slide" onRequestClose={() => setShowVNPayModal(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => setShowVNPayModal(false)} style={styles.backBtnHeader}>
-              <ChevronLeft size={28} color={C.text} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Thanh toán VNPay</Text>
-          </View>
-          {vnpayUrl ? (
-            <WebView
-              source={{ uri: vnpayUrl }}
-              style={{ flex: 1 }}
-              onNavigationStateChange={(navState) => {
-                if (navState.url.includes("eshop://vnpay-return")) {
-                  handleVNPayReturn(navState.url);
-                }
-              }}
-            />
-          ) : (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-              <ActivityIndicator size="large" color={C.blue} />
+          <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <View style={styles.header}>
+              <TouchableOpacity onPress={() => setShowVNPayModal(false)} style={styles.backBtnHeader}>
+                <ChevronLeft size={28} color={C.text} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Thanh toán VNPay</Text>
             </View>
-          )}
+            {vnpayUrl ? (
+              <WebView
+                source={{ uri: vnpayUrl }}
+                style={{ flex: 1 }}
+                injectedJavaScript={`
+                  var style = document.createElement('style');
+                  style.type = 'text/css';
+                  style.innerHTML = 'footer { position: relative !important; }';
+                  document.head.appendChild(style);
+                  true;
+                `}
+                onNavigationStateChange={(navState) => {
+                  if (navState.url.includes("vnpay-return.com")) {
+                    handleVNPayReturn(navState.url);
+                  }
+                }}
+                onShouldStartLoadWithRequest={(request) => {
+                  const url = request.url;
+
+                  if (url.includes("vnpay-return.com")) {
+                    handleVNPayReturn(url);
+                    return false;
+                  }
+
+                  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("about:blank")) {
+                    return true;
+                  }
+
+                  // Xử lý deep link (Mở app ngân hàng)
+                  if (Platform.OS === "android" && url.startsWith("intent://")) {
+                    Linking.openURL(url).catch(() => {
+                      // Nếu máy không có app, thử lấy link tải về (fallback)
+                      const match = url.match(/browser_fallback_url=([^;]+)/);
+                      if (match && match[1]) {
+                        Linking.openURL(decodeURIComponent(match[1]));
+                      } else {
+                        Alert.alert("Thông báo", "Bạn chưa cài đặt ứng dụng ngân hàng này trên thiết bị.");
+                      }
+                    });
+                    return false;
+                  }
+
+                  Linking.canOpenURL(url)
+                    .then((supported) => {
+                      if (supported) {
+                        Linking.openURL(url);
+                      } else {
+                        Alert.alert("Thông báo", "Không tìm thấy ứng dụng hỗ trợ trên thiết bị.");
+                      }
+                    })
+                    .catch(() => {});
+
+                  return false;
+                }}
+              />
+            ) : (
+              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                <ActivityIndicator size="large" color={C.blue} />
+              </View>
+            )}
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
 
@@ -1659,7 +1724,10 @@ export default function CheckoutScreen() {
                 <View style={styles.errorActions}>
                   <TouchableOpacity
                     style={styles.tryAgainBtn}
-                    onPress={() => setPaymentStatus("processing")}
+                    onPress={() => {
+                      setPaymentStatus("idle");
+                      setTimeout(() => handlePlaceOrder(), 300);
+                    }}
                   >
                     <Text style={styles.tryAgainText}>Thử lại</Text>
                   </TouchableOpacity>

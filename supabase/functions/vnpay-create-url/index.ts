@@ -42,8 +42,7 @@ function formatVnTime(date: Date) {
   return `${yyyy}${MM}${dd}${HH}${mm}${ss}`;
 }
 
-function sortObject(obj: Record<string, string | number>) {
-  const sorted: Record<string, string> = {};
+function buildQueryString(obj: Record<string, string | number>) {
   const str = [];
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
@@ -51,13 +50,16 @@ function sortObject(obj: Record<string, string | number>) {
     }
   }
   str.sort();
+  
+  const keyValuePairs = [];
   for (let i = 0; i < str.length; i++) {
     const key = str[i];
     const originalKey = decodeURIComponent(key);
     const val = obj[originalKey];
-    sorted[key] = encodeURIComponent(String(val)).replace(/%20/g, "+");
+    const encodedVal = encodeURIComponent(String(val)).replace(/%20/g, "+");
+    keyValuePairs.push(`${key}=${encodedVal}`);
   }
-  return sorted;
+  return keyValuePairs.join('&');
 }
 
 serve(async (req: any) => {
@@ -87,8 +89,12 @@ serve(async (req: any) => {
       });
     }
 
-    // Get IP address from request or use default
-    const ipAddr = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || '127.0.0.1';
+    // Get IP address from request or use default, handle comma separated IPs safely
+    const rawForwarded = req.headers.get('x-forwarded-for');
+    const rawRealIp = req.headers.get('x-real-ip');
+    const ipAddr = (rawForwarded ? rawForwarded.split(',')[0].trim() : null) || 
+                   (rawRealIp ? rawRealIp.split(',')[0].trim() : null) || 
+                   '127.0.0.1';
     
     // Ensure amount is integer and multiplied by 100
     const vnpAmount = Math.round(Number(amount) * 100);
@@ -108,11 +114,7 @@ serve(async (req: any) => {
       vnp_CreateDate: formatVnTime(new Date()),
     };
 
-    const sortedParams = sortObject(rawParams);
-
-    const signData = Object.entries(sortedParams)
-      .map(([key, val]) => `${key}=${val}`)
-      .join('&');
+    const signData = buildQueryString(rawParams);
 
     const signed = await hmacSha512(secretKey, signData);
 

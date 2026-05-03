@@ -441,16 +441,29 @@ export default function ProductDetailScreen() {
 
       // ── Authenticated: lưu vào DB ───────────────────────────────────────────────
       // 2. Tìm sản phẩm cùng loại trong giỏ (khớp ID, Size và Color)
-      const { data: existingItem, error: fetchError } = await supabase
+      let query = supabase
         .from("cart_items")
         .select("id, quantity")
         .eq("user_id", user.id)
-        .eq("product_id", product.id)
-        .eq("size", selectedSize || null)
-        .eq("color", selectedColor || null)
-        .maybeSingle();
+        .eq("product_id", product.id);
+
+      if (selectedSize) {
+        query = query.eq("size", selectedSize);
+      } else {
+        query = query.is("size", null);
+      }
+
+      if (selectedColor) {
+        query = query.eq("color", selectedColor);
+      } else {
+        query = query.is("color", null);
+      }
+
+      const { data: existingItems, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
+
+      const existingItem = existingItems && existingItems.length > 0 ? existingItems[0] : null;
 
       if (existingItem) {
         // 3. Nếu đã tồn tại -> Cập nhật tăng số lượng
