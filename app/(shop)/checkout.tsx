@@ -43,6 +43,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -185,6 +186,54 @@ export default function CheckoutScreen() {
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const [showVNPayModal, setShowVNPayModal] = useState(false);
+  const [vnpayUrl, setVnpayUrl] = useState("");
+
+  const handleVNPayReturn = async (url: string) => {
+    setShowVNPayModal(false);
+    setPaymentStatus("processing");
+
+    try {
+      const queryString = url.split("?")[1];
+      if (!queryString) {
+        setErrorMessage("URL phản hồi không hợp lệ");
+        setPaymentStatus("error");
+        return;
+      }
+
+      const params: Record<string, string> = {};
+      queryString.split("&").forEach((pair) => {
+        const [key, value] = pair.split("=");
+        if (key) params[key] = decodeURIComponent(value || "");
+      });
+
+      const responseCode = params["vnp_ResponseCode"];
+      const transactionNo = params["vnp_TransactionNo"];
+      const orderIdStr = params["vnp_TxnRef"];
+      const orderId = orderIdStr ? Number(orderIdStr) : null;
+
+      if (responseCode === "00" && orderId) {
+        await supabase.from("orders").update({
+          payment_status: "paid",
+          transaction_id: transactionNo,
+          status: "processing",
+        }).eq("id", orderId);
+        setPaymentStatus("success");
+      } else {
+        if (orderId) {
+          await supabase.from("orders").update({
+            payment_status: "failed",
+          }).eq("id", orderId);
+        }
+        setErrorMessage("Thanh toán bị hủy hoặc thất bại");
+        setPaymentStatus("error");
+      }
+    } catch (e) {
+      setErrorMessage("Lỗi xử lý phản hồi từ VNPay");
+      setPaymentStatus("error");
+    }
+  };
 
   const [customerDistrictId, setCustomerDistrictId] = useState<number | null>(
     null,
@@ -686,6 +735,8 @@ export default function CheckoutScreen() {
         status: "pending",
         shipping_fee: shippingFee,
         discount_amount: finalDiscount,
+        payment_status: "unpaid",
+        payment_method: selectedPaymentId === "vnpay" ? "VNPay" : "COD",
       };
 
       if (isGuest) {
@@ -844,6 +895,29 @@ export default function CheckoutScreen() {
         if (deleteCartError) throw deleteCartError;
       }
 
+      if (selectedPaymentId === "vnpay") {
+        const { data: vnpayData, error: vnpayError } = await supabase.functions.invoke('vnpay-create-url', {
+          body: { orderId: orderData.id, amount: finalTotal, returnUrl: 'eshop://vnpay-return' }
+        });
+
+        if (vnpayError) {
+          throw vnpayError;
+        }
+
+        if (vnpayData?.paymentUrl) {
+          if (Platform.OS === "web") {
+            window.location.href = vnpayData.paymentUrl;
+          } else {
+            setVnpayUrl(vnpayData.paymentUrl);
+            setShowVNPayModal(true);
+            setPaymentStatus("idle");
+          }
+          return;
+        } else {
+          throw new Error("Không thể tạo URL thanh toán");
+        }
+      }
+
       setPaymentStatus("success");
     } catch (error: any) {
       console.error("Lỗi đặt hàng:", error.message);
@@ -975,7 +1049,11 @@ export default function CheckoutScreen() {
                 <Text style={webStyles.sectionTitle}>
                   Phương thức thanh toán
                 </Text>
-                <View style={webStyles.codCard}>
+                <TouchableOpacity
+                  style={[webStyles.codCard, selectedPaymentId === "cash" && { borderColor: C.blue, borderWidth: 1 }]}
+                  onPress={() => setSelectedPaymentId("cash")}
+                  activeOpacity={0.7}
+                >
                   <View style={webStyles.codIconWrapper}>
                     <Banknote size={24} color={C.blue} />
                   </View>
@@ -987,8 +1065,27 @@ export default function CheckoutScreen() {
                       Thanh toán bằng tiền mặt khi giao hàng tận nơi
                     </Text>
                   </View>
-                  <CheckCircle2 size={22} color={C.blue} />
-                </View>
+                  {selectedPaymentId === "cash" && <CheckCircle2 size={22} color={C.blue} />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[webStyles.codCard, selectedPaymentId === "vnpay" && { borderColor: C.blue, borderWidth: 1 }, { marginTop: 12 }]}
+                  onPress={() => setSelectedPaymentId("vnpay")}
+                  activeOpacity={0.7}
+                >
+                  <View style={webStyles.codIconWrapper}>
+                    <Banknote size={24} color={C.blue} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={webStyles.codTitle}>
+                      Thanh toán qua VNPay
+                    </Text>
+                    <Text style={webStyles.codSubtitle}>
+                      Thanh toán online an toàn qua cổng VNPay
+                    </Text>
+                  </View>
+                  {selectedPaymentId === "vnpay" && <CheckCircle2 size={22} color={C.blue} />}
+                </TouchableOpacity>
               </View>
             </ScrollView>
 
@@ -1387,7 +1484,11 @@ export default function CheckoutScreen() {
               <Text style={styles.sectionTitleText}>
                 Phương thức thanh toán
               </Text>
-              <View style={styles.codPaymentCard}>
+              <TouchableOpacity
+                style={[styles.codPaymentCard, selectedPaymentId === "cash" && { borderColor: C.blue, borderWidth: 1 }]}
+                onPress={() => setSelectedPaymentId("cash")}
+                activeOpacity={0.7}
+              >
                 <View style={styles.codIconWrapper}>
                   <Banknote size={24} color={C.blue} />
                 </View>
@@ -1399,10 +1500,35 @@ export default function CheckoutScreen() {
                     Thanh toán bằng tiền mặt khi giao hàng tận nơi
                   </Text>
                 </View>
-                <View style={styles.codCheckMark}>
-                  <CheckCircle2 size={22} color={C.blue} />
+                {selectedPaymentId === "cash" && (
+                  <View style={styles.codCheckMark}>
+                    <CheckCircle2 size={22} color={C.blue} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.codPaymentCard, selectedPaymentId === "vnpay" && { borderColor: C.blue, borderWidth: 1 }, { marginTop: 12 }]}
+                onPress={() => setSelectedPaymentId("vnpay")}
+                activeOpacity={0.7}
+              >
+                <View style={styles.codIconWrapper}>
+                  <Banknote size={24} color={C.blue} />
                 </View>
-              </View>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={styles.codTitle}>
+                    Thanh toán qua VNPay
+                  </Text>
+                  <Text style={styles.codSubtitle}>
+                    Thanh toán online an toàn qua cổng VNPay
+                  </Text>
+                </View>
+                {selectedPaymentId === "vnpay" && (
+                  <View style={styles.codCheckMark}>
+                    <CheckCircle2 size={22} color={C.blue} />
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
           </ScrollView>
 
@@ -1440,6 +1566,33 @@ export default function CheckoutScreen() {
       )}
 
       {/* ── All Modals ── */}
+      {/* VNPay Modal */}
+      <Modal visible={showVNPayModal} animationType="slide" onRequestClose={() => setShowVNPayModal(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => setShowVNPayModal(false)} style={styles.backBtnHeader}>
+              <ChevronLeft size={28} color={C.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Thanh toán VNPay</Text>
+          </View>
+          {vnpayUrl ? (
+            <WebView
+              source={{ uri: vnpayUrl }}
+              style={{ flex: 1 }}
+              onNavigationStateChange={(navState) => {
+                if (navState.url.includes("eshop://vnpay-return")) {
+                  handleVNPayReturn(navState.url);
+                }
+              }}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator size="large" color={C.blue} />
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
+
       {/* Payment status modal */}
       <Modal
         visible={paymentStatus !== "idle"}
