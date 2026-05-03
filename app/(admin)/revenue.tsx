@@ -1,7 +1,6 @@
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/src/auth/AuthContext";
-import { getRevenueReport, RevenueReport } from "@/src/services/admin/revenue";
+import { getRevenueReport, RevenueReport, fetchAiReports, saveAiReport, deleteAiReport, AiReport } from "@/src/services/admin/revenue";
 import {
   endOfDay,
   endOfMonth,
@@ -35,6 +34,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Modal,
   Platform,
@@ -60,21 +60,9 @@ interface FilterState {
   endDate: Date;
 }
 
-interface SavedReport {
-  id: string;
-  title: string;
-  period: string;
-  savedAt: string;
-  content: string;
-  kpis: {
-    revenueIn: number;
-    revenueOut: number;
-    totalOrders: number;
-    aovValue: number;
-  };
-}
+// Use the AiReport type from the service layer (Supabase-backed)
+type SavedReport = AiReport;
 
-const SAVED_REPORTS_KEY = "@ai_revenue_reports";
 const MAX_SAVED_REPORTS = 5;
 
 // ─────────────────────────────────────────────
@@ -299,48 +287,48 @@ export default function AdminRevenueScreen() {
     toastTimeout.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration);
   };
 
-  // ── Load saved reports từ AsyncStorage ──
+  // ── Load saved reports từ Supabase ──
   useEffect(() => {
-    AsyncStorage.getItem(SAVED_REPORTS_KEY).then((raw) => {
-      if (raw) setSavedReports(JSON.parse(raw));
-    }).catch(() => {});
+    fetchAiReports()
+      .then(setSavedReports)
+      .catch(() => {}); // Silent fail (chưa đăng nhập hoặc lỗi kết nối)
   }, []);
 
-  // ── Lưu báo cáo AI ──
+  // ── Lưu báo cáo AI lên Supabase ──
   const handleSaveReport = useCallback(async () => {
     if (!aiInsight) return;
-    if (savedReports.length >= MAX_SAVED_REPORTS) {
-      showToast(`Đã đạt giới hạn ${MAX_SAVED_REPORTS} báo cáo. Vui lòng xóa bớt trước khi lưu thêm.`, "error", 3500);
-      return;
-    }
     setSavingReport(true);
     try {
-      const newReport: SavedReport = {
-        id: Date.now().toString(),
+      const newReport = await saveAiReport({
         title: `Báo cáo ${format(filter.startDate, "dd/MM")} - ${format(filter.endDate, "dd/MM/yyyy")}`,
         period: `${format(filter.startDate, "dd/MM/yyyy")} → ${format(filter.endDate, "dd/MM/yyyy")}`,
-        savedAt: format(new Date(), "HH:mm dd/MM/yyyy"),
         content: aiInsight,
         kpis: { revenueIn, revenueOut, totalOrders, aovValue },
-      };
-      const updated = [newReport, ...savedReports];
-      await AsyncStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(updated));
+      });
+      // Supabase tự xử lý giới hạn 5, reload lại danh sách
+      const updated = await fetchAiReports();
       setSavedReports(updated);
-      showToast("✓ Đã lưu báo cáo AI thành công!", "success");
-    } catch {
-      showToast("Lưu thất bại, vui lòng thử lại.", "error");
+      showToast("✓ Đã lưu báo cáo AI lên Supabase!", "success");
+      Alert.alert("Thành công", "Đã lưu báo cáo AI vào hệ thống.");
+    } catch (err: any) {
+      showToast("Lưu thất bại: " + (err?.message ?? "Lỗi kết nối"), "error");
+      Alert.alert("Lỗi", "Không thể lưu báo cáo: " + (err?.message ?? "Lỗi kết nối"));
     } finally {
       setSavingReport(false);
     }
-  }, [aiInsight, savedReports, filter, revenueIn, revenueOut, totalOrders, aovValue]);
+  }, [aiInsight, filter, revenueIn, revenueOut, totalOrders, aovValue]);
 
-  // ── Xóa báo cáo đã lưu ──
+  // ── Xóa báo cáo khỏi Supabase ──
   const handleDeleteReport = useCallback(async (id: string) => {
-    const updated = savedReports.filter((r) => r.id !== id);
-    await AsyncStorage.setItem(SAVED_REPORTS_KEY, JSON.stringify(updated));
-    setSavedReports(updated);
-    if (selectedReport?.id === id) setSelectedReport(null);
-    showToast("Đã xóa báo cáo.", "info");
+    try {
+      await deleteAiReport(id);
+      const updated = savedReports.filter((r) => r.id !== id);
+      setSavedReports(updated);
+      if (selectedReport?.id === id) setSelectedReport(null);
+      showToast("Đã xóa báo cáo.", "info");
+    } catch (err: any) {
+      showToast("Xóa thất bại: " + (err?.message ?? "Lỗi kết nối"), "error");
+    }
   }, [savedReports, selectedReport]);
 
   // ── AI Insight ──
@@ -1061,7 +1049,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
                         <Text style={styles.historyItemTitle} numberOfLines={1}>{rpt.title}</Text>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
                           <Clock size={10} color="#9CA3AF" />
-                          <Text style={styles.historyItemDate}>{rpt.savedAt}</Text>
+                          <Text style={styles.historyItemDate}>
+                            {rpt.created_at ? format(new Date(rpt.created_at), "HH:mm dd/MM/yyyy") : "--"}
+                          </Text>
                         </View>
                         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                           <View style={styles.historyKpiBadge}>

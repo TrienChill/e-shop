@@ -84,3 +84,77 @@ export async function getRevenueReport(
     heatmap:      Array.isArray(result?.heatmap)      ? result.heatmap      : [],
   };
 }
+
+// ─── AI Report types & CRUD ───────────────────────────────────────────────────
+
+export interface AiReport {
+  id: string;
+  admin_id: string;
+  title: string;
+  period: string;
+  content: string;
+  kpis: {
+    revenueIn: number;
+    revenueOut: number;
+    totalOrders: number;
+    aovValue: number;
+  };
+  created_at: string;
+}
+
+/** Tải tối đa 5 báo cáo AI gần nhất của admin */
+export async function fetchAiReports(): Promise<AiReport[]> {
+  const { data, error } = await supabase
+    .from("ai_reports")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error) throw error;
+  return (data ?? []) as AiReport[];
+}
+
+/** Lưu một báo cáo AI mới (tự động xóa báo cáo cũ nhất nếu đã đủ 5) */
+export async function saveAiReport(
+  payload: Omit<AiReport, "id" | "admin_id" | "created_at">
+): Promise<AiReport> {
+  // Lấy user hiện tại để truyền admin_id vào insert (bắt buộc cho RLS)
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) throw new Error("Chưa đăng nhập.");
+
+  const admin_id = user.id;
+
+  // Đếm báo cáo hiện tại của admin này
+  const { count } = await supabase
+    .from("ai_reports")
+    .select("id", { count: "exact", head: true })
+    .eq("admin_id", admin_id);
+
+  if ((count ?? 0) >= 5) {
+    // Xóa báo cáo cũ nhất của admin này để nhường chỗ
+    const { data: oldest } = await supabase
+      .from("ai_reports")
+      .select("id")
+      .eq("admin_id", admin_id)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single();
+    if (oldest) {
+      await supabase.from("ai_reports").delete().eq("id", oldest.id);
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("ai_reports")
+    .insert([{ ...payload, admin_id }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data as AiReport;
+}
+
+/** Xóa một báo cáo AI theo id */
+export async function deleteAiReport(id: string): Promise<void> {
+  const { error } = await supabase.from("ai_reports").delete().eq("id", id);
+  if (error) throw error;
+}
+
