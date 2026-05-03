@@ -135,6 +135,7 @@ function AdminLayoutWeb() {
               <Pressable
                 style={styles.profileLeft}
                 onPress={() => router.push('/(admin)/profile' as any)}
+                className="web:hover:opacity-80"
               >
                 <View style={[
                   styles.avatarCircle,
@@ -150,12 +151,17 @@ function AdminLayoutWeb() {
               <Pressable
                 style={[styles.settingsIconBtn, isSettingsActive && { backgroundColor: hexToRgba(primaryColor, 0.15) }]}
                 onPress={() => router.push('/(admin)/settings' as any)}
+                className="web:hover:bg-white/10"
               >
                 <SlidersHorizontal size={16} color={isSettingsActive ? primaryColor : '#6B7280'} />
               </Pressable>
             </View>
 
-          <Pressable style={styles.footerLink} onPress={() => signOut()}>
+          <Pressable 
+            style={styles.footerLink} 
+            onPress={() => signOut()}
+            className="web:hover:bg-white/5 py-2 px-2 rounded-lg transition-colors"
+          >
             <LogOut size={18} color="#9CA3AF" />
             <Text style={styles.footerLinkText}>Đăng xuất</Text>
           </Pressable>
@@ -168,6 +174,7 @@ function AdminLayoutWeb() {
               }
               router.replace("/(shop)/(tabs)");
             }}
+            className="web:hover:bg-white/5 py-2 px-2 rounded-lg transition-colors"
           >
             <Store size={18} color="#9CA3AF" />
             <Text style={styles.footerLinkText}>Về cửa hàng</Text>
@@ -191,7 +198,10 @@ function SidebarLink({
 }) {
   return (
     <Link href={href as any} asChild>
-      <Pressable style={StyleSheet.flatten([styles.menuItem, active && { backgroundColor: primaryColor }])}>
+      <Pressable 
+        style={StyleSheet.flatten([styles.menuItem, active && { backgroundColor: primaryColor }])}
+        className="web:hover:bg-white/10 transition-all duration-200"
+      >
         <Icon size={20} color={active ? "#FFF" : "#9CA3AF"} />
         <Text style={StyleSheet.flatten([styles.menuItemText, active && styles.menuItemTextActive])}>
           {label}

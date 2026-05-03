@@ -18,6 +18,7 @@ import {
   X,
   Phone,
 } from "lucide-react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -354,8 +355,8 @@ export default function AdminMembershipScreen() {
     const isHighest = item.id === levels[levels.length - 1]?.id;
 
     return (
-      <View
-        className={`bg-white rounded-2xl p-5 mb-4 border-2 ${tierStyle.border} shadow-sm`}
+      <AdminDataWrapper
+        className={`bg-white rounded-2xl p-5 mb-4 border-2 ${tierStyle.border} shadow-sm flex-col items-stretch`}
       >
         {/* Header */}
         <View className="flex-row justify-between items-start mb-4">
@@ -438,7 +439,7 @@ export default function AdminMembershipScreen() {
             </View>
           </View>
         )}
-      </View>
+      </AdminDataWrapper>
     );
   };
 
@@ -723,7 +724,7 @@ export default function AdminMembershipScreen() {
                 showsVerticalScrollIndicator={false}
                 style={{ maxHeight: 400 }}
                 renderItem={({ item }) => (
-                  <TouchableOpacity
+                  <AdminDataWrapper
                     onPress={() => navigateToUser(item.id)}
                     className="flex-row items-center p-3 bg-gray-50 rounded-xl mb-2"
                   >
@@ -763,7 +764,7 @@ export default function AdminMembershipScreen() {
                       </Text>
                       <Text className="text-gray-400 text-xs">Tổng chi tiêu</Text>
                     </View>
-                  </TouchableOpacity>
+                  </AdminDataWrapper>
                 )}
               />
             )}

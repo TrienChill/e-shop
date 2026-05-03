@@ -1,6 +1,7 @@
 import { supabase } from "@/src/lib/supabase";
 import { exportProductsToExcel } from "@/src/utils/excel";
 import ImportExcelModal from "@/src/components/admin/ImportExcelModal";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import { router } from "expo-router";
 import {
   ArrowDown,
@@ -494,7 +495,7 @@ export default function AdminProductsScreen() {
                 const isLastItem = index === paginatedProducts.length - 1;
 
                 return (
-                  <View style={[styles.tableRow, isLastItem && styles.tableRowLast, isSelected && styles.tableRowSelected]}>
+                  <AdminDataWrapper style={[styles.tableRow, isLastItem && styles.tableRowLast, isSelected && styles.tableRowSelected]}>
                     {/* Cột Checkbox */}
                     <View style={styles.colCheckbox}>
                       <Pressable 
@@ -597,7 +598,7 @@ export default function AdminProductsScreen() {
                         </Pressable>
                       </View>
                     )}
-                  </View>
+                  </AdminDataWrapper>
                 );
               }}
             />

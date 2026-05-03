@@ -1,6 +1,7 @@
 import { useAuth } from "@/src/auth/AuthContext";
 import AdminProductDiscountModal from "@/src/components/admin/AdminProductDiscountModal";
 import AdminVoucherModal from "@/src/components/admin/AdminVoucherModal";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import {
   createProductDiscount,
   createVoucher,
@@ -270,7 +271,7 @@ export default function AdminVouchersScreen() {
               const status = getStatus(v);
               const usageCount = v.order_vouchers?.[0]?.count || 0;
               return (
-                <View key={v.id} style={styles.row}>
+                <AdminDataWrapper key={v.id} style={styles.row}>
                   <View style={styles.columnCode}>
                     <Text style={styles.columnCodeText}>{v.code ?? "-"}</Text>
                     <Text style={{ fontSize: 10, color: "#6B7280", marginTop: 4, textTransform: "capitalize" }}>{v.voucher_type}</Text>
@@ -316,7 +317,7 @@ export default function AdminVouchersScreen() {
                       <Trash2 size={18} color="#EF4444" />
                     </Pressable>
                   </View>
-                </View>
+                </AdminDataWrapper>
               );
             });
           }
@@ -350,7 +351,7 @@ export default function AdminVouchersScreen() {
           if (filteredDiscounts.length === 0) return <View style={styles.emptyContainer}><Text style={styles.emptyText}>Không có sản phẩm nào phù hợp.</Text></View>;
 
           return filteredDiscounts.map((d) => (
-            <View key={d.id} style={styles.row}>
+            <AdminDataWrapper key={d.id} style={styles.row}>
               <View style={[styles.columnCode, { flexDirection: "row", alignItems: "center", gap: 10 }]}>
                 <Image 
                   source={{ uri: (d.products?.images && d.products.images[0]) || "https://placehold.co/100" }} 
@@ -399,7 +400,7 @@ export default function AdminVouchersScreen() {
                   <Trash2 size={18} color="#EF4444" />
                 </Pressable>
               </View>
-            </View>
+            </AdminDataWrapper>
           ));
         })()}
         </ScrollView>

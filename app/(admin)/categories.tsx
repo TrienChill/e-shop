@@ -41,6 +41,7 @@ import {
 } from "@/src/utils/categoryTree";
 import CategoryImageUpload from "@/src/components/admin/CategoryImageUpload";
 import CategoryProductsModal from "@/src/components/admin/CategoryProductsModal";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 
 // ─── Form State ───────────────────────────────────────────────────────────────
 
@@ -113,7 +114,7 @@ function CategoryRow({
   const indent = node.depth * 24;
 
   return (
-    <View style={[styles.row, !node.is_active && styles.rowInactive]}>
+    <AdminDataWrapper style={[styles.row, !node.is_active && styles.rowInactive]}>
       <View style={[styles.rowLeft, { paddingLeft: indent + 12 }]}>
         {/* Chevron mở/đóng */}
         <Pressable
@@ -210,7 +211,7 @@ function CategoryRow({
           <Trash2 size={15} color="#EF4444" />
         </Pressable>
       </View>
-    </View>
+    </AdminDataWrapper>
   );
 }
 

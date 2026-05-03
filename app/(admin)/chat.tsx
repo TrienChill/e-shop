@@ -6,6 +6,7 @@ import { chatService } from "@/src/services/admin/chat";
 import { Conversation, Message } from "@/src/types/chat";
 import { supabase } from "@/src/lib/supabase";
 import { Bot, Send, User, Clock, Search, MoreVertical, Package, MapPin, MessageSquare } from "lucide-react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 
 export default function AdminChat() {
   const { session } = useAuth();
@@ -192,7 +193,7 @@ export default function AdminChat() {
     const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
     return (
-      <Pressable
+      <AdminDataWrapper
         style={[
           styles.convItem,
           isActive && { backgroundColor: '#F3F4F6' },
@@ -217,7 +218,7 @@ export default function AdminChat() {
             {item.last_message}
           </Text>
         </View>
-      </Pressable>
+      </AdminDataWrapper>
     );
   };
 

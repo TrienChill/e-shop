@@ -10,6 +10,7 @@ import {
   UserPlus,
   X,
 } from "lucide-react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -322,7 +323,7 @@ export default function AdminUserManagementScreen() {
   };
 
   const renderUserRow = ({ item: user }: { item: UserProfile }) => (
-    <View className="bg-white rounded-xl p-4 mb-3 border border-gray-100 shadow-sm">
+    <AdminDataWrapper className="bg-white rounded-xl mb-3 border border-gray-100 shadow-sm">
       <View className="flex-row items-start">
         {/* Avatar */}
         <View className="w-14 h-14 rounded-full bg-indigo-50 items-center justify-center mr-4 overflow-hidden">
@@ -426,7 +427,7 @@ export default function AdminUserManagementScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </AdminDataWrapper>
   );
 
   // ─── Render ───────────────────────────────────────────────────────────────────

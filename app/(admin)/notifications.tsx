@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useWindowDimensions, Platform, ActivityIndicator } from 'react-native';
 import { ShoppingCart, CreditCard, Users, Settings, Bell, Search, Star, Download, RefreshCw, MoreVertical } from 'lucide-react-native';
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import { supabase } from '@/src/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -224,7 +225,7 @@ export default function NotificationsPage() {
               filteredNotifications.map((item, index) => {
                 const Icon = item.icon;
                 return (
-                  <TouchableOpacity 
+                  <AdminDataWrapper 
                     key={item.id} 
                     style={[
                       styles.notificationItem, 
@@ -232,7 +233,6 @@ export default function NotificationsPage() {
                       index !== filteredNotifications.length - 1 && styles.borderBottom
                     ]}
                     onPress={() => markAsRead(item.id)}
-                    activeOpacity={0.7}
                   >
                     <View style={[styles.iconContainer, { backgroundColor: item.bgColor }]}>
                       <Icon size={20} color={item.color} strokeWidth={2.5} />
@@ -250,7 +250,7 @@ export default function NotificationsPage() {
                     <TouchableOpacity style={styles.moreButton}>
                       <MoreVertical size={20} color="#9CA3AF" />
                     </TouchableOpacity>
-                  </TouchableOpacity>
+                  </AdminDataWrapper>
                 )
               })
             )}

@@ -18,6 +18,7 @@ import {
   toggleReviewVisibility,
   replyToReview,
 } from "@/src/services/admin/review";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 
 export default function AdminReviewsScreen() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
@@ -182,7 +183,7 @@ export default function AdminReviewsScreen() {
         <>
           <ScrollView style={styles.listContainer}>
             {reviews.map((review) => (
-              <View key={review.id} style={[styles.card, !review.is_visible && styles.cardHidden]}>
+              <AdminDataWrapper key={review.id} style={[styles.card, !review.is_visible && styles.cardHidden]}>
                 
                 {/* Dòng 1: Info Khách + Sản phẩm */}
                 <View style={styles.cardHeader}>
@@ -258,7 +259,7 @@ export default function AdminReviewsScreen() {
                   </View>
                 </View>
 
-              </View>
+              </AdminDataWrapper>
             ))}
           </ScrollView>
 
@@ -380,6 +381,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#F3F4F6",
+    flexDirection: "column",
+    alignItems: "stretch",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,

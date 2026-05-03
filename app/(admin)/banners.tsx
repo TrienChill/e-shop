@@ -7,6 +7,7 @@ import {
   updateBanner,
 } from "@/src/services/banner";
 import { CheckCircle2, ChevronDown, Edit2, Plus, Trash2, Upload, X } from "lucide-react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -361,7 +362,7 @@ export default function AdminBannersScreen() {
           ) : (
             <View style={styles.grid}>
               {banners.map((item) => (
-                <View key={item.id} style={styles.card}>
+                <AdminDataWrapper key={item.id} style={styles.card}>
                   <View style={styles.cardImageContainer}>
                     <Image source={{ uri: item.image_url }} style={styles.cardImage} />
                     <View style={styles.statusOverlay}>
@@ -384,7 +385,7 @@ export default function AdminBannersScreen() {
                       </Pressable>
                     </View>
                   </View>
-                </View>
+                </AdminDataWrapper>
               ))}
             </View>
           )}
@@ -658,7 +659,7 @@ const styles = StyleSheet.create({
   addBtnText: { color: "white", fontWeight: "600", fontSize: 14 },
   listContainer: { flex: 1 },
   grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -8 },
-  card: { width: "33.33%", padding: 8 },
+  card: { width: "33.33%", padding: 8, flexDirection: "column", alignItems: "stretch", borderBottomWidth: 0 },
   cardImageContainer: { height: 140, borderRadius: 12, backgroundColor: "#E5E7EB", overflow: "hidden", position: "relative" },
   cardImage: { width: "100%", height: "100%", resizeMode: "cover" },
   statusOverlay: { position: "absolute", top: 10, right: 10 },

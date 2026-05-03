@@ -29,6 +29,7 @@ import {
   ChevronDown,
 } from "lucide-react-native";
 import { TextInput, Alert } from "react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import { fetchProvinces, fetchDistricts, fetchWards, calculateShippingFee } from "@/src/services/ghn/shippingService";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -601,7 +602,7 @@ export default function OrderDetailScreen() {
                     const lineTotal = (item.price_at_purchase ?? 0) * item.quantity;
 
                     return (
-                      <View
+                      <AdminDataWrapper
                         key={item.id}
                         style={[styles.productRow, index % 2 === 0 && styles.productRowEven]}
                       >
@@ -631,7 +632,7 @@ export default function OrderDetailScreen() {
                         <Text style={[styles.productCell, styles.productTotal, { flex: 1.5, textAlign: "right" }]}>
                           {formatMoney(lineTotal)}
                         </Text>
-                      </View>
+                      </AdminDataWrapper>
                     );
                   })}
                 </>

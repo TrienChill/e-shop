@@ -5,6 +5,7 @@ import { listOrders, pushOrderToGHN, updateOrderStatus, deleteOrders } from "@/s
 import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download, ExternalLink, Package, Plus, Search, Settings, Settings2, Trash2, Truck, XCircle } from "lucide-react-native";
 import * as XLSX from 'xlsx';
 import { useRouter } from "expo-router";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -615,12 +616,12 @@ export default function AdminOrdersScreen() {
                   paginatedOrders.map((order) => {
                     const isProcessingThis = processingOrderId === order.id;
                     return (
-                      <Pressable 
+                      <AdminDataWrapper 
                         key={order.id} 
                         onPress={() => router.push(`/(admin)/orders/${order.id}` as any)}
-                        style={({ pressed, hovered }: any) => [
+                        style={[
                           styles.row,
-                          (pressed || hovered || selectedOrders.includes(order.id)) && { backgroundColor: '#F3F4F6' }
+                          selectedOrders.includes(order.id) && { backgroundColor: '#F3F4F6' }
                         ]}
                       >
                         {/* Checkbox */}
@@ -769,7 +770,7 @@ export default function AdminOrdersScreen() {
                             )}
                           </View>
                         )}
-                      </Pressable>
+                      </AdminDataWrapper>
                     );
                   })
                 )}

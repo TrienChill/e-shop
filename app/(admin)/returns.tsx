@@ -22,6 +22,7 @@ import {
   X,
   XCircle
 } from "lucide-react-native";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -297,7 +298,7 @@ export default function AdminReturnsScreen() {
                     RETURN_STATUS_COLORS[ret.status] || "#999";
 
                   return (
-                    <View key={ret.id} style={styles.row}>
+                    <AdminDataWrapper key={ret.id} style={styles.row}>
                       {/* ID */}
                       <View style={styles.colId}>
                         <Text style={styles.cellId}>#{ret.id}</Text>
@@ -408,7 +409,7 @@ export default function AdminReturnsScreen() {
                           <Text style={styles.noAction}>-</Text>
                         )}
                       </View>
-                    </View>
+                    </AdminDataWrapper>
                   );
                 })
               )}
