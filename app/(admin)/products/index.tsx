@@ -495,7 +495,10 @@ export default function AdminProductsScreen() {
                 const isLastItem = index === paginatedProducts.length - 1;
 
                 return (
-                  <AdminDataWrapper style={[styles.tableRow, isLastItem && styles.tableRowLast, isSelected && styles.tableRowSelected]}>
+                  <AdminDataWrapper 
+                    onPress={() => router.push(`/(admin)/products/${item.id}` as any)}
+                    style={[styles.tableRow, isLastItem && styles.tableRowLast, isSelected && styles.tableRowSelected]}
+                  >
                     {/* Cột Checkbox */}
                     <View style={styles.colCheckbox}>
                       <Pressable 

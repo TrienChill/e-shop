@@ -384,7 +384,14 @@ export default function AdminOrdersScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={true}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
+    >
       {/* FIXED HEADER SECTION */}
       <View style={styles.fixedHeaderSection}>
         <View style={styles.header}>
@@ -601,13 +608,7 @@ export default function AdminOrdersScreen() {
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             ) : (
-              <ScrollView
-                ref={scrollRef}
-                showsVerticalScrollIndicator={true}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                contentContainerStyle={styles.tableScrollContent}
-              >
+              <View>
                 {paginatedOrders.length === 0 ? (
                   <View style={styles.emptyContainer}>
                     <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
@@ -774,68 +775,59 @@ export default function AdminOrdersScreen() {
                     );
                   })
                 )}
-              </ScrollView>
+              </View>
             )}
           </View>
 
-          {/* FIXED PAGINATION FOOTER */}
-          <View style={styles.paginationContainer}>
-            <View style={styles.paginationLeft}>
-              <Text style={styles.paginationText}>
-                Hiển thị <Text style={styles.paginationTextBold}>{totalItems === 0 ? 0 : startIndex + 1}-{endIndex}</Text> trong tổng số <Text style={styles.paginationTextBold}>{totalItems}</Text> kết quả
-              </Text>
-            </View>
+          {/* FOOTER PAGINATION */}
+          <View style={styles.tableFooter}>
+            <Text style={styles.footerInfo}>
+              Hiển thị {totalItems === 0 ? 0 : startIndex + 1}-{endIndex} trong tổng số {totalItems} kết quả
+            </Text>
 
-            <View style={styles.paginationRight}>
-              <View style={styles.pageSizeContainer}>
-                <Text style={styles.pageSizeLabel}>Hàng mỗi trang:</Text>
-                <View style={{ position: 'relative' }}>
-                  {showPageSizeDropdown && (
-                    <Pressable
-                      style={styles.dropdownOverlay}
-                      onPress={() => setShowPageSizeDropdown(false)}
-                    />
-                  )}
-                  <Pressable
-                    style={styles.pageSizeSelector}
-                    onPress={() => setShowPageSizeDropdown(!showPageSizeDropdown)}
-                  >
-                    <Text style={styles.pageSizeValue}>{pageSize}</Text>
-                    <ChevronDown size={14} color="#6B7280" />
-                  </Pressable>
+            <View style={styles.footerRight}>
+              {/* Số dòng selector */}
+              <View style={styles.rowsSelectorContainer}>
+                <Pressable
+                  style={styles.rowsSelector}
+                  onPress={() => setShowPageSizeDropdown(!showPageSizeDropdown)}
+                >
+                  <Text style={styles.footerLabel}>Số dòng</Text>
+                  <View style={styles.selectBox}>
+                    <Text style={styles.selectText}>{pageSize}</Text>
+                    <ChevronDown size={14} color="#64748B" />
+                  </View>
+                </Pressable>
 
-                  {showPageSizeDropdown && (
-                    <View style={styles.pageSizeDropdown}>
-                      {[20, 50, 100].map(size => (
-                        <Pressable
-                          key={size}
-                          style={StyleSheet.flatten([
-                            styles.pageSizeItem,
-                            pageSize === size && styles.pageSizeItemActive
-                          ])}
-                          onPress={() => togglePageSize(size)}
-                        >
-                          <Text style={StyleSheet.flatten([
-                            styles.pageSizeItemText,
-                            pageSize === size && styles.pageSizeItemTextActive
-                          ])}>
-                            {size} hàng
-                          </Text>
-                          {pageSize === size && <Check size={14} color="#2563EB" />}
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-                </View>
+                {showPageSizeDropdown && (
+                  <View style={styles.rowsMenu}>
+                    {[20, 50, 100].map((val) => (
+                      <Pressable
+                        key={val}
+                        style={styles.rowsMenuItem}
+                        onPress={() => {
+                          setPageSize(val);
+                          setCurrentPage(1);
+                          setShowPageSizeDropdown(false);
+                        }}
+                      >
+                        <Text style={[styles.rowsMenuText, pageSize === val && styles.rowsMenuTextActive]}>
+                          {val}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </View>
 
-              <View style={styles.pageButtons}>
+              {/* Nút phân trang */}
+              <View style={styles.paginationButtons}>
                 <Pressable
-                  style={StyleSheet.flatten([styles.pageButton, currentPage === 1 && styles.pageButtonDisabled])}
+                  style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
                   onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                 >
-                  <Text style={StyleSheet.flatten([styles.pageButtonText, currentPage === 1 && styles.pageButtonTextDisabled])}>Trước</Text>
+                  <Text style={styles.pageBtnText}>Trước</Text>
                 </Pressable>
 
                 {[...Array(totalPages)].map((_, i) => {
@@ -846,20 +838,13 @@ export default function AdminOrdersScreen() {
                     }
                     return null;
                   }
-
                   return (
                     <Pressable
                       key={pageNum}
                       onPress={() => setCurrentPage(pageNum)}
-                      style={StyleSheet.flatten([
-                        styles.pageNumberButton,
-                        currentPage === pageNum && styles.pageNumberButtonActive
-                      ])}
+                      style={[styles.pageNumber, currentPage === pageNum && styles.pageNumberActive]}
                     >
-                      <Text style={StyleSheet.flatten([
-                        styles.pageNumberText,
-                        currentPage === pageNum && styles.pageNumberTextActive
-                      ])}>
+                      <Text style={[styles.pageNumberText, currentPage === pageNum && styles.pageNumberTextActive]}>
                         {pageNum}
                       </Text>
                     </Pressable>
@@ -867,11 +852,11 @@ export default function AdminOrdersScreen() {
                 })}
 
                 <Pressable
-                  style={StyleSheet.flatten([styles.pageButton, currentPage === totalPages && styles.pageButtonDisabled])}
+                  style={[styles.pageBtn, (currentPage === totalPages || totalPages === 0) && styles.pageBtnDisabled]}
                   onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                   disabled={currentPage === totalPages || totalPages === 0}
                 >
-                  <Text style={StyleSheet.flatten([styles.pageButtonText, (currentPage === totalPages || totalPages === 0) && styles.pageButtonTextDisabled])}>Tiếp</Text>
+                  <Text style={styles.pageBtnText}>Sau</Text>
                 </Pressable>
               </View>
             </View>
@@ -988,7 +973,7 @@ export default function AdminOrdersScreen() {
         </View>
       </Modal>
 
-    </View>
+    </ScrollView>
   );
 }
 
@@ -1015,6 +1000,7 @@ function ActionButton({ onPress, label, color, outline = false }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F9FAFB" },
+  scrollContainer: { flexGrow: 1, paddingBottom: 40 },
   fixedHeaderSection: {
     paddingHorizontal: 40,
     paddingTop: 0,
@@ -1022,12 +1008,10 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   tableArea: {
-    flex: 1,
     paddingHorizontal: 40,
     paddingBottom: 0,
   },
   tableCard: {
-    flex: 1,
     backgroundColor: "white",
     borderRadius: 16,
     borderWidth: 1,
@@ -1035,10 +1019,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     boxShadow: "0 1px 2px rgba(0, 0, 0, 0.05)",
     elevation: 2,
+    marginBottom: 24,
   },
-  tableBodyContainer: {
-    flex: 1,
-  },
+  tableBodyContainer: {},
+  tableBodyContainerExpanded: {},
   tableScrollContent: {
     flexGrow: 1,
   },
@@ -1361,141 +1345,139 @@ const styles = StyleSheet.create({
   },
   modalBtnOutlineText: { color: "#374151", fontWeight: "600", fontSize: 15 },
 
-  // ── Pagination Styles ──
-  paginationContainer: {
+  // ── Footer / Pagination ──
+  tableFooter: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
-    backgroundColor: "white",
-  },
-  paginationLeft: {
-    flex: 1,
-  },
-  paginationText: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  paginationTextBold: {
-    fontWeight: "600",
-    color: "#374151",
-  },
-  paginationRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 24,
-  },
-  pageSizeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  pageSizeLabel: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  pageSizeSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
     borderColor: "#E5E7EB",
-    borderRadius: 8,
+    backgroundColor: "#FFFFFF",
+  },
+  footerInfo: {
+    fontSize: 13,
+    color: "#64748B",
+  },
+  footerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 20,
+  },
+  toggleAllButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    minWidth: 60,
-    justifyContent: "space-between",
-  },
-  pageSizeValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  pageSizeDropdown: {
-    position: "absolute",
-    bottom: "100%",
-    right: 0,
-    marginBottom: 8,
-    width: 120,
-    backgroundColor: "white",
-    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 6,
-    zIndex: 1000,
-    ...Platform.select({
-      web: { boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1)" },
-      default: { elevation: 5 }
-    }),
-  },
-  pageSizeItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    borderColor: "#E2E8F0",
     borderRadius: 6,
+    backgroundColor: "transparent",
   },
-  pageSizeItemActive: {
-    backgroundColor: "#EFF6FF",
-  },
-  pageSizeItemText: {
+  toggleAllText: {
     fontSize: 13,
-    color: "#4B5563",
+    color: "#475569",
+    fontWeight: "500",
   },
-  pageSizeItemTextActive: {
-    color: "#2563EB",
-    fontWeight: "600",
+  rowsSelectorContainer: {
+    position: "relative",
+    zIndex: 10,
   },
-  pageButtons: {
+  rowsSelector: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
-  pageButton: {
-    paddingHorizontal: 12,
+  rowsMenu: {
+    position: "absolute",
+    bottom: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 999,
+  },
+  rowsMenuItem: {
     paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "white",
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
   },
-  pageButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: "#F9FAFB",
+  rowsMenuText: {
+    fontSize: 13,
+    color: "#475569",
+    textAlign: "center",
   },
-  pageButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#374151",
+  rowsMenuTextActive: {
+    color: "#10B981",
+    fontWeight: "600",
   },
-  pageButtonTextDisabled: {
-    color: "#3c3f45ff",
+  footerLabel: {
+    fontSize: 13,
+    color: "#64748B",
   },
-  pageNumberButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+  selectBox: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
+    gap: 8,
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
-  pageNumberButtonActive: {
-    backgroundColor: "#10B981", // Green matching the image
-    borderColor: "#10B981",
+  selectText: {
+    fontSize: 13,
+    color: "#0F172A",
+    fontWeight: "500",
+  },
+  paginationButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pageBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  pageBtnDisabled: {
+    opacity: 0.5,
+  },
+  pageBtnText: {
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
+  },
+  pageNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pageNumberActive: {
+    backgroundColor: "#059669",
   },
   pageNumberText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
+    fontSize: 13,
+    color: "#475569",
+    fontWeight: "500",
   },
   pageNumberTextActive: {
-    color: "white",
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   paginationEllipsis: {
     color: "#9CA3AF",

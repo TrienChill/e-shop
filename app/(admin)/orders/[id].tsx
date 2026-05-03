@@ -604,6 +604,7 @@ export default function OrderDetailScreen() {
                     return (
                       <AdminDataWrapper
                         key={item.id}
+                        onPress={() => router.push(`/(admin)/products/${item.product_id}` as any)}
                         style={[styles.productRow, index % 2 === 0 && styles.productRowEven]}
                       >
                         <View style={[styles.productInfo, { flex: 3 }]}>
