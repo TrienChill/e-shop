@@ -1,7 +1,8 @@
 import { supabase } from "@/src/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { ArrowLeft, ChevronDown, Image as ImageIcon, Plus, Save, Trash2 } from "lucide-react-native";
+import { ArrowLeft, ChevronDown, Image as ImageIcon, Plus, Save, Trash2, Sparkles } from "lucide-react-native";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,6 +48,7 @@ export default function ProductEditorScreen() {
   const [newSpecValue, setNewSpecValue] = useState("");
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
 
   // Category State
   const [categories, setCategories] = useState<CategoryNode[]>([]);
@@ -218,6 +220,62 @@ export default function ProductEditorScreen() {
     const cat = flatCategories.find(c => c.id === selectedCategoryId);
     return cat ? cat.name_vi || cat.name : null;
   }, [selectedCategoryId, flatCategories]);
+
+  // Hàm tạo mô tả tự động bằng AI
+  const generateDescriptionWithAI = async () => {
+    if (!name) {
+      alert("Vui lòng nhập tên sản phẩm trước khi tạo mô tả bằng AI!");
+      return;
+    }
+
+    setIsGeneratingDescription(true);
+    try {
+      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error("Không tìm thấy API Key của Gemini.");
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+      const categoryStr = selectedCategoryName ? `Thuộc danh mục: ${selectedCategoryName}.` : "";
+      const priceStr = price ? `Giá sản phẩm: ${price} VNĐ.` : "";
+      const shortDescStr = shortDescription ? `Mô tả ngắn: ${shortDescription}.` : "";
+      const specsStr = specifications.length > 0 
+        ? `Thông số kỹ thuật: ${specifications.map(s => `${s.name}: ${s.value}`).join(', ')}.` 
+        : "";
+
+      const prompt = `Bạn là một chuyên gia viết nội dung marketing (copywriter) cho nền tảng thương mại điện tử. 
+Hãy viết một đoạn mô tả sản phẩm chi tiết, hấp dẫn và thuyết phục cho sản phẩm có các thông tin sau:
+Tên sản phẩm: ${name}
+${categoryStr}
+${priceStr}
+${shortDescStr}
+${specsStr}
+
+Yêu cầu:
+- Viết bằng tiếng Việt, giọng văn chuyên nghiệp, thu hút người mua.
+- Bố cục rõ ràng, có các đoạn văn ngắn, sử dụng dấu đầu dòng cho các tính năng nổi bật.
+- Cấu trúc gợi ý: Giới thiệu chung -> Đặc điểm nổi bật -> Lợi ích khi sử dụng -> Kết luận/Kêu gọi mua hàng.
+- Chỉ trả về nội dung mô tả, không kèm theo các câu giải thích thừa như "Dưới đây là nội dung...", không dùng markdown code block cho toàn bộ câu trả lời, chỉ dùng văn bản và markdown formatting thông thường.`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      setDescription(text);
+      if (Platform.OS === 'web') {
+        alert("Thành công: Đã tạo mô tả sản phẩm bằng AI hoàn tất!");
+      } else {
+        Alert.alert("Thành công", "Đã tạo mô tả sản phẩm bằng AI hoàn tất!");
+      }
+    } catch (error: any) {
+      console.error("Lỗi tạo mô tả AI:", error);
+      alert("Đã có lỗi xảy ra khi tạo mô tả bằng AI: " + (error.message || "Lỗi không xác định"));
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  };
 
   // Hàm lấy ảnh mô tả cho một màu sắc cụ thể
   const getImageForColor = (color: string) => {
@@ -754,7 +812,23 @@ export default function ProductEditorScreen() {
           </View>
 
           <View style={{ marginBottom: 16 }}>
-            <Text style={[styles.label, { fontSize: 13, color: '#6B7280' }]}>Mô tả chi tiết sản phẩm</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[styles.label, { fontSize: 13, color: '#6B7280', marginBottom: 0 }]}>Mô tả chi tiết sản phẩm</Text>
+              <Pressable 
+                style={[styles.pickBtn, { backgroundColor: '#F3E8FF', paddingVertical: 4, paddingHorizontal: 10 }]} 
+                onPress={generateDescriptionWithAI}
+                disabled={isGeneratingDescription || saving}
+              >
+                {isGeneratingDescription ? (
+                  <ActivityIndicator size="small" color="#9333EA" />
+                ) : (
+                  <Sparkles size={14} color="#9333EA" />
+                )}
+                <Text style={[styles.pickBtnText, { color: '#9333EA', fontSize: 12 }]}>
+                  {isGeneratingDescription ? "Đang tạo..." : "Tạo bằng AI"}
+                </Text>
+              </Pressable>
+            </View>
             <TextInput
               style={[styles.input, { height: 120, textAlignVertical: "top", marginBottom: 0 }]}
               value={description}
