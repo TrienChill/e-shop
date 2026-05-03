@@ -547,11 +547,26 @@ export default function AdminRevenueScreen() {
         label: { show: false, position: "center" },
         emphasis: { label: { show: true, fontSize: 16, fontWeight: "bold" } },
         labelLine: { show: false },
-        data: paymentMethods.map((pm, i) => ({
-          value: pm.amount,
-          name: pm.method,
-          itemStyle: { color: TOP_COLORS[i % TOP_COLORS.length] },
-        })),
+        data: paymentMethods.map((pm, i) => {
+          let name = pm.method;
+          let color = TOP_COLORS[i % TOP_COLORS.length];
+          
+          if (pm.method === "VNPay") {
+            name = "Thanh toán VNPay";
+            color = "#2563EB"; // Blue
+          } else if (pm.method === "COD") {
+            name = "Thanh toán khi nhận hàng";
+            color = "#10B981"; // Emerald
+          } else if (!pm.method) {
+            name = "Khác";
+          }
+          
+          return {
+            value: pm.amount,
+            name: name,
+            itemStyle: { color: color },
+          };
+        }),
       },
     ],
   };

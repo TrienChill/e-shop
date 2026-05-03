@@ -33,6 +33,8 @@ export async function listOrders(params?: {
       shipping_address,
       shipping_fee,
       payment_method,
+      payment_status,
+      transaction_id,
       ghn_order_code,
       address_id,
       shipping_district_id,

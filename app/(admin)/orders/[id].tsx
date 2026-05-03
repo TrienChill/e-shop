@@ -521,8 +521,31 @@ export default function OrderDetailScreen() {
               <InfoRow
                 icon={<CreditCard size={16} color="#6B7280" />}
                 label="Phương thức TT"
-                value={order.payment_method === "COD" ? "Thanh toán khi nhận hàng (COD)" : order.payment_method ?? "—"}
+                value={order.payment_method === "COD" ? "Thanh toán khi nhận hàng (COD)" : order.payment_method === "VNPay" ? "Thanh toán qua VNPay" : order.payment_method ?? "—"}
               />
+              {order.payment_method === "VNPay" && (
+                <>
+                  <InfoRow
+                    icon={<FileText size={16} color="#6B7280" />}
+                    label="Trạng thái TT"
+                    value={
+                      order.payment_status === "paid" ? "Đã thanh toán" 
+                      : order.payment_status === "failed" ? "Thất bại" 
+                      : order.payment_status === "refunded" ? "Đã hoàn tiền"
+                      : "Chưa thanh toán"
+                    }
+                    highlight={order.payment_status === "paid"}
+                  />
+                  {order.transaction_id && (
+                    <InfoRow
+                      icon={<FileText size={16} color="#6B7280" />}
+                      label="Mã GD VNPay"
+                      value={order.transaction_id}
+                      highlight={true}
+                    />
+                  )}
+                </>
+              )}
               {order.ghn_order_code && (
                 <InfoRow
                   icon={<Truck size={16} color="#6B7280" />}

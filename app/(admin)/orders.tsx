@@ -76,6 +76,7 @@ export default function AdminOrdersScreen() {
     date: true,
     customer: true,
     phone: true,
+    payment: true,
     amount: true,
     tracking: true,
     status: true,
@@ -126,6 +127,7 @@ export default function AdminOrdersScreen() {
       "Ngày đặt": new Date(order.created_at).toLocaleString("vi-VN"),
       "Tên khách": order.receiver_name || "N/A",
       "Số điện thoại": order.phone_contact || "",
+      "Phương thức TT": order.payment_method || "N/A",
       "Tổng tiền": order.total_amount || 0,
       "Mã vận đơn GHN": order.ghn_order_code || "N/A",
       "Trạng thái": STATUS_LABELS[order.status] || order.status
@@ -460,6 +462,7 @@ export default function AdminOrdersScreen() {
                       { id: 'date', label: 'Ngày đặt' },
                       { id: 'customer', label: 'Tên khách' },
                       { id: 'phone', label: 'Số điện thoại' },
+                      { id: 'payment', label: 'Thanh toán' },
                       { id: 'amount', label: 'Tổng tiền' },
                       { id: 'tracking', label: 'Mã vận đơn' },
                       { id: 'status', label: 'Trạng thái' },
@@ -560,6 +563,16 @@ export default function AdminOrdersScreen() {
               >
                 <Text style={styles.headerText}>SỐ ĐIỆN THOẠI</Text>
                 <SortIndicator columnKey="phone_contact" />
+              </Pressable>
+            )}
+
+            {visibleColumns.payment && (
+              <Pressable
+                style={StyleSheet.flatten([styles.columnPhone, styles.headerSortable])}
+                onPress={() => toggleSort('payment_method')}
+              >
+                <Text style={styles.headerText}>THANH TOÁN</Text>
+                <SortIndicator columnKey="payment_method" />
               </Pressable>
             )}
 
@@ -669,6 +682,20 @@ export default function AdminOrdersScreen() {
                         {visibleColumns.phone && (
                           <View style={styles.columnPhone}>
                             <Text style={styles.customerPhone}>{order.phone_contact}</Text>
+                          </View>
+                        )}
+
+                        {/* Thanh toán */}
+                        {visibleColumns.payment && (
+                          <View style={styles.columnPhone}>
+                            <Text style={[styles.customerName, order.payment_method === "VNPay" && { color: "#2563EB", fontWeight: "600" }]}>
+                              {order.payment_method === "VNPay" ? "VNPay" : "COD"}
+                            </Text>
+                            {order.payment_method === "VNPay" && (
+                              <Text style={{ fontSize: 11, color: order.payment_status === "paid" ? "#10B981" : "#EF4444", marginTop: 2 }}>
+                                {order.payment_status === "paid" ? "Đã TT" : "Chưa TT"}
+                              </Text>
+                            )}
                           </View>
                         )}
 
