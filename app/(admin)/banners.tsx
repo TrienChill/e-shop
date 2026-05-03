@@ -362,7 +362,13 @@ export default function AdminBannersScreen() {
           ) : (
             <View style={styles.grid}>
               {banners.map((item) => (
-                <AdminDataWrapper key={item.id} style={styles.card}>
+                <Pressable
+                  key={item.id}
+                  style={({ hovered }: any) => [
+                    styles.card,
+                    hovered && styles.cardHovered,
+                  ]}
+                >
                   <View style={styles.cardImageContainer}>
                     <Image source={{ uri: item.image_url }} style={styles.cardImage} />
                     <View style={styles.statusOverlay}>
@@ -371,7 +377,7 @@ export default function AdminBannersScreen() {
                   </View>
                   <View style={styles.cardContent}>
                     <Text style={styles.cardTitle} numberOfLines={1}>{item.title || "(Không có tiêu đề)"}</Text>
-                    <Text style={styles.cardSubtitle} numberOfLines={1}>{item.subtitle || "(Không có chú thích)"}</Text>
+                    <Text style={styles.cardSubtitle} numberOfLines={2}>{item.subtitle || "(Không có chú thích)"}</Text>
                     <View style={styles.cardMeta}>
                       <Text style={styles.metaText}>Thứ tự: {item.display_order}</Text>
                       <Text style={styles.metaText} numberOfLines={1}>🔗 {getActionLabel(item.action_type, item.action_value || "")}</Text>
@@ -385,7 +391,7 @@ export default function AdminBannersScreen() {
                       </Pressable>
                     </View>
                   </View>
-                </AdminDataWrapper>
+                </Pressable>
               ))}
             </View>
           )}
@@ -658,19 +664,64 @@ const styles = StyleSheet.create({
   addBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#2563EB", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
   addBtnText: { color: "white", fontWeight: "600", fontSize: 14 },
   listContainer: { flex: 1 },
-  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -8 },
-  card: { width: "33.33%", padding: 8, flexDirection: "column", alignItems: "stretch", borderBottomWidth: 0 },
-  cardImageContainer: { height: 140, borderRadius: 12, backgroundColor: "#E5E7EB", overflow: "hidden", position: "relative" },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    padding: 16,
+  },
+  card: {
+    width: Platform.OS === "web" ? ("calc(33.333% - 11px)" as any) : "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+    flexDirection: "column",
+  },
+  cardHovered: {
+    borderColor: "#93C5FD",
+    ...Platform.select({
+      web: {
+        boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+      } as any,
+      default: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 4,
+      },
+    }),
+  },
+  cardImageContainer: {
+    width: "100%",
+    height: 160,
+    backgroundColor: "#F3F4F6",
+    position: "relative",
+  },
   cardImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  statusOverlay: { position: "absolute", top: 10, right: 10 },
-  cardContent: { padding: 12, backgroundColor: "white", borderBottomLeftRadius: 12, borderBottomRightRadius: 12, borderWidth: 1, borderColor: "#E5E7EB", borderTopWidth: 0 },
-  cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827", marginBottom: 4 },
-  cardSubtitle: { fontSize: 13, color: "#6B7280", marginBottom: 8 },
-  cardMeta: { gap: 4, marginBottom: 16 },
-  metaText: { fontSize: 12, color: "#4B5563" },
-  cardActions: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
-  iconBtnEdit: { padding: 8, backgroundColor: "#DBEAFE", borderRadius: 8 },
-  iconBtnDelete: { padding: 8, backgroundColor: "#FEE2E2", borderRadius: 8 },
+  statusOverlay: { position: "absolute", top: 12, right: 12, zIndex: 10 },
+  cardContent: {
+    padding: 16,
+    flexDirection: "column",
+    gap: 8,
+  },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
+  cardSubtitle: { fontSize: 14, color: "#6B7280", height: 40 },
+  cardMeta: { flexDirection: "column", gap: 4, marginTop: 4 },
+  metaText: { fontSize: 13, color: "#9CA3AF" },
+  cardActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: "#F3F4F6",
+  },
+  iconBtnEdit: { padding: 8, backgroundColor: "#EFF6FF", borderRadius: 8 },
+  iconBtnDelete: { padding: 8, backgroundColor: "#FEF2F2", borderRadius: 8 },
   emptyText: { textAlign: "center", marginTop: 50, color: "#9CA3AF" },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
   badgeGreen: { backgroundColor: "#DCFCE7" },
