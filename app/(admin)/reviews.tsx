@@ -120,7 +120,11 @@ export default function AdminReviewsScreen() {
   const totalPages = Math.ceil(totalCount / LIMIT) || 1;
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContainer}
+      showsVerticalScrollIndicator={true}
+    >
       {/* Toast */}
       {toast && (
         <View style={[styles.toast, toast.type === "error" ? styles.toastError : styles.toastSuccess]}>
@@ -181,87 +185,96 @@ export default function AdminReviewsScreen() {
         </View>
       ) : (
         <>
-          <ScrollView style={styles.listContainer}>
+          <View style={styles.listContainer}>
             {reviews.map((review) => (
               <AdminDataWrapper key={review.id} style={[styles.card, !review.is_visible && styles.cardHidden]}>
-                
-                {/* Dòng 1: Info Khách + Sản phẩm */}
-                <View style={styles.cardHeader}>
-                  <Image source={{ uri: review.profile?.avatar_url || "https://via.placeholder.com/150" }} style={styles.avatar} />
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{review.profile?.full_name || "Nhà thám hiểm ẩn danh"}</Text>
-                    <Text style={styles.productName} numberOfLines={1}>Sản phẩm: {review.product?.name || "Không rõ"}</Text>
-                  </View>
-                  <Text style={styles.dateText}>
-                    {new Date(review.created_at).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                  </Text>
+
+                {/* Cột trái: Avatar */}
+                <View style={styles.avatarContainer}>
+                  <Image
+                    source={{ uri: review.profile?.avatar_url || "https://via.placeholder.com/150" }}
+                    style={styles.avatar}
+                  />
                 </View>
 
-                {/* Dòng 2: Nội dung Đánh giá */}
-                <View style={styles.reviewContent}>
-                  {renderStars(review.rating)}
-                  <Text style={styles.commentText}>{review.comment || "Khách hàng không để lại bình luận"}</Text>
-                  
-                  {/* Gallery */}
-                  {review.images && review.images.length > 0 && (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gallery}>
-                      {review.images.map((img, idx) => (
-                        <Pressable key={idx} onPress={() => setSelectedImage(img)}>
-                          <Image source={{ uri: img }} style={styles.thumbnail} />
-                        </Pressable>
-                      ))}
-                    </ScrollView>
-                  )}
-                </View>
+                {/* Cột phải: Toàn bộ nội dung */}
+                <View style={styles.contentContainer}>
 
-                {/* Admin Reply (Nếu có) */}
-                {review.admin_reply && (
-                  <View style={styles.adminReplyBox}>
-                    <Text style={styles.adminReplyTitle}>Admin đã phản hồi:</Text>
-                    <Text style={styles.adminReplyText}>{review.admin_reply}</Text>
+                  {/* Dòng 1: Tên, Sản phẩm, Ngày */}
+                  <View style={styles.headerRow}>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>{review.profile?.full_name || "Nhà thám hiểm ẩn danh"}</Text>
+                      <Text style={styles.productName} numberOfLines={1}>SP: {review.product?.name || "Không rõ"}</Text>
+                    </View>
+                    <Text style={styles.dateText}>
+                      {new Date(review.created_at).toLocaleDateString("vi-VN", { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </Text>
                   </View>
-                )}
 
-                {/* Dòng 3: Actions */}
-                <View style={styles.cardActions}>
-                  <View style={styles.badgeRow}>
-                    {review.rating <= 2 ? (
-                      <View style={styles.badgeDanger}><Text style={styles.badgeDangerText}>Tiêu cực</Text></View>
-                    ) : review.rating === 5 ? (
-                      <View style={styles.badgeSuccess}><Text style={styles.badgeSuccessText}>Tuyệt vời</Text></View>
-                    ) : null}
-                    
-                    {!review.is_visible && (
-                      <View style={styles.badgeWarning}><Text style={styles.badgeWarningText}>Đã bị ẩn</Text></View>
+                  {/* Dòng 2: Rating, Comment, Gallery */}
+                  <View style={styles.reviewBody}>
+                    {renderStars(review.rating)}
+                    <Text style={styles.commentText}>{review.comment || "Khách hàng không để lại bình luận"}</Text>
+
+                    {review.images && review.images.length > 0 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gallery}>
+                        {review.images.map((img, idx) => (
+                          <Pressable key={idx} onPress={() => setSelectedImage(img)}>
+                            <Image source={{ uri: img }} style={styles.thumbnail} />
+                          </Pressable>
+                        ))}
+                      </ScrollView>
                     )}
                   </View>
 
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      style={[styles.actionBtn, review.is_visible ? styles.btnDanger : styles.btnSuccess]}
-                      onPress={() => handleToggleVisibility(review)}
-                    >
-                      {review.is_visible ? <EyeOff size={15} color="#EF4444" /> : <Eye size={15} color="#10B981" />}
-                      <Text style={[styles.actionBtnText, { color: review.is_visible ? "#EF4444" : "#10B981" }]}>
-                        {review.is_visible ? "Ẩn bài" : "Bỏ ẩn"}
-                      </Text>
-                    </Pressable>
+                  {/* Dòng 3: Admin Reply */}
+                  {review.admin_reply && (
+                    <View style={styles.adminReplyBox}>
+                      <Text style={styles.adminReplyTitle}>Admin đã phản hồi:</Text>
+                      <Text style={styles.adminReplyText}>{review.admin_reply} 👍</Text>
+                    </View>
+                  )}
 
-                    <Pressable
-                      style={[styles.actionBtn, styles.btnPrimary]}
-                      onPress={() => setReplyModal({ isOpen: true, reviewId: review.id, content: review.admin_reply || "" })}
-                    >
-                      <MessageSquare size={15} color="#4F46E5" />
-                      <Text style={[styles.actionBtnText, { color: "#4F46E5" }]}>
-                        {review.admin_reply ? "Sửa phản hồi" : "Phản hồi"}
-                      </Text>
-                    </Pressable>
+                  {/* Dòng 4: Badges + Action Buttons */}
+                  <View style={styles.actionsRow}>
+                    <View style={styles.badgeRow}>
+                      {review.rating <= 2 ? (
+                        <View style={styles.badgeDanger}><Text style={styles.badgeDangerText}>Tiêu cực</Text></View>
+                      ) : review.rating === 5 ? (
+                        <View style={styles.badgeSuccess}><Text style={styles.badgeSuccessText}>Tuyệt vời</Text></View>
+                      ) : null}
+                      {!review.is_visible && (
+                        <View style={styles.badgeWarning}><Text style={styles.badgeWarningText}>Đã bị ẩn</Text></View>
+                      )}
+                    </View>
+
+                    <View style={styles.actionButtons}>
+                      <Pressable
+                        style={[styles.actionBtn, review.is_visible ? styles.btnDanger : styles.btnSuccess]}
+                        onPress={() => handleToggleVisibility(review)}
+                      >
+                        {review.is_visible ? <EyeOff size={15} color="#EF4444" /> : <Eye size={15} color="#10B981" />}
+                        <Text style={[styles.actionBtnText, { color: review.is_visible ? "#EF4444" : "#10B981" }]}>
+                          {review.is_visible ? "Ẩn bài" : "Bỏ ẩn"}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[styles.actionBtn, styles.btnPrimary]}
+                        onPress={() => setReplyModal({ isOpen: true, reviewId: review.id, content: review.admin_reply || "" })}
+                      >
+                        <MessageSquare size={15} color="#4F46E5" />
+                        <Text style={[styles.actionBtnText, { color: "#4F46E5" }]}>
+                          {review.admin_reply ? "Sửa phản hồi" : "Phản hồi"}
+                        </Text>
+                      </Pressable>
+                    </View>
                   </View>
-                </View>
 
+                </View>
               </AdminDataWrapper>
             ))}
-          </ScrollView>
+          </View>
 
           {/* Phân trang */}
           <View style={styles.pagination}>
@@ -315,7 +328,7 @@ export default function AdminReviewsScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -323,7 +336,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F9FAFB",
-    padding: 16,
+  },
+  scrollContainer: {
+    padding: 24,
+    paddingBottom: 60,
   },
   header: {
     marginBottom: 16,
@@ -371,18 +387,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#D1D5DB",
     marginHorizontal: 8,
   },
-  listContainer: {
-    flex: 1,
-  },
+  listContainer: {},
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#F3F4F6",
-    flexDirection: "column",
-    alignItems: "stretch",
+    alignItems: "flex-start",
+    padding: 16,
+    gap: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -393,20 +407,28 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     backgroundColor: "#F9FAFB",
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
+  avatarContainer: {
+    width: 48,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#E5E7EB",
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 12,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
   userInfo: {
     flex: 1,
-    marginLeft: 12,
+    paddingRight: 16,
   },
   userName: {
     fontSize: 15,
@@ -422,12 +444,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#9CA3AF",
   },
-  reviewContent: {
-    marginBottom: 12,
+  reviewBody: {
+    flexDirection: "column",
+    gap: 8,
   },
   starContainer: {
     flexDirection: "row",
-    marginBottom: 6,
   },
   commentText: {
     fontSize: 14,
@@ -436,7 +458,6 @@ const styles = StyleSheet.create({
   },
   gallery: {
     flexDirection: "row",
-    marginTop: 10,
   },
   thumbnail: {
     width: 70,
@@ -451,7 +472,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: "#22C55E",
-    marginBottom: 12,
   },
   adminReplyTitle: {
     fontSize: 12,
@@ -464,13 +484,13 @@ const styles = StyleSheet.create({
     color: "#15803D",
     lineHeight: 18,
   },
-  cardActions: {
+  actionsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
     paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: "#F3F4F6",
   },
   badgeRow: {
     flexDirection: "row",
@@ -482,7 +502,7 @@ const styles = StyleSheet.create({
   badgeSuccessText: { color: "#166534", fontSize: 11, fontWeight: "600" },
   badgeWarning: { backgroundColor: "#FFFBEB", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#FEF3C7" },
   badgeWarningText: { color: "#B45309", fontSize: 11, fontWeight: "600" },
-  actionRow: {
+  actionButtons: {
     flexDirection: "row",
     gap: 8,
   },
