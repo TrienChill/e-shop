@@ -18,6 +18,7 @@ import {
   Bell,
   UserCircle,
   SlidersHorizontal,
+  Clock,
 } from "lucide-react-native";
 import React from "react";
 import {
@@ -68,7 +69,7 @@ export default function AdminLayout() {
 
 // ─── Giao diện Admin Web (dùng context Appearance) ────────────────────────────
 function AdminLayoutWeb() {
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { primaryColor, contentPadding } = useAppearance();
@@ -76,9 +77,19 @@ function AdminLayoutWeb() {
   const isProfileActive = pathname.startsWith('/(admin)/profile') || pathname.startsWith('/(admin)/settings');
   const isSettingsActive = pathname.startsWith('/(admin)/settings');
 
-  // BƯỚC 5: Thiết lập Menu cho Admin/Staff trên Web
+  // BƯỚC 5: Phân quyền Menu cho Admin/Staff
+  // Danh sách các route bị hạn chế đối với từng vai trò
+  const RESTRICTED_ROUTES: Record<string, string[]> = {
+    staff: [
+      "/(admin)/users",
+      "/(admin)/revenue",
+      "/(admin)/membership",
+    ],
+  };
+
   const menuItems = [
     { href: "/(admin)/dashboard", label: "Tổng quan", icon: LayoutDashboard },
+    { href: "/(admin)/shift-report", label: "Báo cáo ca", icon: Clock },
     { href: "/(admin)/chat", label: "Tin nhắn", icon: MessageSquare },
     { href: "/(admin)/orders", label: "Đơn hàng", icon: ShoppingBag },
     { href: "/(admin)/products", label: "Sản phẩm", icon: Package },
@@ -91,7 +102,13 @@ function AdminLayoutWeb() {
     { href: "/(admin)/banners", label: "Banner", icon: ImageIcon },
     { href: "/(admin)/users", label: "Người dùng & Quyền", icon: Shield },
     { href: "/(admin)/notifications", label: "Thông báo", icon: Bell },
-  ];
+  ].filter(item => {
+    // Nếu route nằm trong danh sách hạn chế của role hiện tại thì không hiển thị
+    if (role && RESTRICTED_ROUTES[role]?.includes(item.href)) {
+      return false;
+    }
+    return true;
+  });
 
   // BƯỚC 6: Render Giao diện chính cho Web Admin
   return (
@@ -145,7 +162,9 @@ function AdminLayoutWeb() {
                 </View>
                 <View style={styles.profileInfo}>
                   <Text style={styles.profileName}>Admin</Text>
-                  <Text style={[styles.profileRole, isProfileActive && { color: primaryColor }]}>Quản trị viên</Text>
+                  <Text style={[styles.profileRole, isProfileActive && { color: primaryColor }]}>
+                    {role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
+                  </Text>
                 </View>
               </Pressable>
               <Pressable

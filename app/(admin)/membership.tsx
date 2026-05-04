@@ -19,6 +19,7 @@ import {
   Phone,
 } from "lucide-react-native";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import { useAuth } from "@/src/auth/AuthContext";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -61,6 +62,7 @@ const parseVND = (value: string): number => {
 };
 
 export default function AdminMembershipScreen() {
+  const { role, loading: authLoading } = useAuth();
   const router = useRouter();
   const [levels, setLevels] = useState<MembershipLevelWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,8 +141,12 @@ export default function AdminMembershipScreen() {
   }, []);
 
   useEffect(() => {
+    if (!authLoading && role !== "admin") {
+      router.replace("/(admin)/dashboard");
+      return;
+    }
     fetchLevels();
-  }, [fetchLevels]);
+  }, [fetchLevels, role, authLoading]);
 
   // Fetch members for a specific level
   const fetchMembers = useCallback(async (levelId: string) => {

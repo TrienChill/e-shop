@@ -1,5 +1,6 @@
 
 import { useAuth } from "@/src/auth/AuthContext";
+import { useRouter } from "expo-router";
 import { getRevenueReport, RevenueReport, fetchAiReports, saveAiReport, deleteAiReport, AiReport } from "@/src/services/admin/revenue";
 import {
   endOfDay,
@@ -746,13 +747,19 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
     ],
   };
 
+  const router = useRouter();
+
   // ── Permission guard ──
+  useEffect(() => {
+    if (role && role !== "admin") {
+      router.replace("/(admin)/dashboard");
+    }
+  }, [role]);
+
   if (role !== "admin") {
     return (
-      <View style={styles.permCard}>
-        <AlertCircle size={32} color="#EF4444" />
-        <Text style={styles.permTitle}>Không có quyền truy cập</Text>
-        <Text style={styles.permText}>Bạn không có quyền xem trang Quản lý Doanh thu.</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
   }

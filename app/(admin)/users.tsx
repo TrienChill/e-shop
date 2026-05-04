@@ -11,6 +11,8 @@ import {
   X,
 } from "lucide-react-native";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import { useAuth } from "@/src/auth/AuthContext";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -85,6 +87,9 @@ const formatVND = (amount: number) => {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function AdminUserManagementScreen() {
+  const { role, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -138,8 +143,12 @@ export default function AdminUserManagementScreen() {
   };
 
   useEffect(() => {
+    if (!authLoading && role !== "admin") {
+      router.replace("/(admin)/dashboard");
+      return;
+    }
     fetchUsers();
-  }, []);
+  }, [role, authLoading]);
 
   // ─── Filter & Search ─────────────────────────────────────────────────────────
 
