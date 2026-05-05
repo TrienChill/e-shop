@@ -27,7 +27,7 @@ export default function LockedAccountScreen() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.replace("/(auth)/login");
+        router.replace("/login");
         return;
       }
 
@@ -55,7 +55,7 @@ export default function LockedAccountScreen() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    router.replace("/(auth)/login");
+    router.replace("/login");
   };
 
   if (loading) {

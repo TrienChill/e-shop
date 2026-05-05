@@ -10,6 +10,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   InteractionManager,
   KeyboardAvoidingView,
@@ -24,21 +25,27 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { AlertDialog, AlertButton } from "@/src/components/AlertDialog";
 
-// Constants for colors to match the design exactly
+const { width } = Dimensions.get("window");
+
 const COLORS = {
-  background: "#FFFFFF",
-  textMain: "#1A1A1A",
-  textSecondary: "#6B7280",
-  textPlaceholder: "#9CA3AF",
-  primary: "#1A1A1A",
-  accent: "#6467f2",
-  border: "#E5E7EB",
-  inputBg: "#FFFFFF",
-  googleBlue: "#4285F4",
+  bg: "#0F0F1A",
+  surface: "#1A1A2E",
+  card: "#16213E",
+  accent: "#6C63FF",
+  accentLight: "#8B85FF",
+  accentGlow: "rgba(108, 99, 255, 0.25)",
+  text: "#FFFFFF",
+  textSub: "#A0A8C0",
+  textMuted: "#5A6282",
+  border: "#2A2D4A",
+  borderFocus: "#6C63FF",
+  inputBg: "#1E2240",
+  success: "#4ADE80",
+  error: "#F87171",
+  googleRed: "#EA4335",
   facebookBlue: "#1877F2",
 };
 
@@ -55,52 +62,40 @@ const App = () => {
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Alert dialog state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [alertButtons, setAlertButtons] = useState<AlertButton[]>([]);
   const [onAlertClose, setOnAlertClose] = useState<(() => void) | null>(null);
 
-  // Helper function to show alert dialog
   const showAlert = (
     title: string,
     message: string,
     buttons: AlertButton[],
-    onClose?: () => void,
+    onClose?: () => void
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
     setAlertButtons(buttons);
     setOnAlertClose(() => onClose || (() => {}));
-    // Sử dụng setTimeout để đảm bảo state update đầy đủ
     setTimeout(() => setAlertVisible(true), 0);
   };
 
-  // Xử lý đăng nhập bằng Email/Password
   async function handleLogin() {
     const platform = getCurrentPlatform();
     authLogger.loginAttempt({ email, platform });
     setLoading(true);
 
     try {
-      // ── BƯỚC 1: Kiểm tra trạng thái khóa bằng RPC (vượt qua RLS an toàn) ─────
       const { data: lockStatus, error: rpcError } = await supabase.rpc(
         "check_user_lock_status",
-        {
-          p_email: email.trim().toLowerCase(),
-        },
+        { p_email: email.trim().toLowerCase() }
       );
 
-      // BẮT LỖI NGẦM NẾU CÓ:
       if (rpcError) {
-        console.error("🚨 Lỗi khi gọi RPC check_user_lock_status:", rpcError);
-        // Nếu terminal báo lỗi ở đây, nghĩa là DB của bạn sai tên cột (is_locked hay is_banned)
+        console.error("🚨 Lỗi RPC check_user_lock_status:", rpcError);
       }
 
-      console.log("👉 Dữ liệu trả về từ RPC:", lockStatus);
-
-      // Bắt buộc so sánh === true để tránh lỗi định dạng JSON
       if (lockStatus && lockStatus.is_locked === true) {
         authLogger.loginError({
           email,
@@ -109,13 +104,7 @@ const App = () => {
           errorMessage: `Account locked: ${lockStatus.lock_reason || "No reason provided"}`,
           platform,
         });
-
         setLoading(false);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // HIỂN THỊ ALERT THÔNG BÁO LÝ DO KHÓA
-        // Dùng InteractionManager + setTimeout để tránh Expo Router conflict
-        // ═══════════════════════════════════════════════════════════════════════
         InteractionManager.runAfterInteractions(() => {
           setTimeout(() => {
             showAlert(
@@ -128,26 +117,22 @@ const App = () => {
                   onPress: () => {
                     setAlertVisible(false);
                     router.push({
-                      pathname: "/(auth)/locked-account",
+                      pathname: "/locked-account",
                       params: {
-                        reason: lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa bởi Quản trị viên.",
+                        reason: lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa.",
                         locked_at: lockStatus.locked_at || "",
                       },
                     });
                   },
                 },
               ],
-              () => {
-                // onClose handler
-              }
+              () => {}
             );
           }, 300);
         });
-
-        return; // Dừng hoàn toàn quá trình login
+        return;
       }
 
-      // ── BƯỚC 2: Thực hiện đăng nhập ───────────────────────────────────────────
       const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
@@ -161,25 +146,21 @@ const App = () => {
           errorMessage: error.message,
           platform,
         });
-
         setLoading(false);
         if (error.message.includes("Email not confirmed")) {
           showAlert(
             "Chưa xác thực email",
-            "Vui lòng kiểm tra hộp thư đến (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.",
-            [{ text: "Đã hiểu", style: "default" }],
+            "Vui lòng kiểm tra hộp thư (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.",
+            [{ text: "Đã hiểu", style: "default" }]
           );
         } else {
-          showAlert(
-            "Đăng nhập thất bại",
-            error.message,
-            [{ text: "Đã hiểu", style: "default" }],
-          );
+          showAlert("Đăng nhập thất bại", error.message, [
+            { text: "Đã hiểu", style: "default" },
+          ]);
         }
         return;
       }
 
-      // ── BƯỚC 3: Đăng nhập thành công → kiểm tra role & platform ─────────────────
       const userId = authData.user?.id;
       if (userId) {
         try {
@@ -189,7 +170,6 @@ const App = () => {
             .eq("id", userId)
             .maybeSingle();
 
-          // Lớp phòng thủ số 2: Đề phòng Admin vừa bấm khóa đúng lúc User đang đăng nhập
           if (fullProfileData?.is_locked) {
             authLogger.loginError({
               email,
@@ -198,10 +178,6 @@ const App = () => {
               errorMessage: `Account locked: ${fullProfileData.lock_reason || "No reason provided"}`,
               platform,
             });
-
-            // ═══════════════════════════════════════════════════════════════════════
-            // HIỂN THỊ ALERT + CHUYỂN TRANG (dùng InteractionManager cho web)
-            // ═══════════════════════════════════════════════════════════════════════
             InteractionManager.runAfterInteractions(() => {
               setTimeout(() => {
                 showAlert(
@@ -215,11 +191,9 @@ const App = () => {
                         setAlertVisible(false);
                         await supabase.auth.signOut();
                         router.replace({
-                          pathname: "/(auth)/locked-account",
+                          pathname: "/locked-account",
                           params: {
-                            reason:
-                              fullProfileData.lock_reason ||
-                              "Tài khoản của bạn đã bị khóa.",
+                            reason: fullProfileData.lock_reason || "Tài khoản của bạn đã bị khóa.",
                             locked_at: fullProfileData.locked_at || "",
                           },
                         });
@@ -230,29 +204,21 @@ const App = () => {
                 );
               }, 300);
             });
-
             setLoading(false);
             return;
           }
 
           const role = (fullProfileData?.role as UserRole | null) ?? null;
-
-          // ── Kiểm tra chính sách nền tảng ─────────────────────────────────────
           if (!isRoleAllowedOnPlatform(role, platform)) {
-          authLogger.rolePolicyViolation({
-            userId,
-            role: role!,
-            email,
-            platform,
-          });
-          await supabase.auth.signOut();
-          setLoading(false);
-          showAlert(
-            "Không được phép đăng nhập",
-            getRolePlatformErrorMessage(role!),
-            [{ text: "Đã hiểu", style: "default" }],
-          );
-          return;
+            authLogger.rolePolicyViolation({ userId, role: role!, email, platform });
+            await supabase.auth.signOut();
+            setLoading(false);
+            showAlert(
+              "Không được phép đăng nhập",
+              getRolePlatformErrorMessage(role!),
+              [{ text: "Đã hiểu", style: "default" }]
+            );
+            return;
           }
 
           authLogger.loginSuccess({ userId, role, platform });
@@ -264,63 +230,49 @@ const App = () => {
 
       setLoading(false);
       router.replace("/");
-  } catch (err) {
+    } catch (err) {
       console.error("Login error:", err);
       setLoading(false);
-      showAlert(
-        "Lỗi",
-        "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.",
-        [{ text: "Đã hiểu", style: "default" }],
-      );
+      showAlert("Lỗi", "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.", [
+        { text: "Đã hiểu", style: "default" },
+      ]);
     }
   }
-  // --- MỚI THÊM: Xử lý đăng nhập bằng Google/Facebook ---
+
   async function handleOAuthLogin(provider: "google" | "facebook") {
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: {
-          // Quan trọng: Phải khớp với scheme bạn khai báo trong app.json (eshop)
-          redirectTo: "eshop://",
-        },
+        options: { redirectTo: "eshop://" },
       });
-
       if (error) throw error;
-
-      // Mở trình duyệt để người dùng đăng nhập
-      if (data?.url) {
-        await Linking.openURL(data.url);
-      }
+      if (data?.url) await Linking.openURL(data.url);
     } catch (error) {
-      showAlert(
-        "Đăng nhập thất bại",
-        (error as Error).message,
-        [{ text: "Đã hiểu", style: "default" }],
-      );
+      showAlert("Đăng nhập thất bại", (error as Error).message, [
+        { text: "Đã hiểu", style: "default" },
+      ]);
     } finally {
-      // Lưu ý: setLoading(false) ở đây chỉ tắt loading ban đầu.
-      // Khi quay lại app từ trình duyệt, app sẽ reload lại state auth.
       setLoading(false);
     }
   }
 
-  // --- Xử lý tiếp tục với tư cách Khách ---
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
-
   function handleGuestContinue() {
-    // Nếu có redirect param (e.g. /login?redirect=/checkout), quay về trang đó
     if (redirect) {
       router.replace(redirect as any);
     } else {
-      // Mặc định quay về trang chủ
       router.replace("/");
     }
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+
+      {/* Decorative Background Orbs */}
+      <View style={styles.orb1} />
+      <View style={styles.orb2} />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -329,58 +281,80 @@ const App = () => {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* --- Header Section --- */}
+          {/* Logo & Header */}
           <View style={styles.headerContainer}>
-            <View style={styles.imageContainer}>
-              <View style={styles.imageBlurBg} />
-              <Image
-                source={{
-                  uri: "https://lh3.googleusercontent.com/aida-public/AB6AXuCunnHZlV4LRZKgfNaut1VmCRHTb3xKqHXS75uXE-An1Jg6C6yyIgHcLW7Nd8qwn5JZjg32Hb5DUkol0ybSlCnki0EIkC5OnvhcFlc3idFugb5rL9G-jisY0zbW0WkQJ0Jxh4KgSjeI6CW8gOJgwWLVJhroNzHlHcTjzHZtzeizBWnN0Dnse4H6SZx-Fx8ZChRUp0OQxTtKduIjM8aHevel3SPFMw-lFpSytHXqhrDxnuF4I5DkWKZ5FYq_d8YAnFIgXuGHXBOIU_g",
-                }}
-                style={styles.heroImage}
-                resizeMode="contain"
-              />
+            <View style={styles.logoWrapper}>
+              <View style={styles.logoGlow} />
+              <View style={styles.logoCircle}>
+                <Icon name="shopping-bag" size={36} color={COLORS.accentLight} />
+              </View>
             </View>
-
-            <Text style={styles.title}>Welcome to E-Shop</Text>
-            <Text style={styles.subtitle}>Your personal AI stylist awaits</Text>
+            <Text style={styles.appName}>E-Shop</Text>
+            <Text style={styles.tagline}>Chào mừng trở lại! 👋</Text>
+            <Text style={styles.subtitle}>Đăng nhập để tiếp tục mua sắm</Text>
           </View>
 
-          {/* --- Form Section --- */}
-          <View style={styles.formContainer}>
-            {/* Email Input */}
+          {/* Form Card */}
+          <View style={styles.card}>
+            {/* Email */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  focusedInput === "email" && styles.inputFocused,
-                ]}
-                placeholder="name@example.com"
-                placeholderTextColor={COLORS.textPlaceholder}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                onFocus={() => setFocusedInput("email")}
-                onBlur={() => setFocusedInput(null)}
-              />
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Password</Text>
+              <Text style={styles.label}>Địa chỉ Email</Text>
               <View
                 style={[
-                  styles.passwordContainer,
-                  focusedInput === "password" && styles.inputFocused,
+                  styles.inputWrapper,
+                  focusedInput === "email" && styles.inputWrapperFocused,
                 ]}
               >
+                <Icon
+                  name="email-outline"
+                  size={20}
+                  color={
+                    focusedInput === "email" ? COLORS.accentLight : COLORS.textMuted
+                  }
+                  style={styles.inputIcon}
+                />
                 <TextInput
-                  style={styles.passwordInput}
-                  placeholder="•••••••••"
-                  placeholderTextColor={COLORS.textPlaceholder}
+                  style={styles.input}
+                  placeholder="ten@example.com"
+                  placeholderTextColor={COLORS.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  onFocus={() => setFocusedInput("email")}
+                  onBlur={() => setFocusedInput(null)}
+                />
+              </View>
+            </View>
+
+            {/* Password */}
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Mật khẩu</Text>
+                <TouchableOpacity onPress={() => router.push("/forgot-password" as any)}>
+                  <Text style={styles.forgotText}>Quên mật khẩu?</Text>
+                </TouchableOpacity>
+              </View>
+              <View
+                style={[
+                  styles.inputWrapper,
+                  focusedInput === "password" && styles.inputWrapperFocused,
+                ]}
+              >
+                <Icon
+                  name="lock-outline"
+                  size={20}
+                  color={
+                    focusedInput === "password" ? COLORS.accentLight : COLORS.textMuted
+                  }
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="••••••••"
+                  placeholderTextColor={COLORS.textMuted}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!isPasswordVisible}
@@ -389,61 +363,56 @@ const App = () => {
                 />
                 <TouchableOpacity
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                  style={styles.eyeIcon}
+                  style={styles.eyeBtn}
                 >
                   <Icon
-                    name={isPasswordVisible ? "eye-off" : "eye-off-outline"}
+                    name={isPasswordVisible ? "eye-outline" : "eye-off-outline"}
                     size={20}
-                    color={COLORS.textPlaceholder}
+                    color={COLORS.textMuted}
                   />
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                style={styles.forgotPasswordContainer}
-                onPress={() => router.push("/forgot-password")}
-              >
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
             </View>
 
-            {/* Sign In Button */}
+            {/* Login Button */}
             <TouchableOpacity
-              style={[styles.signInButton, loading && { opacity: 0.7 }]}
-              activeOpacity={0.8}
+              style={[styles.primaryBtn, loading && { opacity: 0.7 }]}
               onPress={handleLogin}
+              activeOpacity={0.85}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.signInButtonText}>Sign In</Text>
+                <>
+                  <Icon name="login" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.primaryBtnText}>Đăng Nhập</Text>
+                </>
               )}
             </TouchableOpacity>
 
-            {/* Continue as Guest */}
+            {/* Guest Button */}
             <TouchableOpacity
-              style={styles.guestButton}
-              activeOpacity={0.7}
+              style={styles.guestBtn}
               onPress={handleGuestContinue}
+              activeOpacity={0.7}
             >
-              <Text style={styles.guestButtonText}>
-                Tiếp tục với tư cách Khách
-              </Text>
+              <Icon name="account-outline" size={18} color={COLORS.textSub} style={{ marginRight: 6 }} />
+              <Text style={styles.guestBtnText}>Tiếp tục với tư cách Khách</Text>
             </TouchableOpacity>
 
             {/* Divider */}
-            <View style={styles.dividerContainer}>
+            <View style={styles.divider}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR CONTINUE WITH</Text>
+              <Text style={styles.dividerText}>HOẶC ĐĂNG NHẬP VỚI</Text>
               <View style={styles.dividerLine} />
             </View>
 
-            {/* Social Buttons (Đã cập nhật onPress) */}
+            {/* Social Buttons */}
             <View style={styles.socialRow}>
               <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleOAuthLogin("google")} // <-- Gọi hàm Google
+                style={styles.socialBtn}
+                onPress={() => handleOAuthLogin("google")}
                 disabled={loading}
               >
                 <Image
@@ -451,12 +420,12 @@ const App = () => {
                   style={styles.socialIcon}
                   resizeMode="contain"
                 />
-                <Text style={styles.socialButtonText}>Google</Text>
+                <Text style={styles.socialBtnText}>Google</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.socialButton}
-                onPress={() => handleOAuthLogin("facebook")} // <-- Gọi hàm Facebook
+                style={styles.socialBtn}
+                onPress={() => handleOAuthLogin("facebook")}
                 disabled={loading}
               >
                 <Image
@@ -464,25 +433,23 @@ const App = () => {
                   style={styles.socialIcon}
                   resizeMode="contain"
                 />
-                <Text style={styles.socialButtonText}>Facebook</Text>
+                <Text style={styles.socialBtnText}>Facebook</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* --- Footer --- */}
+          {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              Dont have an account?{" "}
-              <Text
-                style={styles.signUpLink}
-                onPress={() => router.push("/register")}
-              >
-                Sign Up
+              Chưa có tài khoản?{" "}
+              <Text style={styles.footerLink} onPress={() => router.push("/register" as any)}>
+                Đăng ký ngay
               </Text>
             </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
       <AlertDialog
         visible={alertVisible}
         title={alertTitle}
@@ -500,7 +467,26 @@ const App = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.bg,
+  },
+  // Background Orbs
+  orb1: {
+    position: "absolute",
+    width: width * 0.8,
+    height: width * 0.8,
+    borderRadius: width * 0.4,
+    backgroundColor: "rgba(108, 99, 255, 0.08)",
+    top: -width * 0.3,
+    right: -width * 0.2,
+  },
+  orb2: {
+    position: "absolute",
+    width: width * 0.6,
+    height: width * 0.6,
+    borderRadius: width * 0.3,
+    backgroundColor: "rgba(74, 222, 128, 0.05)",
+    bottom: -width * 0.1,
+    left: -width * 0.2,
   },
   scrollContent: {
     flexGrow: 1,
@@ -510,146 +496,167 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  // Header Styles
+  // Header
   headerContainer: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 28,
     width: "100%",
   },
-  imageContainer: {
-    width: 128,
-    height: 128,
-    marginBottom: 24,
-    justifyContent: "center",
+  logoWrapper: {
+    width: 90,
+    height: 90,
+    marginBottom: 16,
     alignItems: "center",
-    position: "relative",
+    justifyContent: "center",
   },
-  imageBlurBg: {
+  logoGlow: {
     position: "absolute",
-    width: 100,
-    height: 100,
-    backgroundColor: "rgba(100, 103, 242, 0.2)", // Primary color low opacity
-    borderRadius: 50,
-    transform: [{ scale: 1.5 }],
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: COLORS.accentGlow,
+    transform: [{ scale: 1.4 }],
   },
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    zIndex: 10,
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderFocus,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  title: {
-    fontSize: 32,
+  appName: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: COLORS.text,
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  tagline: {
+    fontSize: 20,
     fontWeight: "700",
-    color: COLORS.textMain,
-    marginBottom: 8,
-    textAlign: "center",
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    color: COLORS.text,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: "500",
-    textAlign: "center",
+    color: COLORS.textSub,
+    fontWeight: "400",
   },
 
-  // Form Styles
-  formContainer: {
+  // Card
+  card: {
     width: "100%",
+    backgroundColor: COLORS.card,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
+
+  // Inputs
   inputGroup: {
     marginBottom: 20,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.textMain,
+  labelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
-    marginLeft: 4,
   },
-  input: {
-    width: "100%",
-    height: 56,
-    backgroundColor: COLORS.inputBg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: COLORS.textMain,
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textSub,
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  passwordContainer: {
-    width: "100%",
-    height: 56,
+  forgotText: {
+    fontSize: 13,
+    color: COLORS.accentLight,
+    fontWeight: "600",
+  },
+  inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.inputBg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-  },
-  inputFocused: {
-    borderColor: COLORS.accent,
     borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 56,
   },
-  passwordInput: {
+  inputWrapperFocused: {
+    borderColor: COLORS.borderFocus,
+    backgroundColor: "#1C1F3C",
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
     flex: 1,
-    height: "100%",
     fontSize: 16,
-    color: COLORS.textMain,
+    color: COLORS.text,
+    height: "100%",
   },
-  eyeIcon: {
-    padding: 8,
-  },
-  forgotPasswordContainer: {
-    alignSelf: "flex-end",
-    marginTop: 8,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.textSecondary,
+  eyeBtn: {
+    padding: 6,
   },
 
-  // Button Styles
-  signInButton: {
-    width: "100%",
+  // Primary Button
+  primaryBtn: {
     height: 56,
-    backgroundColor: COLORS.primary,
-    borderRadius: 28,
+    backgroundColor: COLORS.accent,
+    borderRadius: 14,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginTop: 8,
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  signInButtonText: {
+  primaryBtnText: {
     color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
-  guestButton: {
-    width: "100%",
-    height: 52,
-    borderRadius: 26,
+
+  // Guest Button
+  guestBtn: {
+    height: 48,
+    borderRadius: 12,
+    flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 10,
     borderWidth: 1.5,
     borderColor: COLORS.border,
-    backgroundColor: "#FAFAFA",
   },
-  guestButtonText: {
-    fontSize: 15,
+  guestBtnText: {
+    fontSize: 14,
     fontWeight: "600",
-    color: COLORS.textSecondary,
+    color: COLORS.textSub,
   },
 
-  // Divider Styles
-  dividerContainer: {
+  // Divider
+  divider: {
     flexDirection: "row",
     alignItems: "center",
     marginVertical: 24,
@@ -660,54 +667,53 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
   },
   dividerText: {
-    marginHorizontal: 16,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#9CA3AF",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    marginHorizontal: 12,
+    fontSize: 11,
+    fontWeight: "700",
+    color: COLORS.textMuted,
+    letterSpacing: 0.8,
   },
 
-  // Social Buttons Styles
+  // Social
   socialRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 16,
+    gap: 12,
   },
-  socialButton: {
+  socialBtn: {
     flex: 1,
     height: 48,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
+    backgroundColor: COLORS.inputBg,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
-    borderRadius: 24,
-  },
-  socialButtonText: {
-    marginLeft: 12,
-    fontSize: 14,
-    fontWeight: "500",
-    color: COLORS.textMain,
+    borderRadius: 12,
   },
   socialIcon: {
     width: 20,
     height: 20,
   },
+  socialBtnText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
 
-  // Footer Styles
+  // Footer
   footer: {
-    marginTop: "auto",
-    paddingTop: 32,
+    marginTop: 24,
+    paddingBottom: 8,
   },
   footerText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize: 15,
+    color: COLORS.textSub,
+    textAlign: "center",
   },
-  signUpLink: {
-    fontWeight: "bold",
-    color: COLORS.textMain,
+  footerLink: {
+    fontWeight: "700",
+    color: COLORS.accentLight,
   },
 });
 
