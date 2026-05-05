@@ -29,6 +29,7 @@ import {
   ChevronDown,
 } from "lucide-react-native";
 import { TextInput, Alert } from "react-native";
+import { encodeOrderId } from "@/src/utils/orderId";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import { fetchProvinces, fetchDistricts, fetchWards, calculateShippingFee } from "@/src/services/ghn/shippingService";
 
@@ -326,7 +327,7 @@ export default function OrderDetailScreen() {
         </Pressable>
 
         <View style={styles.headerCenter}>
-          <Text style={styles.orderTitle}>Đơn hàng #{String(order.id).slice(0, 8).toUpperCase()}</Text>
+          <Text style={styles.orderTitle}>Đơn hàng {encodeOrderId(order.id)}</Text>
           <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
         </View>
 

@@ -17,6 +17,7 @@ import {
   CheckCheck,
   Settings,
 } from "lucide-react-native";
+import { encodeOrderId } from "@/src/utils/orderId";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -1410,7 +1411,7 @@ export default function AdminDashboardHome() {
                       </View>
                     </View>
                     <Text style={{ flex: 1, fontSize: 13, color: '#4B5563' }}>
-                      ORD-{String(order.id).slice(-6).toUpperCase()}
+                      {encodeOrderId(order.id)}
                     </Text>
                     <Text style={{ flex: 2, fontSize: 13, color: '#111827', fontWeight: '500' }} numberOfLines={1}>
                       {productName}{hasMore ? ` +${productNames.length - 1}` : ''}

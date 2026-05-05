@@ -52,3 +52,6 @@ supabase/.branch/
 
 # Generated embeddings
 generate_embeddings.js
+
+#overviews
+OVERVIEW.md

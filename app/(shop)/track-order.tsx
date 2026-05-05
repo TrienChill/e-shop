@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 // eslint-disable-next-line import/no-named-as-default
 import CommonHeader from "@/src/components/layout/Header";
+import { encodeOrderId } from "@/src/utils/orderId";
 import { supabase } from "@/src/lib/supabase";
 
 // Bảng màu hệ thống
@@ -280,7 +281,7 @@ export default function TrackOrderScreen() {
             <View>
               <Text style={styles.headerTitle}>Theo dõi đơn hàng</Text>
               <Text style={styles.headerSubtitle}>
-                Mã đơn: #{orderId || "N/A"}
+                Mã đơn: {encodeOrderId(orderId as string)}
               </Text>
             </View>
           </View>

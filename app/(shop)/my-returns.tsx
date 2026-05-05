@@ -13,6 +13,7 @@ import {
   RotateCcw,
   XCircle,
 } from "lucide-react-native";
+import { encodeOrderId } from "@/src/utils/orderId";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -144,7 +145,7 @@ export default function MyReturnsScreen() {
           </View>
           <View style={styles.cardInfo}>
             <Text style={styles.orderLabel}>
-              Đơn #{item.order_id?.toString().slice(-8).toUpperCase()}
+              Đơn {encodeOrderId(item.order_id)}
             </Text>
             <Text style={styles.dateText}>
               {new Date(item.created_at).toLocaleDateString("vi-VN", {

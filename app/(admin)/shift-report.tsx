@@ -8,6 +8,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { supabase } from "@/src/lib/supabase";
 import { format, startOfDay, endOfDay } from "date-fns";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import { encodeOrderId } from "@/src/utils/orderId";
 
 export default function ShiftReportScreen() {
   const { session, role, loading: authLoading } = useAuth();
@@ -89,7 +90,7 @@ export default function ShiftReportScreen() {
     }
 
     const data = orders.map(o => ({
-      "Mã đơn": `#${String(o.id).slice(-8)}`,
+      "Mã đơn": encodeOrderId(o.id),
       "Ngày đặt": new Date(o.created_at).toLocaleString("vi-VN"),
       "Khách hàng": o.receiver_name || "N/A",
       "Thanh toán": `${o.payment_method} - ${o.payment_status === "paid" ? "Đã TT" : "Chưa TT"}`,
@@ -239,7 +240,7 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, văn phong chuyên nghi�
           orders.map((o) => (
             <AdminDataWrapper key={o.id} onPress={() => router.push(`/(admin)/orders/${o.id}` as any)} style={styles.row}>
               <Text style={[styles.td, { flex: 1, fontWeight: "600", color: "#374151" }]}>
-                #{String(o.id).slice(-8)}
+                {encodeOrderId(o.id)}
               </Text>
               <Text style={[styles.td, { flex: 2 }]}>{o.receiver_name || "Khách"}</Text>
               <Text style={[styles.td, { flex: 1.5 }]}>{o.status}</Text>

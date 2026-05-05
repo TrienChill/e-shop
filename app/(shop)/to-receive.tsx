@@ -16,6 +16,7 @@ import {
   PackageX,
   X
 } from "lucide-react-native";
+import { encodeOrderId } from "@/src/utils/orderId";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -264,7 +265,7 @@ export default function ToReceiveScreen() {
 
         return {
           id: order.id.toString(),
-          orderCode: order.id.toString().slice(-8).toUpperCase(),
+          orderCode: encodeOrderId(order.id).replace('ORD-', ''),
           shippingMethod: "Giao hàng tiêu chuẩn",
           itemsCount,
           totalAmount: order.total_amount,

@@ -23,6 +23,7 @@ import {
   XCircle
 } from "lucide-react-native";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import { encodeOrderId } from "@/src/utils/orderId";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -323,7 +324,7 @@ export default function AdminReturnsScreen() {
                           style={styles.orderLink}
                           onPress={() => openDetail(ret)}
                         >
-                          #{String(ret.order_id).slice(-8)}
+                          {encodeOrderId(ret.order_id)}
                         </Text>
                         <Text style={styles.reasonPreview}>
                           {ret.reason?.slice(0, 30)}

@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download,
 import * as XLSX from 'xlsx';
 import { useRouter } from "expo-router";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import { encodeOrderId } from "@/src/utils/orderId";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -123,7 +124,7 @@ export default function AdminOrdersScreen() {
 
     // Prepare data for XLSX
     const data = sortedOrders.map(order => ({
-      "Mã đơn": `#${String(order.id).slice(-8)}`,
+      "Mã đơn": encodeOrderId(order.id),
       "Ngày đặt": new Date(order.created_at).toLocaleString("vi-VN"),
       "Tên khách": order.receiver_name || "N/A",
       "Số điện thoại": order.phone_contact || "",
@@ -659,7 +660,7 @@ export default function AdminOrdersScreen() {
                         {/* Mã đơn */}
                         {visibleColumns.id && (
                           <View style={styles.columnId}>
-                            <Text style={styles.orderId}>#{String(order.id).slice(-8)}</Text>
+                            <Text style={styles.orderId}>{encodeOrderId(order.id)}</Text>
                           </View>
                         )}
 

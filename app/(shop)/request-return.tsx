@@ -9,6 +9,7 @@ import {
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
+import { encodeOrderId } from "@/src/utils/orderId";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AlertCircle,
@@ -255,7 +256,7 @@ export default function RequestReturnScreen() {
           <Text style={styles.sectionTitle}>Thông tin đơn hàng</Text>
           <View style={styles.rowBetween}>
             <Text style={styles.label}>Mã đơn:</Text>
-            <Text style={styles.value}>#{params.orderId}</Text>
+            <Text style={styles.value}>{encodeOrderId(params.orderId)}</Text>
           </View>
           <View style={styles.rowBetween}>
             <Text style={styles.label}>Tổng giá trị:</Text>
