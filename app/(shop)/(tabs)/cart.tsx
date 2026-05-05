@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { getGuestCart } from "@/src/services/guestCart";
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft } from "lucide-react-native";
@@ -22,7 +23,12 @@ export default function CartScreen() {
 
   const fetchCartCount = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      const guestCart = await getGuestCart();
+      const total = guestCart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      setCartCount(total);
+      return;
+    }
     const { data } = await supabase.from("cart_items").select("quantity").eq("user_id", user.id);
     const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
     setCartCount(total);

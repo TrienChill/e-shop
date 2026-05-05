@@ -35,6 +35,7 @@ import {
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
+import { getGuestCart, updateGuestCartQuantity, removeFromGuestCart } from "@/src/services/guestCart";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface CartItem {
@@ -306,7 +307,11 @@ export default function CartContent() {
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
-    await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+    if (id.startsWith("guest_")) {
+      await updateGuestCartQuantity(id, newQty);
+    } else {
+      await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+    }
   };
 
   const decrease = async (id: string) => {
@@ -318,12 +323,20 @@ export default function CartContent() {
     setCartItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, quantity: newQty } : i)),
     );
-    await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+    if (id.startsWith("guest_")) {
+      await updateGuestCartQuantity(id, newQty);
+    } else {
+      await supabase.from("cart_items").update({ quantity: newQty }).eq("id", id);
+    }
   };
 
   const deleteItem = async (id: string) => {
     setCartItems((prev) => prev.filter((i) => i.id !== id));
-    await supabase.from("cart_items").delete().eq("id", id);
+    if (id.startsWith("guest_")) {
+      await removeFromGuestCart(id);
+    } else {
+      await supabase.from("cart_items").delete().eq("id", id);
+    }
   };
 
   const addWishlistToCart = async (item: WishlistItem) => {
@@ -423,7 +436,9 @@ export default function CartContent() {
       return next;
     });
     // Đồng bộ xuống DB để checkout đọc đúng
-    await supabase.from("cart_items").update({ is_selected: willBeSelected }).eq("id", id);
+    if (!id.startsWith("guest_")) {
+      await supabase.from("cart_items").update({ is_selected: willBeSelected }).eq("id", id);
+    }
   };
 
   const isAllSelected =
@@ -434,11 +449,17 @@ export default function CartContent() {
     if (isAllSelected) {
       setSelectedIds(new Set());
       // Bỏ chọn tất cả trong DB
-      await supabase.from("cart_items").update({ is_selected: false }).in("id", cartItems.map(i => i.id));
+      const dbIds = cartItems.filter(i => !i.id.startsWith("guest_")).map(i => i.id);
+      if (dbIds.length > 0) {
+        await supabase.from("cart_items").update({ is_selected: false }).in("id", dbIds);
+      }
     } else {
       setSelectedIds(new Set(cartItems.map((i) => i.id)));
       // Chọn tất cả trong DB
-      await supabase.from("cart_items").update({ is_selected: true }).in("id", cartItems.map(i => i.id));
+      const dbIds = cartItems.filter(i => !i.id.startsWith("guest_")).map(i => i.id);
+      if (dbIds.length > 0) {
+        await supabase.from("cart_items").update({ is_selected: true }).in("id", dbIds);
+      }
     }
   };
 
@@ -464,6 +485,14 @@ export default function CartContent() {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
+        const guestCart = await getGuestCart();
+        const formattedGuestCart = guestCart.map(item => ({
+          ...item,
+          finalPrice: item.price
+        }));
+        setCartItems(formattedGuestCart);
+        // Tự động chọn tất cả sản phẩm trong guest cart
+        setSelectedIds(new Set(formattedGuestCart.map(i => i.id)));
         setLoadingCart(false);
         return;
       }

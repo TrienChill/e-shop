@@ -187,27 +187,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const signInAnon = async () => {
-      try {
-        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-        if (anonError) throw anonError;
-        if (mounted) {
-          if (anonData.session) {
-            setSession(anonData.session);
-          } else {
-            setRoleResolved(true);
-            setLoading(false);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to sign in anonymously:", err);
-        if (mounted) {
-          setRoleResolved(true);
-          setLoading(false);
-        }
-      }
-    };
-
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!mounted) return;
 
@@ -220,7 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (mounted) {
             setSession(null);
             setRole(null);
-            await signInAnon();
+            setRoleResolved(true);
+            setLoading(false);
             setSessionInitialized(true);
           }
           return;
@@ -241,9 +221,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       setSession(session);
 
-      // Nếu không có session → cấp phát tài khoản ẩn danh
+      // Nếu không có session → không tự động cấp phát tài khoản ẩn danh
       if (!session) {
-        await signInAnon();
+        setRoleResolved(true);
+        setLoading(false);
       }
       
       if (mounted) {
@@ -255,7 +236,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Check if it's a refresh token error even in catch
         if (isRefreshTokenError(err)) {
           await handleCorruptedSession(err);
-          await signInAnon();
+          setRoleResolved(true);
+          setLoading(false);
         } else {
           setRoleResolved(true);
           setLoading(false);

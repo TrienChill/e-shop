@@ -11,6 +11,7 @@ import {
   getProductImageByColor,
 } from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { clearGuestCart, getGuestCart } from "@/src/services/guestCart";
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
@@ -498,15 +499,10 @@ export default function CheckoutScreen() {
           data: { user },
         } = await supabase.auth.getUser();
 
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-
-        const isAnon = user.is_anonymous ?? false;
+        const isAnon = !user || (user.is_anonymous ?? false);
         setIsGuest(isAnon);
 
-        if (!isAnon) {
+        if (!isAnon && user) {
           // ── Authenticated user ────────────────────────────────────────────────
           const { data: addresses } = await supabase
             .from("user_addresses")
@@ -629,57 +625,62 @@ export default function CheckoutScreen() {
         }
 
         // ── Fetch Cart (cho cả Guest và User) ─────────────────────────────────
-        const { data: cartData } = await supabase
-          .from("cart_items")
-          .select(
-            `
-            id,
-            product_id,
-            quantity,
-            color,
-            size,
-            products (
-              name,
-              price,
-              images,
-              variants,
-              product_discounts (
-                id, discount_type, discount_value, is_active, start_date, end_date
-              ),
-              product_images (
-                id, url, display_order, is_thumbnail, image_type, variant_id
-              ),
-              product_variants (
-                id, color, size, price, stock, sku
-              )
-            )
-          `,
-          )
-          .eq("user_id", user.id)
-          .eq("is_selected", true);
-
-        if (cartData) {
-          const formattedItems = cartData.map((item: any) => {
-            const p = item.products;
-            const withDiscount = calculateDiscountedPrice(p);
-            return {
-              id: item.id,
-              product_id: item.product_id,
-              name: p.name,
-              price: withDiscount.finalPrice,
-              originalPrice: withDiscount.originalPrice,
-              hasDiscount: withDiscount.hasDiscount,
-              quantity: item.quantity,
-              image: getProductImageByColor(p, item.color) || "https://via.placeholder.com/200",
-              color: COLOR_TRANSLATIONS[item.color] || item.color,
-              size: item.size,
-              rawColor: item.color,
-              rawSize: item.size,
-            };
-          });
-          setCartItems(formattedItems);
+        if (!user) {
+          const guestCart = await getGuestCart();
+          setCartItems(guestCart);
         } else {
-          setCartItems([]);
+          const { data: cartData } = await supabase
+            .from("cart_items")
+            .select(
+              `
+              id,
+              product_id,
+              quantity,
+              color,
+              size,
+              products (
+                name,
+                price,
+                images,
+                variants,
+                product_discounts (
+                  id, discount_type, discount_value, is_active, start_date, end_date
+                ),
+                product_images (
+                  id, url, display_order, is_thumbnail, image_type, variant_id
+                ),
+                product_variants (
+                  id, color, size, price, stock, sku
+                )
+              )
+            `,
+            )
+            .eq("user_id", user.id)
+            .eq("is_selected", true);
+
+          if (cartData) {
+            const formattedItems = cartData.map((item: any) => {
+              const p = item.products;
+              const withDiscount = calculateDiscountedPrice(p);
+              return {
+                id: item.id,
+                product_id: item.product_id,
+                name: p.name,
+                price: withDiscount.finalPrice,
+                originalPrice: withDiscount.originalPrice,
+                hasDiscount: withDiscount.hasDiscount,
+                quantity: item.quantity,
+                image: getProductImageByColor(p, item.color) || "https://via.placeholder.com/200",
+                color: COLOR_TRANSLATIONS[item.color] || item.color,
+                size: item.size,
+                rawColor: item.color,
+                rawSize: item.size,
+              };
+            });
+            setCartItems(formattedItems);
+          } else {
+            setCartItems([]);
+          }
         }
       } catch (err) {
         console.error("Lỗi fetch checkout:", err);
@@ -780,6 +781,10 @@ export default function CheckoutScreen() {
 
         if (deleteCartError) throw deleteCartError;
       }
+      
+      if (isGuest) {
+        await clearGuestCart();
+      }
     } catch (error) {
       console.error("Lỗi khi finalize order:", error);
     }
@@ -830,9 +835,18 @@ export default function CheckoutScreen() {
         data: { user },
       } = await supabase.auth.getUser();
 
+      let currentUser = user;
+      
+      // ── Create Anonymous User for Guests ──────────────────────────────────────────
+      if (isGuest && !currentUser) {
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
+        if (anonError) throw anonError;
+        currentUser = anonData.user;
+      }
+
       // ── Build order payload ─────────────────────────────────────────────────────
       let orderPayload: Record<string, any> = {
-        user_id: user?.id ?? null,
+        user_id: currentUser?.id ?? null,
         total_amount: finalTotal,
         status: "pending",
         shipping_fee: shippingFee,
@@ -931,7 +945,7 @@ export default function CheckoutScreen() {
           throw new Error("Không thể tạo URL thanh toán");
         }
       } else {
-        await finalizeSuccessfulOrder(orderData.id, user?.id);
+        await finalizeSuccessfulOrder(orderData.id, currentUser?.id);
         setPaymentStatus("success");
       }
     } catch (error: any) {
