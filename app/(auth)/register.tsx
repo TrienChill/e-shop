@@ -21,20 +21,22 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 const { width } = Dimensions.get('window');
 
 const COLORS = {
-  bg: '#0F0F1A',
-  surface: '#1A1A2E',
-  card: '#16213E',
-  accent: '#6C63FF',
-  accentLight: '#8B85FF',
-  accentGlow: 'rgba(108, 99, 255, 0.25)',
-  text: '#FFFFFF',
-  textSub: '#A0A8C0',
-  textMuted: '#5A6282',
-  border: '#2A2D4A',
-  borderFocus: '#6C63FF',
-  inputBg: '#1E2240',
-  success: '#4ADE80',
-  error: '#F87171',
+  bg: '#F9FAFB',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  accent: '#2563EB',
+  accentLight: '#3B82F6',
+  accentGlow: 'rgba(37, 99, 235, 0.15)',
+  text: '#111827',
+  textSub: '#4B5563',
+  textMuted: '#9CA3AF',
+  border: '#E5E7EB',
+  borderFocus: '#2563EB',
+  inputBg: '#F3F4F6',
+  success: '#10B981',
+  error: '#EF4444',
+  googleRed: '#EA4335',
+  facebookBlue: '#1877F2',
 };
 
 // ─── OTP Input Component ──────────────────────────────────────────────────────
@@ -113,15 +115,15 @@ const otpStyles = StyleSheet.create({
     width: 48,
     height: 56,
     borderRadius: 12,
-    backgroundColor: '#1E2240',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1.5,
-    borderColor: '#2A2D4A',
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   boxFilled: {
     borderColor: '#6C63FF',
-    backgroundColor: '#1C1F3C',
+    backgroundColor: '#FFFFFF',
   },
   boxText: {
     fontSize: 22,
@@ -358,7 +360,7 @@ const RegisterScreen = () => {
           <Text style={styles.label}>Xác nhận Mật khẩu</Text>
           {renderInputWrapper(
             'confirm',
-            'lock-check-outline',
+            'shield-check-outline',
             '••••••••',
             confirmPassword,
             setConfirmPassword,
@@ -428,7 +430,7 @@ const RegisterScreen = () => {
       </TouchableOpacity>
 
       <View style={styles.headerContainer}>
-        <View style={[styles.logoCircle, { backgroundColor: 'rgba(74,222,128,0.12)', borderColor: COLORS.success }]}>
+        <View style={[styles.logoCircle, { backgroundColor: 'rgba(16, 185, 129, 0.08)', borderColor: COLORS.success }]}>
           <Icon name="email-check-outline" size={34} color={COLORS.success} />
         </View>
         <Text style={styles.title}>Xác Thực Email</Text>
@@ -510,7 +512,7 @@ const RegisterScreen = () => {
       <View style={styles.successOrb} />
       <View style={[styles.logoCircle, {
         width: 100, height: 100, borderRadius: 50,
-        backgroundColor: 'rgba(74,222,128,0.15)',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
         borderColor: COLORS.success,
         marginBottom: 24,
       }]}>
@@ -536,7 +538,7 @@ const RegisterScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
       <View style={styles.orb1} />
       <View style={styles.orb2} />
 
@@ -568,7 +570,7 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: width * 0.4,
-    backgroundColor: 'rgba(108, 99, 255, 0.07)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     top: -width * 0.3,
     right: -width * 0.2,
   },
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
     width: width * 0.6,
     height: width * 0.6,
     borderRadius: width * 0.3,
-    backgroundColor: 'rgba(74, 222, 128, 0.05)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     bottom: 0,
     left: -width * 0.2,
   },
@@ -609,7 +611,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(108, 99, 255, 0.12)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     borderWidth: 1.5,
     borderColor: COLORS.borderFocus,
     alignItems: 'center',
@@ -636,10 +638,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
     elevation: 10,
     marginBottom: 24,
   },
@@ -666,12 +665,7 @@ const styles = StyleSheet.create({
   },
   inputWrapperFocused: {
     borderColor: COLORS.borderFocus,
-    backgroundColor: '#1C1F3C',
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#FFFFFF',
   },
   inputIcon: {
     marginRight: 10,
@@ -724,10 +718,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
     elevation: 8,
   },
   primaryBtnText: {
@@ -756,7 +747,7 @@ const styles = StyleSheet.create({
   successBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(74, 222, 128, 0.3)',
     borderRadius: 10,
@@ -813,7 +804,7 @@ const styles = StyleSheet.create({
     width: width * 0.7,
     height: width * 0.7,
     borderRadius: width * 0.35,
-    backgroundColor: 'rgba(74, 222, 128, 0.06)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     top: '20%',
   },
 });

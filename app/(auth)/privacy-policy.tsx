@@ -15,19 +15,23 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 const { width } = Dimensions.get('window');
 
 const COLORS = {
-  bg: '#0F0F1A',
-  surface: '#1A1A2E',
-  card: '#16213E',
-  accent: '#6C63FF',
-  accentLight: '#8B85FF',
-  text: '#FFFFFF',
-  textSub: '#A0A8C0',
-  textMuted: '#5A6282',
-  border: '#2A2D4A',
-  inputBg: '#1E2240',
-  success: '#4ADE80',
-  warning: '#FBBF24',
-  error: '#F87171',
+  bg: '#F9FAFB',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  accent: '#2563EB',
+  accentLight: '#3B82F6',
+  accentGlow: 'rgba(37, 99, 235, 0.15)',
+  text: '#111827',
+  textSub: '#4B5563',
+  textMuted: '#9CA3AF',
+  border: '#E5E7EB',
+  borderFocus: '#2563EB',
+  inputBg: '#F3F4F6',
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+  googleRed: '#EA4335',
+  facebookBlue: '#1877F2',
 };
 
 interface Section {
@@ -136,7 +140,7 @@ const PrivacyPolicyScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
 
       {/* Background Orbs */}
       <View style={styles.orb1} />
@@ -276,7 +280,7 @@ const styles = StyleSheet.create({
     width: width * 0.7,
     height: width * 0.7,
     borderRadius: width * 0.35,
-    backgroundColor: 'rgba(108, 99, 255, 0.06)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     top: -width * 0.2,
     right: -width * 0.2,
   },
@@ -285,7 +289,7 @@ const styles = StyleSheet.create({
     width: width * 0.5,
     height: width * 0.5,
     borderRadius: width * 0.25,
-    backgroundColor: 'rgba(74, 222, 128, 0.04)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     bottom: 0,
     left: -width * 0.1,
   },
@@ -339,7 +343,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(108, 99, 255, 0.12)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
   },
   heroIconBox: {
     width: 100,
@@ -350,10 +354,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(108, 99, 255, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
     elevation: 8,
   },
   heroTitle: {
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   sectionIconWrapperActive: {
-    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     borderColor: 'rgba(108, 99, 255, 0.4)',
   },
   accordionTitle: {
@@ -484,7 +485,7 @@ const styles = StyleSheet.create({
   footerCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(108, 99, 255, 0.08)',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(108, 99, 255, 0.25)',
     borderRadius: 16,
@@ -507,10 +508,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
     elevation: 8,
   },
   primaryBtnText: {

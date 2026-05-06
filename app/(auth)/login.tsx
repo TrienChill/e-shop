@@ -31,29 +31,25 @@ import { AlertDialog, AlertButton } from "@/src/components/AlertDialog";
 const { width } = Dimensions.get("window");
 
 const COLORS = {
-  bg: "#0F0F1A",
-  surface: "#1A1A2E",
-  card: "#16213E",
-  accent: "#6C63FF",
-  accentLight: "#8B85FF",
-  accentGlow: "rgba(108, 99, 255, 0.25)",
-  text: "#FFFFFF",
-  textSub: "#A0A8C0",
-  textMuted: "#5A6282",
-  border: "#2A2D4A",
-  borderFocus: "#6C63FF",
-  inputBg: "#1E2240",
-  success: "#4ADE80",
-  error: "#F87171",
-  googleRed: "#EA4335",
-  facebookBlue: "#1877F2",
+  bg: '#F9FAFB',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  accent: '#2563EB',
+  accentLight: '#3B82F6',
+  accentGlow: 'rgba(37, 99, 235, 0.15)',
+  text: '#111827',
+  textSub: '#4B5563',
+  textMuted: '#9CA3AF',
+  border: '#E5E7EB',
+  borderFocus: '#2563EB',
+  inputBg: '#F3F4F6',
+  success: '#10B981',
+  error: '#EF4444',
+  googleRed: '#EA4335',
+  facebookBlue: '#1877F2',
 };
 
-const SOCIAL_LOGOS = {
-  google: "https://cdn-icons-png.flaticon.com/512/300/300221.png",
-  facebook:
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Facebook_Logo_%282019%29.png/1024px-Facebook_Logo_%282019%29.png",
-};
+
 
 const App = () => {
   const [email, setEmail] = useState("");
@@ -239,23 +235,6 @@ const App = () => {
     }
   }
 
-  async function handleOAuthLogin(provider: "google" | "facebook") {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: "eshop://" },
-      });
-      if (error) throw error;
-      if (data?.url) await Linking.openURL(data.url);
-    } catch (error) {
-      showAlert("Đăng nhập thất bại", (error as Error).message, [
-        { text: "Đã hiểu", style: "default" },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   function handleGuestContinue() {
@@ -268,7 +247,7 @@ const App = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
 
       {/* Decorative Background Orbs */}
       <View style={styles.orb1} />
@@ -288,7 +267,7 @@ const App = () => {
             <View style={styles.logoWrapper}>
               <View style={styles.logoGlow} />
               <View style={styles.logoCircle}>
-                <Icon name="shopping-bag" size={36} color={COLORS.accentLight} />
+                <Icon name="cart-outline" size={36} color={COLORS.accentLight} />
               </View>
             </View>
             <Text style={styles.appName}>E-Shop</Text>
@@ -401,41 +380,6 @@ const App = () => {
               <Text style={styles.guestBtnText}>Tiếp tục với tư cách Khách</Text>
             </TouchableOpacity>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>HOẶC ĐĂNG NHẬP VỚI</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Social Buttons */}
-            <View style={styles.socialRow}>
-              <TouchableOpacity
-                style={styles.socialBtn}
-                onPress={() => handleOAuthLogin("google")}
-                disabled={loading}
-              >
-                <Image
-                  source={{ uri: SOCIAL_LOGOS.google }}
-                  style={styles.socialIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.socialBtnText}>Google</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.socialBtn}
-                onPress={() => handleOAuthLogin("facebook")}
-                disabled={loading}
-              >
-                <Image
-                  source={{ uri: SOCIAL_LOGOS.facebook }}
-                  style={styles.socialIcon}
-                  resizeMode="contain"
-                />
-                <Text style={styles.socialBtnText}>Facebook</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
           {/* Footer */}
@@ -475,7 +419,7 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: width * 0.4,
-    backgroundColor: "rgba(108, 99, 255, 0.08)",
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
     top: -width * 0.3,
     right: -width * 0.2,
   },
@@ -484,7 +428,7 @@ const styles = StyleSheet.create({
     width: width * 0.6,
     height: width * 0.6,
     borderRadius: width * 0.3,
-    backgroundColor: "rgba(74, 222, 128, 0.05)",
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
     bottom: -width * 0.1,
     left: -width * 0.2,
   },
@@ -554,10 +498,7 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
     elevation: 10,
   },
 
@@ -596,12 +537,7 @@ const styles = StyleSheet.create({
   },
   inputWrapperFocused: {
     borderColor: COLORS.borderFocus,
-    backgroundColor: "#1C1F3C",
-    shadowColor: COLORS.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    backgroundColor: '#FFFFFF',
   },
   inputIcon: {
     marginRight: 10,
@@ -625,14 +561,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
-    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
     elevation: 8,
   },
   primaryBtnText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -674,32 +607,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 
-  // Social
-  socialRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  socialBtn: {
-    flex: 1,
-    height: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.inputBg,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-  },
-  socialIcon: {
-    width: 20,
-    height: 20,
-  },
-  socialBtnText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.text,
-  },
+
 
   // Footer
   footer: {
