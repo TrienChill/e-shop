@@ -218,10 +218,14 @@ function SidebarLink({
   return (
     <Link href={href as any} asChild>
       <Pressable 
-        style={StyleSheet.flatten([styles.menuItem, active && { backgroundColor: primaryColor }])}
-        className="web:hover:bg-white/10 transition-all duration-200"
+        style={StyleSheet.flatten([
+          styles.menuItem, 
+          active && styles.menuItemActive,
+          // active && { borderLeftColor: primaryColor } // Optional: Use primary color for accent
+        ])}
+        className="web:hover:bg-gray-50 transition-colors duration-200"
       >
-        <Icon size={20} color={active ? "#FFF" : "#9CA3AF"} />
+        <Icon size={18} color={active ? "#111827" : "#6B7280"} strokeWidth={active ? 2.5 : 2} />
         <Text style={StyleSheet.flatten([styles.menuItemText, active && styles.menuItemTextActive])}>
           {label}
         </Text>
@@ -234,81 +238,92 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   container: { flex: 1, flexDirection: "row", backgroundColor: "#F9FAFB", minHeight: "100vh" as any },
   sidebar: {
-    width: 280,
-    backgroundColor: "#111827",
-    padding: 24,
+    width: 260,
+    backgroundColor: "#FFFFFF",
+    borderRightWidth: 1,
+    borderRightColor: "#E5E7EB",
+    paddingVertical: 24,
     justifyContent: "space-between",
   },
   sidebarHeader: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 24,
     marginBottom: 40,
     gap: 12,
   },
   logoBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    // backgroundColor được set bằng inline primaryColor
+    width: 32,
+    height: 32,
+    backgroundColor: "#111827",
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 4, // Sharp, utilitarian look
   },
   sidebarTitle: {
-    color: "white",
-    fontSize: 18,
+    color: "#111827",
+    fontSize: 16,
     fontWeight: "800",
     letterSpacing: -0.5,
+    textTransform: "uppercase",
   },
   menuScroll: { flex: 1 },
-  menu: { gap: 4, paddingBottom: 20 },
+  menu: { gap: 2, paddingBottom: 20 },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingHorizontal: 24,
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
     gap: 12,
   },
-  // menuItemActive: dùng inline primaryColor thay cho static
-  menuItemActive: {},
+  menuItemActive: {
+    backgroundColor: "#F9FAFB",
+    borderLeftColor: "#111827",
+  },
   menuItemText: {
-    color: "#9CA3AF",
-    fontSize: 15,
-    fontWeight: "600",
+    color: "#6B7280",
+    fontSize: 14,
+    fontWeight: "500",
+    letterSpacing: -0.2,
   },
   menuItemTextActive: {
-    color: "white",
+    color: "#111827",
+    fontWeight: "700",
   },
   sidebarFooter: {
     borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopColor: "#E5E7EB",
     paddingTop: 20,
-    gap: 16,
+    paddingHorizontal: 16,
+    gap: 8,
   },
   footerLink: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   footerLinkText: {
-    color: "#9CA3AF",
-    fontSize: 14,
+    color: "#6B7280",
+    fontSize: 13,
     fontWeight: "500",
   },
   // Profile Widget (footer)
   profileWidget: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 8,
     gap: 10,
     backgroundColor: "transparent",
   },
   profileWidgetActive: {
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    backgroundColor: "#F3F4F6",
   },
   profileLeft: {
     flex: 1,
@@ -318,43 +333,42 @@ const styles = StyleSheet.create({
     ...Platform.select({ web: { cursor: "pointer" } as any }),
   },
   avatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#374151",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.1)",
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     justifyContent: "center",
     alignItems: "center",
   },
   avatarCircleActive: {
-    backgroundColor: "#059669",
-    borderColor: "#10B981",
+    borderColor: "#111827",
+    backgroundColor: "#FFFFFF",
   },
   avatarInitials: {
-    color: "white",
-    fontSize: 14,
+    color: "#111827",
+    fontSize: 13,
     fontWeight: "700",
-    letterSpacing: 0.5,
   },
   settingsIconBtn: {
     width: 32,
     height: 32,
-    borderRadius: 8,
+    borderRadius: 6,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "transparent",
     ...Platform.select({ web: { cursor: "pointer" } as any }),
   },
   settingsIconBtnActive: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: "#E5E7EB",
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    color: "white",
-    fontSize: 14,
+    color: "#111827",
+    fontSize: 13,
     fontWeight: "700",
   },
   profileRole: {
@@ -362,11 +376,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   profileRoleActive: {
-    color: "#10B981",
+    color: "#111827",
+    fontWeight: "600",
   },
   content: {
     flex: 1,
-    // padding được override bằng contentPadding từ context
-    padding: 24,
+    padding: 32, // Generous whitespace
   },
 });
