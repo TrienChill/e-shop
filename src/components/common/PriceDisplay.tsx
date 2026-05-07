@@ -2,8 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 // ─── Hàm định dạng số tiền VNĐ ───────────────────────────────────────────────
-const formatVND = (price: number) =>
-  price?.toLocaleString("vi-VN") ?? "0";
+const formatVND = (price: number) => price?.toLocaleString("vi-VN") ?? "0";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 export interface PriceDisplayProps {
@@ -22,6 +21,8 @@ export interface PriceDisplayProps {
   size?: "sm" | "md" | "lg";
   /** Căn lề ngang của container (mặc định "flex-start") */
   justify?: "flex-start" | "center" | "flex-end";
+  /** Ẩn badge phần trăm giảm giá (mặc định hiện) */
+  hideDiscountBadge?: boolean;
 }
 
 // ─── Cấu hình kích cỡ font theo từng variant ─────────────────────────────────
@@ -38,6 +39,7 @@ export function PriceDisplay({
   hasDiscount = false,
   size = "sm",
   justify = "flex-start",
+  hideDiscountBadge = false,
 }: PriceDisplayProps) {
   const { final: finalSize, original: originalSize } = sizeConfig[size];
 
@@ -65,7 +67,7 @@ export function PriceDisplay({
             </Text>
 
             {/* Phần trăm giảm giá - Badge nổi bật */}
-            {discountPercent > 0 && (
+            {discountPercent > 0 && !hideDiscountBadge && (
               <View style={styles.discountBadge}>
                 <Text style={styles.discountText}>-{discountPercent}%</Text>
               </View>

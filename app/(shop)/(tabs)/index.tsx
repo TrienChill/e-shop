@@ -13,7 +13,7 @@ import {
   Text,
   TouchableOpacity,
   useWindowDimensions,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
@@ -573,6 +573,7 @@ const HomeScreen = () => {
                     originalPrice={product.originalPrice}
                     size="sm"
                     justify="center"
+                    hideDiscountBadge
                   />
                 </View>
               </TouchableOpacity>
@@ -631,28 +632,63 @@ const HomeScreen = () => {
 
         {/* ========== FLASH SALE SECTION ========== */}
         <TouchableOpacity
-          style={styles.section}
+          style={[styles.section, isWeb && { paddingHorizontal: 0 }]}
           activeOpacity={0.9}
           onPress={() => router.push("/(shop)/flash-sale")}
         >
-          <View style={styles.flashSaleHeader}>
+          <View
+            style={[
+              styles.flashSaleHeader,
+              isWeb && { paddingHorizontal: responsivePadding },
+            ]}
+          >
             <View style={styles.flashSaleTitleContainer}>
               <MaterialIcons name="access-time" size={20} color="#ef4444" />
               <Text style={styles.flashSaleTitle}>Flash Sale</Text>
             </View>
           </View>
 
-          <View style={styles.flashSaleGrid}>
+          <View
+            style={[
+              styles.flashSaleGrid,
+              isWeb && {
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: responsivePadding,
+                gap: 16,
+              },
+            ]}
+          >
             {flashSaleProducts.map((product) => {
+              const flashColumns = isWeb ? 4 : 2;
+              const cardWidth = isWeb
+                ? (windowWidth -
+                    responsivePadding * 2 -
+                    16 * (flashColumns - 1)) /
+                  flashColumns
+                : (width - 44) / 2;
+
               return (
-                <View key={product.id} style={styles.flashSaleCard}>
+                <View
+                  key={product.id}
+                  style={[
+                    styles.flashSaleCard,
+                    isWeb && {
+                      width: cardWidth,
+                      marginBottom: 12,
+                    },
+                  ]}
+                >
                   <Image
                     source={{
                       uri:
                         product.images?.[0] ||
                         "https://via.placeholder.com/150",
                     }}
-                    style={styles.flashSaleImage}
+                    style={[
+                      styles.flashSaleImage,
+                      isWeb && { height: cardWidth * 0.75 },
+                    ]}
                     resizeMode="cover"
                   />
                   <View style={styles.discountBadge}>
@@ -660,6 +696,27 @@ const HomeScreen = () => {
                       {product.discountBadgeText || "SALE"}
                     </Text>
                   </View>
+                  {isWeb && (
+                    <View style={{ padding: 8 }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: "#4b5563",
+                          marginBottom: 4,
+                          lineHeight: 18,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {product.name}
+                      </Text>
+                      <PriceDisplay
+                        hasDiscount={product.hasDiscount}
+                        finalPrice={product.finalPrice}
+                        originalPrice={product.originalPrice}
+                        size="sm"
+                      />
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -1079,7 +1136,8 @@ const styles = StyleSheet.create({
   productInfo: {
     marginTop: 8,
     alignItems: "center",
-    width: 80,
+    width: 100,
+    paddingHorizontal: 4,
   },
 
   // New Items & Product Cards

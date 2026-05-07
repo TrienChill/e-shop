@@ -1,12 +1,22 @@
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
-import { getFlashSaleProducts, getMostPopularProducts } from "@/src/services/product";
-import { Banner, getActiveBanners } from "@/src/services/banner";
 import { supabase } from "@/src/lib/supabase";
-import { useRouter } from "expo-router";
-import { ArrowRight, ChevronLeft, Clock, Heart, Zap, TrendingUp } from "lucide-react-native";
+import { Banner, getActiveBanners } from "@/src/services/banner";
+import {
+  getFlashSaleProducts,
+  getMostPopularProducts,
+} from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { MaterialIcons } from "@expo/vector-icons";
-import React, { useEffect, useState, useRef } from "react";
+import { useRouter } from "expo-router";
+import {
+  ArrowRight,
+  ChevronLeft,
+  Clock,
+  Heart,
+  TrendingUp,
+  Zap,
+} from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -38,6 +48,7 @@ const COLORS = {
 };
 
 // ==================== MOCK DATA ====================
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const FLASH_SALE_PRODUCTS = [
   {
     id: "1",
@@ -89,6 +100,7 @@ const FLASH_SALE_PRODUCTS = [
   },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const POPULAR_PRODUCTS = [
   {
     id: "p1",
@@ -122,6 +134,7 @@ const POPULAR_PRODUCTS = [
 
 // ==================== SUB-COMPONENTS ====================
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const CountdownTimer = () => {
   const [timeLeft, setTimeLeft] = useState(36 * 60 + 58); // 00:36:58
 
@@ -163,7 +176,15 @@ const CountdownTimer = () => {
   );
 };
 
-const DiscountTabs = ({ selected, onSelect, levels }: { selected: string; onSelect: (val: string) => void, levels: string[] }) => {
+const DiscountTabs = ({
+  selected,
+  onSelect,
+  levels,
+}: {
+  selected: string;
+  onSelect: (val: string) => void;
+  levels: string[];
+}) => {
   return (
     <ScrollView
       horizontal
@@ -175,10 +196,7 @@ const DiscountTabs = ({ selected, onSelect, levels }: { selected: string; onSele
         <TouchableOpacity
           key={level}
           onPress={() => onSelect(level)}
-          style={[
-            styles.tabItem,
-            selected === level && styles.tabItemSelected,
-          ]}
+          style={[styles.tabItem, selected === level && styles.tabItemSelected]}
         >
           <Text
             style={[
@@ -204,14 +222,26 @@ const ProductCard = ({ product }: { product: any }) => {
       onPress={() => router.push(`/(shop)/product/${product.id}`)}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/400' }} style={styles.productImage} />
+        <Image
+          source={{
+            uri: product.images?.[0] || "https://via.placeholder.com/400",
+          }}
+          style={styles.productImage}
+        />
         <View style={styles.discountBadge}>
           <Text style={styles.discountBadgeText}>{discountBadgeText}</Text>
         </View>
       </View>
       <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-        <PriceDisplay finalPrice={product.finalPrice} originalPrice={product.originalPrice} hasDiscount={true} size="sm" />
+        <Text style={styles.productName} numberOfLines={2}>
+          {product.name}
+        </Text>
+        <PriceDisplay
+          finalPrice={product.finalPrice}
+          originalPrice={product.originalPrice}
+          hasDiscount={true}
+          size="sm"
+        />
       </View>
     </TouchableOpacity>
   );
@@ -228,7 +258,13 @@ const WebProductCard = ({ product }: { product: any }) => {
       onPress={() => router.push(`/(shop)/product/${product.id}`)}
     >
       <View style={webStyles.cardImgWrapper}>
-        <Image source={{ uri: product.images?.[0] || 'https://via.placeholder.com/400' }} style={webStyles.cardImg} resizeMode="cover" />
+        <Image
+          source={{
+            uri: product.images?.[0] || "https://via.placeholder.com/400",
+          }}
+          style={webStyles.cardImg}
+          resizeMode="cover"
+        />
         <View style={webStyles.cardBadge}>
           <Zap size={10} color="#fff" fill="#fff" />
           <Text style={webStyles.cardBadgeText}>{badge}</Text>
@@ -236,13 +272,21 @@ const WebProductCard = ({ product }: { product: any }) => {
         <View style={webStyles.cardOverlay} />
       </View>
       <View style={webStyles.cardInfo}>
-        <Text style={webStyles.cardName} numberOfLines={2}>{product.name}</Text>
-        <PriceDisplay finalPrice={product.finalPrice} originalPrice={product.originalPrice} hasDiscount={true} size="sm" />
+        <Text style={webStyles.cardName} numberOfLines={2}>
+          {product.name}
+        </Text>
+        <PriceDisplay
+          finalPrice={product.finalPrice}
+          originalPrice={product.originalPrice}
+          hasDiscount={true}
+          size="sm"
+        />
       </View>
     </TouchableOpacity>
   );
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PopularItemCard = ({ item }: { item: any }) => {
   return (
     <View style={styles.popularCard}>
@@ -254,7 +298,9 @@ const PopularItemCard = ({ item }: { item: any }) => {
       </View>
       <View style={styles.popularInfo}>
         <View style={styles.popularPriceRow}>
-          <Text style={styles.popularPrice}>{item.price.toLocaleString("vi-VN")}đ</Text>
+          <Text style={styles.popularPrice}>
+            {item.price.toLocaleString("vi-VN")}đ
+          </Text>
           <Heart size={14} color={COLORS.blue} fill={COLORS.blue} />
         </View>
       </View>
@@ -281,39 +327,55 @@ export default function FlashSaleScreen() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useSupabaseRealtime({
-    table: 'products',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "products",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'banners',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "banners",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'wishlist',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "wishlist",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   const fetchWishlist = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error } = await supabase.from("wishlist").select("*").eq("user_id", user.id);
+      const { data, error } = await supabase
+        .from("wishlist")
+        .select("*")
+        .eq("user_id", user.id);
       if (error) throw error;
       setWishlistItems(data || []);
-    } catch (e) {}
+    } catch {}
   };
 
-  const handleToggleFavoritePopular = async (productId: string, isCurrentlyFavorited: boolean) => {
+  const handleToggleFavoritePopular = async (
+    productId: string,
+    isCurrentlyFavorited: boolean,
+  ) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         alert("Vui lòng đăng nhập để lưu sản phẩm yêu thích");
         return;
       }
       if (isCurrentlyFavorited) {
-        await supabase.from("wishlist").delete().eq("user_id", user.id).eq("product_id", productId);
+        await supabase
+          .from("wishlist")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("product_id", productId);
       } else {
-        await supabase.from("wishlist").insert([{ user_id: user.id, product_id: productId }]);
+        await supabase
+          .from("wishlist")
+          .insert([{ user_id: user.id, product_id: productId }]);
       }
       fetchWishlist();
     } catch (err: any) {
@@ -329,13 +391,15 @@ export default function FlashSaleScreen() {
       const levels = new Set<number>();
       data.forEach((product: any) => {
         const activeDiscount = product.product_discounts?.find(
-          (d: any) => d.is_active && d.discount_type === 'percentage'
+          (d: any) => d.is_active && d.discount_type === "percentage",
         );
         if (activeDiscount && activeDiscount.discount_value) {
           levels.add(activeDiscount.discount_value);
         }
       });
-      const sorted = Array.from(levels).sort((a, b) => a - b).map(v => `${v}%`);
+      const sorted = Array.from(levels)
+        .sort((a, b) => a - b)
+        .map((v) => `${v}%`);
       setDiscountLevels(["Tất cả", ...sorted]);
     };
     const fetchBanners = async () => {
@@ -352,13 +416,17 @@ export default function FlashSaleScreen() {
     fetchWishlist();
   }, [refreshTrigger]);
 
-  const displayBanners = banners.length > 1 ? [...banners, banners[0]] : banners;
+  const displayBanners =
+    banners.length > 1 ? [...banners, banners[0]] : banners;
 
   useEffect(() => {
     if (banners.length <= 1) return;
     const timer = setInterval(() => {
       const nextIndex = activeBannerIndex + 1;
-      bannerScrollRef.current?.scrollTo({ x: nextIndex * (width - 48), animated: true });
+      bannerScrollRef.current?.scrollTo({
+        x: nextIndex * (width - 48),
+        animated: true,
+      });
       if (nextIndex === banners.length) {
         setTimeout(() => {
           bannerScrollRef.current?.scrollTo({ x: 0, animated: false });
@@ -386,7 +454,7 @@ export default function FlashSaleScreen() {
     if (selectedDiscount === "Tất cả") return true;
     const level = parseInt(selectedDiscount); // e.g. "20%" -> 20
     const activeDiscount = product.product_discounts?.find(
-      (d: any) => d.is_active && d.discount_type === 'percentage'
+      (d: any) => d.is_active && d.discount_type === "percentage",
     );
     if (!activeDiscount) return false;
     return activeDiscount.discount_value >= level;
@@ -398,7 +466,10 @@ export default function FlashSaleScreen() {
       <View style={styles.headerBackground} />
 
       <View style={styles.headerTopRow}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ChevronLeft size={28} color={COLORS.dark} />
         </TouchableOpacity>
       </View>
@@ -408,7 +479,11 @@ export default function FlashSaleScreen() {
         <Text style={styles.screenSubtitle}>Chọn mức giảm giá của bạn</Text>
       </View>
 
-      <DiscountTabs selected={selectedDiscount} onSelect={setSelectedDiscount} levels={discountLevels} />
+      <DiscountTabs
+        selected={selectedDiscount}
+        onSelect={setSelectedDiscount}
+        levels={discountLevels}
+      />
     </View>
   );
 
@@ -441,7 +516,9 @@ export default function FlashSaleScreen() {
                   }
                 }}
               >
-                <View style={[styles.bannerTextContainer, styles.bannerTextContent]}>
+                <View
+                  style={[styles.bannerTextContainer, styles.bannerTextContent]}
+                >
                   <Text style={styles.bannerTitle}>{banner.title}</Text>
                   <Text style={styles.bannerSubtitle}>{banner.subtitle}</Text>
                 </View>
@@ -459,8 +536,9 @@ export default function FlashSaleScreen() {
                 key={index}
                 style={[
                   styles.paginationDot,
-                  (index === activeBannerIndex || (index === 0 && activeBannerIndex === banners.length)) &&
-                  styles.paginationDotActive,
+                  (index === activeBannerIndex ||
+                    (index === 0 && activeBannerIndex === banners.length)) &&
+                    styles.paginationDotActive,
                 ]}
               />
             ))}
@@ -486,7 +564,9 @@ export default function FlashSaleScreen() {
           contentContainerStyle={styles.popularList}
         >
           {popularProducts.map((item) => {
-            const isFavorited = wishlistItems.some(w => w.product_id === item.id);
+            const isFavorited = wishlistItems.some(
+              (w) => w.product_id === item.id,
+            );
             return (
               <TouchableOpacity
                 key={item.id}
@@ -495,20 +575,45 @@ export default function FlashSaleScreen() {
                 activeOpacity={0.8}
               >
                 <View style={styles.popularImageContainer}>
-                  <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={styles.popularImageGrid} resizeMode="cover" />
-                  <TouchableOpacity style={styles.popularLabel} onPress={() => handleToggleFavoritePopular(item.id, isFavorited)}>
-                    <Heart size={14} color={isFavorited ? "#EF4444" : "#EF4444"} fill={isFavorited ? "#EF4444" : "rgba(255,255,255,1)"} />
+                  <Image
+                    source={{
+                      uri:
+                        item.images?.[0] || "https://via.placeholder.com/300",
+                    }}
+                    style={styles.popularImageGrid}
+                    resizeMode="cover"
+                  />
+                  <TouchableOpacity
+                    style={styles.popularLabel}
+                    onPress={() =>
+                      handleToggleFavoritePopular(item.id, isFavorited)
+                    }
+                  >
+                    <Heart
+                      size={14}
+                      color={isFavorited ? "#EF4444" : "#EF4444"}
+                      fill={isFavorited ? "#EF4444" : "rgba(255,255,255,1)"}
+                    />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.popularInfo}>
                   <View style={styles.statsRow}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
                       <Heart size={12} color="#EF4444" fill="#EF4444" />
-                      <Text style={styles.heartText}>{item.heart_count || 0}</Text>
+                      <Text style={styles.heartText}>
+                        {item.heart_count || 0}
+                      </Text>
                     </View>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
                       <MaterialIcons name="star" size={12} color="#f59e0b" />
-                      <Text style={styles.ratingText}> {item.average_rating || 0}</Text>
+                      <Text style={styles.ratingText}>
+                        {" "}
+                        {item.average_rating || 0}
+                      </Text>
                     </View>
                   </View>
                   <Text style={styles.popularNameGrid} numberOfLines={2}>
@@ -530,15 +635,17 @@ export default function FlashSaleScreen() {
   );
 
   const { width: winWidth } = useWindowDimensions();
-  const isWeb = Platform.OS === 'web' && winWidth >= 1024;
+  const isWeb = Platform.OS === "web" && winWidth >= 1024;
 
   // ══════════════ WEB LAYOUT ══════════════
   if (isWeb) {
     return (
       <View style={webStyles.root}>
         <StatusBar barStyle="dark-content" />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
-
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 60 }}
+        >
           {/* ── Hero Banner ── */}
           <View style={webStyles.hero}>
             <View style={webStyles.heroLeft}>
@@ -546,21 +653,35 @@ export default function FlashSaleScreen() {
                 <Zap size={14} color="#FF3B30" fill="#FF3B30" />
                 <Text style={webStyles.heroPill}>GIỚI HẠN THỜI GIAN</Text>
               </View>
-              <Text style={webStyles.heroTitle}>Flash Sale{"\n"}Siêu Giảm Giá</Text>
-              <Text style={webStyles.heroSub}>Hàng nghìn sản phẩm giảm sâu đến 50% · Chỉ hôm nay!</Text>
-
+              <Text style={webStyles.heroTitle}>
+                Flash Sale{"\n"}Siêu Giảm Giá
+              </Text>
+              <Text style={webStyles.heroSub}>
+                Hàng nghìn sản phẩm giảm sâu đến 50% · Chỉ hôm nay!
+              </Text>
             </View>
             <View style={webStyles.heroRight}>
               {flashSaleData.slice(0, 3).map((p, i) => (
                 <TouchableOpacity
                   key={p.id}
-                  style={[webStyles.heroThumb, i === 1 && webStyles.heroThumbCenter]}
+                  style={[
+                    webStyles.heroThumb,
+                    i === 1 && webStyles.heroThumbCenter,
+                  ]}
                   activeOpacity={0.85}
                   onPress={() => router.push(`/(shop)/product/${p.id}`)}
                 >
-                  <Image source={{ uri: p.images?.[0] || 'https://via.placeholder.com/200' }} style={webStyles.heroThumbImg} resizeMode="cover" />
+                  <Image
+                    source={{
+                      uri: p.images?.[0] || "https://via.placeholder.com/200",
+                    }}
+                    style={webStyles.heroThumbImg}
+                    resizeMode="cover"
+                  />
                   <View style={webStyles.heroThumbBadge}>
-                    <Text style={webStyles.heroThumbBadgeText}>{p.discountBadgeText || 'SALE'}</Text>
+                    <Text style={webStyles.heroThumbBadgeText}>
+                      {p.discountBadgeText || "SALE"}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -572,18 +693,37 @@ export default function FlashSaleScreen() {
             {/* Sidebar discount filter */}
             <View style={webStyles.sidebar}>
               <Text style={webStyles.sidebarTitle}>Mức giảm giá</Text>
-              {discountLevels.map(level => (
+              {discountLevels.map((level) => (
                 <TouchableOpacity
                   key={level}
                   onPress={() => setSelectedDiscount(level)}
-                  style={[webStyles.sidebarItem, selectedDiscount === level && webStyles.sidebarItemActive]}
+                  style={[
+                    webStyles.sidebarItem,
+                    selectedDiscount === level && webStyles.sidebarItemActive,
+                  ]}
                 >
-                  {selectedDiscount === level && <Zap size={13} color="#0055FF" fill="#0055FF" style={{ marginRight: 6 }} />}
-                  <Text style={[webStyles.sidebarItemText, selectedDiscount === level && webStyles.sidebarItemTextActive]}>
+                  {selectedDiscount === level && (
+                    <Zap
+                      size={13}
+                      color="#0055FF"
+                      fill="#0055FF"
+                      style={{ marginRight: 6 }}
+                    />
+                  )}
+                  <Text
+                    style={[
+                      webStyles.sidebarItemText,
+                      selectedDiscount === level &&
+                        webStyles.sidebarItemTextActive,
+                    ]}
+                  >
                     {level}
                   </Text>
                   <View style={webStyles.sidebarItemArrow}>
-                    <ArrowRight size={13} color={selectedDiscount === level ? '#0055FF' : '#9CA3AF'} />
+                    <ArrowRight
+                      size={13}
+                      color={selectedDiscount === level ? "#0055FF" : "#9CA3AF"}
+                    />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -594,17 +734,25 @@ export default function FlashSaleScreen() {
               <View style={webStyles.gridHeader}>
                 <View style={webStyles.gridHeaderLeft}>
                   <Zap size={20} color="#FF3B30" fill="#FF3B30" />
-                  <Text style={webStyles.gridHeaderTitle}>Sản phẩm Flash Sale</Text>
+                  <Text style={webStyles.gridHeaderTitle}>
+                    Sản phẩm Flash Sale
+                  </Text>
                   <View style={webStyles.gridCount}>
-                    <Text style={webStyles.gridCountText}>{filteredData.length} sản phẩm</Text>
+                    <Text style={webStyles.gridCountText}>
+                      {filteredData.length} sản phẩm
+                    </Text>
                   </View>
                 </View>
               </View>
               <View style={webStyles.grid}>
-                {filteredData.map(p => <WebProductCard key={p.id} product={p} />)}
+                {filteredData.map((p) => (
+                  <WebProductCard key={p.id} product={p} />
+                ))}
                 {filteredData.length === 0 && (
                   <View style={webStyles.emptyState}>
-                    <Text style={webStyles.emptyText}>Không có sản phẩm ở mức giảm này.</Text>
+                    <Text style={webStyles.emptyText}>
+                      Không có sản phẩm ở mức giảm này.
+                    </Text>
                   </View>
                 )}
               </View>
@@ -615,18 +763,27 @@ export default function FlashSaleScreen() {
           {popularProducts.length > 0 && (
             <View style={webStyles.popularSection}>
               <View style={webStyles.popularHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
                   <TrendingUp size={22} color="#0055FF" />
                   <Text style={webStyles.popularTitle}>Nổi tiếng nhất</Text>
                 </View>
-                <TouchableOpacity style={webStyles.popularSeeAll} onPress={() => router.push('/(shop)/(tabs)/categories' as any)}>
+                <TouchableOpacity
+                  style={webStyles.popularSeeAll}
+                  onPress={() =>
+                    router.push("/(shop)/(tabs)/categories" as any)
+                  }
+                >
                   <Text style={webStyles.popularSeeAllText}>Xem tất cả</Text>
                   <ArrowRight size={16} color="#0055FF" />
                 </TouchableOpacity>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {popularProducts.map(item => {
-                  const isFav = wishlistItems.some(w => w.product_id === item.id);
+                {popularProducts.map((item) => {
+                  const isFav = wishlistItems.some(
+                    (w) => w.product_id === item.id,
+                  );
                   return (
                     <TouchableOpacity
                       key={item.id}
@@ -635,21 +792,53 @@ export default function FlashSaleScreen() {
                       activeOpacity={0.85}
                     >
                       <View style={webStyles.popularImgWrapper}>
-                        <Image source={{ uri: item.images?.[0] || 'https://via.placeholder.com/300' }} style={webStyles.popularImg} resizeMode="cover" />
-                        <TouchableOpacity style={webStyles.popularFav} onPress={() => handleToggleFavoritePopular(item.id, isFav)}>
-                          <Heart size={15} color="#EF4444" fill={isFav ? '#EF4444' : 'transparent'} />
+                        <Image
+                          source={{
+                            uri:
+                              item.images?.[0] ||
+                              "https://via.placeholder.com/300",
+                          }}
+                          style={webStyles.popularImg}
+                          resizeMode="cover"
+                        />
+                        <TouchableOpacity
+                          style={webStyles.popularFav}
+                          onPress={() =>
+                            handleToggleFavoritePopular(item.id, isFav)
+                          }
+                        >
+                          <Heart
+                            size={15}
+                            color="#EF4444"
+                            fill={isFav ? "#EF4444" : "transparent"}
+                          />
                         </TouchableOpacity>
                       </View>
                       <View style={webStyles.popularInfo}>
                         <View style={webStyles.popularStats}>
-                          <MaterialIcons name="star" size={13} color="#F59E0B" />
-                          <Text style={webStyles.popularRating}>{item.average_rating || '5.0'}</Text>
+                          <MaterialIcons
+                            name="star"
+                            size={13}
+                            color="#F59E0B"
+                          />
+                          <Text style={webStyles.popularRating}>
+                            {item.average_rating || "5.0"}
+                          </Text>
                           <Text style={webStyles.popularDot}>·</Text>
                           <Heart size={11} color="#EF4444" fill="#EF4444" />
-                          <Text style={webStyles.popularHeart}>{item.heart_count || 0}</Text>
+                          <Text style={webStyles.popularHeart}>
+                            {item.heart_count || 0}
+                          </Text>
                         </View>
-                        <Text style={webStyles.popularName} numberOfLines={2}>{item.name}</Text>
-                        <PriceDisplay hasDiscount={item.hasDiscount} finalPrice={item.finalPrice} originalPrice={item.originalPrice} size="sm" />
+                        <Text style={webStyles.popularName} numberOfLines={2}>
+                          {item.name}
+                        </Text>
+                        <PriceDisplay
+                          hasDiscount={item.hasDiscount}
+                          finalPrice={item.finalPrice}
+                          originalPrice={item.originalPrice}
+                          size="sm"
+                        />
                       </View>
                     </TouchableOpacity>
                   );
@@ -838,27 +1027,96 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 24,
   },
-  bannerContent: { backgroundColor: "#ff6b35", borderRadius: 16, height: 160, flexDirection: "row", overflow: "hidden", position: "relative" },
+  bannerContent: {
+    backgroundColor: "#ff6b35",
+    borderRadius: 16,
+    height: 160,
+    flexDirection: "row",
+    overflow: "hidden",
+    position: "relative",
+  },
   bannerTextContent: { flex: 1, justifyContent: "center", paddingLeft: 24 },
-  bannerTitle: { fontSize: 24, fontWeight: "bold", color: "#fff", marginBottom: 4 },
-  bannerSubtitle: { fontSize: 14, color: "#fff", opacity: 0.9, marginBottom: 12 },
-  happeningBtn: { backgroundColor: "#fff", alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  bannerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 4,
+  },
+  bannerSubtitle: {
+    fontSize: 14,
+    color: "#fff",
+    opacity: 0.9,
+    marginBottom: 12,
+  },
+  happeningBtn: {
+    backgroundColor: "#fff",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
   happeningText: { color: "#ff6b35", fontWeight: "bold", fontSize: 12 },
   bannerImage: { width: 140, height: 140, alignSelf: "flex-end" },
 
   // Added styles for dynamic banner & popular items
   bannerContainer: { marginBottom: 20 },
   bannerTextContainer: { flex: 1, paddingLeft: 24, justifyContent: "center" },
-  paginationContainer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 12, gap: 8 },
-  paginationDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#E5E7EB" },
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 12,
+    gap: 8,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#E5E7EB",
+  },
   paginationDotActive: { width: 24, backgroundColor: "#0055FF" },
 
-  popularCardGrid: { width: 160, backgroundColor: "#fff", borderRadius: 16, padding: 8, marginBottom: 16, marginRight: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 4 },
-  popularImageGrid: { width: "100%", height: 160, borderRadius: 12, backgroundColor: "#f5f5f5" },
-  statsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 8 },
-  heartText: { fontSize: 12, color: "#EF4444", fontWeight: "bold", marginLeft: 4 },
+  popularCardGrid: {
+    width: 160,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 8,
+    marginBottom: 16,
+    marginRight: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  popularImageGrid: {
+    width: "100%",
+    height: 160,
+    borderRadius: 12,
+    backgroundColor: "#f5f5f5",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 8,
+  },
+  heartText: {
+    fontSize: 12,
+    color: "#EF4444",
+    fontWeight: "bold",
+    marginLeft: 4,
+  },
   ratingText: { fontSize: 11, color: "#666" },
-  popularNameGrid: { fontSize: 14, fontWeight: "700", color: "#1e293b", marginTop: 6, marginBottom: 4, lineHeight: 20, paddingHorizontal: 4 },
+  popularNameGrid: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginTop: 6,
+    marginBottom: 4,
+    lineHeight: 20,
+    paddingHorizontal: 4,
+  },
 
   // Most Popular
   mostPopularSection: {
@@ -944,170 +1202,288 @@ const styles = StyleSheet.create({
 
 // ==================== WEB STYLES ====================
 const webStyles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFF' },
+  root: { flex: 1, backgroundColor: "#F8FAFF" },
 
   // Hero
   hero: {
-    flexDirection: 'row',
-    backgroundColor: '#0A1628',
-    paddingHorizontal: 80,
+    flexDirection: "row",
+    backgroundColor: "#0A1628",
+    paddingHorizontal: 60,
     paddingVertical: 56,
-    alignItems: 'center',
-    gap: 48,
+    alignItems: "center",
+    gap: 40,
     minHeight: 320,
+    justifyContent: "space-between",
+    maxWidth: 1600,
+    alignSelf: "center",
+    width: "100%",
   },
-  heroLeft: { flex: 1 },
-  heroPillRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  heroLeft: { flex: 1, minWidth: 0 },
+  heroPillRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 16,
+  },
   heroPill: {
-    color: '#FF3B30', fontWeight: '800', fontSize: 12, letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    color: "#FF3B30",
+    fontWeight: "800",
+    fontSize: 12,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   heroTitle: {
-    fontSize: 52, fontWeight: '900', color: '#FFFFFF', lineHeight: 60,
+    fontSize: 48,
+    fontWeight: "900",
+    color: "#FFFFFF",
+    lineHeight: 56,
     marginBottom: 12,
   },
-  heroSub: { fontSize: 16, color: 'rgba(255,255,255,0.65)', lineHeight: 24, marginBottom: 28 },
-  heroTimerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroTimerLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600' },
-  heroRight: { flexDirection: 'row', alignItems: 'flex-end', gap: 12 },
+  heroSub: {
+    fontSize: 15,
+    color: "rgba(255,255,255,0.65)",
+    lineHeight: 24,
+    marginBottom: 28,
+  },
+  heroTimerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  heroTimerLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  heroRight: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 10,
+    flexShrink: 1,
+    justifyContent: "flex-end",
+  },
   heroThumb: {
-    width: 130, height: 160, borderRadius: 20, overflow: 'hidden',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
+    width: 120,
+    height: 150,
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.15)",
+    flexShrink: 0,
   },
-  heroThumbCenter: { width: 160, height: 200, marginBottom: -20 },
-  heroThumbImg: { width: '100%', height: '100%' },
+  heroThumbCenter: { width: 150, height: 190, marginBottom: -15 },
+  heroThumbImg: { width: "100%", height: "100%" },
   heroThumbBadge: {
-    position: 'absolute', top: 10, right: 10,
-    backgroundColor: '#FF3B30', borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4,
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#FF3B30",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  heroThumbBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  heroThumbBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 
   // Body layout
   body: {
-    flexDirection: 'row',
-    paddingHorizontal: 48,
+    flexDirection: "row",
+    paddingHorizontal: 60,
     paddingTop: 40,
+    paddingBottom: 40,
     gap: 32,
-    maxWidth: 1400,
-    alignSelf: 'center',
-    width: '100%',
+    maxWidth: 1600,
+    alignSelf: "center",
+    width: "100%",
   },
 
   // Sidebar
   sidebar: {
     width: 200,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    height: 'auto',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 18,
+    height: "auto",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-    alignSelf: 'flex-start',
+    shadowRadius: 8,
+    elevation: 2,
+    alignSelf: "flex-start",
+    position: "sticky" as any,
+    top: 80,
   },
-  sidebarTitle: { fontSize: 15, fontWeight: '800', color: '#111', marginBottom: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  sidebarTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111",
+    marginBottom: 14,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
   sidebarItem: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 12,
-    borderRadius: 12, marginBottom: 6,
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1.5, borderColor: 'transparent',
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+    borderRadius: 10,
+    marginBottom: 6,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    cursor: "pointer" as any,
   },
-  sidebarItemActive: { backgroundColor: '#EFF6FF', borderColor: '#0055FF' },
-  sidebarItemText: { flex: 1, fontSize: 14, color: '#4B5563', fontWeight: '500' },
-  sidebarItemTextActive: { color: '#0055FF', fontWeight: '700' },
-  sidebarItemArrow: { marginLeft: 'auto' as any },
+  sidebarItemActive: { backgroundColor: "#EFF6FF", borderColor: "#0055FF" },
+  sidebarItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#4B5563",
+    fontWeight: "500",
+  },
+  sidebarItemTextActive: { color: "#0055FF", fontWeight: "700" },
+  sidebarItemArrow: { marginLeft: "auto" as any },
 
   // Grid area
   gridArea: { flex: 1 },
   gridHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
-  gridHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  gridHeaderTitle: { fontSize: 20, fontWeight: '800', color: '#111' },
+  gridHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  gridHeaderTitle: { fontSize: 22, fontWeight: "800", color: "#111" },
   gridCount: {
-    backgroundColor: '#FEF2F2', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 3,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
-  gridCountText: { fontSize: 12, color: '#EF4444', fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  emptyState: { flex: 1, alignItems: 'center', paddingVertical: 60 },
-  emptyText: { color: '#9CA3AF', fontSize: 16 },
+  gridCountText: { fontSize: 13, color: "#EF4444", fontWeight: "700" },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 20,
+    justifyContent: "flex-start",
+  },
+  emptyState: { flex: 1, alignItems: "center", paddingVertical: 80 },
+  emptyText: { color: "#9CA3AF", fontSize: 16, fontWeight: "500" },
 
   // Web Product Card
   productCard: {
-    width: '22%' as any, // ~4 cols
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    elevation: 4,
+    width: "calc(25% - 15px)" as any,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
+    borderColor: "#F3F4F6",
   },
-  cardImgWrapper: { width: '100%', aspectRatio: 0.9, position: 'relative' },
-  cardImg: { width: '100%', height: '100%' },
+  cardImgWrapper: { width: "100%", aspectRatio: 1, position: "relative" },
+  cardImg: { width: "100%", height: "100%" },
   cardOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0, height: 60,
-    backgroundColor: 'rgba(0,0,0,0.04)',
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 50,
+    backgroundColor: "rgba(0,0,0,0.02)",
   },
   cardBadge: {
-    position: 'absolute', top: 12, left: 12,
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: '#FF3B30', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 4,
+    position: "absolute",
+    top: 10,
+    left: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FF3B30",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  cardBadgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  cardInfo: { padding: 14 },
-  cardName: { fontSize: 14, fontWeight: '600', color: '#1F2937', marginBottom: 8, lineHeight: 20, minHeight: 40 },
+  cardBadgeText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  cardInfo: { padding: 12 },
+  cardName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#1F2937",
+    marginBottom: 8,
+    lineHeight: 18,
+    minHeight: 36,
+  },
 
   // Popular section
   popularSection: {
-    paddingHorizontal: 48, paddingTop: 40, paddingBottom: 20,
-    maxWidth: 1400, alignSelf: 'center', width: '100%',
+    paddingHorizontal: 60,
+    paddingTop: 40,
+    paddingBottom: 60,
+    maxWidth: 1600,
+    alignSelf: "center",
+    width: "100%",
+    backgroundColor: "#F8FAFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
   popularHeader: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
   },
-  popularTitle: { fontSize: 22, fontWeight: '800', color: '#111' },
-  popularSeeAll: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  popularSeeAllText: { color: '#0055FF', fontSize: 14, fontWeight: '600' },
+  popularTitle: { fontSize: 22, fontWeight: "800", color: "#111" },
+  popularSeeAll: { flexDirection: "row", alignItems: "center", gap: 6 },
+  popularSeeAllText: { color: "#0055FF", fontSize: 14, fontWeight: "600" },
   popularCard: {
-    width: 200, marginRight: 16,
-    backgroundColor: '#fff', borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  popularImgWrapper: { width: '100%', height: 200, position: 'relative' },
-  popularImg: { width: '100%', height: '100%' },
-  popularFav: {
-    position: 'absolute', top: 10, right: 10,
-    backgroundColor: '#fff', borderRadius: 20,
-    width: 32, height: 32,
-    justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000',
+    width: 180,
+    marginRight: 16,
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#F3F4F6",
+    flexShrink: 0,
   },
-  popularInfo: { padding: 12 },
-  popularStats: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
-  popularRating: { fontSize: 12, fontWeight: '700', color: '#1F2937' },
-  popularDot: { color: '#9CA3AF', fontSize: 12 },
-  popularHeart: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
-  popularName: { fontSize: 14, fontWeight: '700', color: '#1F2937', lineHeight: 20, marginBottom: 6 },
+  popularImgWrapper: { width: "100%", height: 180, position: "relative" },
+  popularImg: { width: "100%", height: "100%" },
+  popularFav: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  popularInfo: { padding: 10 },
+  popularStats: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    marginBottom: 6,
+  },
+  popularRating: { fontSize: 11, fontWeight: "700", color: "#1F2937" },
+  popularDot: { color: "#D1D5DB", fontSize: 10 },
+  popularHeart: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+  popularName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1F2937",
+    lineHeight: 18,
+    marginBottom: 6,
+  },
 });
-
