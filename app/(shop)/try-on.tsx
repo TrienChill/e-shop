@@ -1,8 +1,15 @@
-import CommonHeader from "@/src/components/layout/Header";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Camera, CheckCircle2, RefreshCw, Save, Shirt } from "lucide-react-native";
+import { CommonHeader } from "@/src/components/layout/Header";
+import { EncodingType, readAsStringAsync } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import { readAsStringAsync, EncodingType } from "expo-file-system/legacy";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  ArrowLeft,
+  Camera,
+  CheckCircle2,
+  RefreshCw,
+  Save,
+  Shirt,
+} from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -19,7 +26,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // API URL - có thể thay đổi theo môi trường
-const API_URL = process.env.EXPO_PUBLIC_TRYON_API_URL || "http://localhost:8000/api/try-on";
+const API_URL =
+  process.env.EXPO_PUBLIC_TRYON_API_URL || "http://localhost:8000/api/try-on";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
@@ -42,10 +50,17 @@ const colorTranslations: Record<string, string> = {
 type TryOnState = "idle" | "loading" | "result" | "error";
 
 export default function VirtualTryOnScreen() {
-  const { productImageUrl, selectedColor } = useLocalSearchParams<{ productImageUrl?: string; selectedColor?: string }>();
+  const { productImageUrl, selectedColor } = useLocalSearchParams<{
+    productImageUrl?: string;
+    selectedColor?: string;
+  }>();
   const router = useRouter();
 
-  const [personImage, setPersonImage] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [personImage, setPersonImage] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+  } | null>(null);
   const [clothImage] = useState<string>(productImageUrl || "");
   const [clothColor] = useState<string>(selectedColor || "");
   const [state, setState] = useState<TryOnState>("idle");
@@ -73,7 +88,10 @@ export default function VirtualTryOnScreen() {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert("Cần quyền truy cập", "Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.");
+        Alert.alert(
+          "Cần quyền truy cập",
+          "Vui lòng cấp quyền truy cập thư viện ảnh để tiếp tục.",
+        );
         return;
       }
 
@@ -197,8 +215,13 @@ export default function VirtualTryOnScreen() {
 
       if (err.name === "AbortError") {
         msg = "Yêu cầu bị timeout. Vui lòng thử lại sau.";
-      } else if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError") || err.message.includes("net::ERR")) {
-        msg = "Không thể kết nối đến server thử đồ. Vui lòng kiểm tra:\n• Server thử đồ đang chạy\n• Kết nối internet của bạn";
+      } else if (
+        err.message.includes("Failed to fetch") ||
+        err.message.includes("NetworkError") ||
+        err.message.includes("net::ERR")
+      ) {
+        msg =
+          "Không thể kết nối đến server thử đồ. Vui lòng kiểm tra:\n• Server thử đồ đang chạy\n• Kết nối internet của bạn";
       } else if (err instanceof Error) {
         msg = err.message;
       }
@@ -224,7 +247,10 @@ export default function VirtualTryOnScreen() {
       const blob = await response.blob();
       const reader = new FileReader();
       reader.onloadend = () => {
-        Alert.alert("Thành công", "Ảnh kết quả đã được xử lý. Bạn có thể chụp màn hình để lưu lại.");
+        Alert.alert(
+          "Thành công",
+          "Ảnh kết quả đã được xử lý. Bạn có thể chụp màn hình để lưu lại.",
+        );
       };
       reader.readAsDataURL(blob);
     } catch {
@@ -259,7 +285,11 @@ export default function VirtualTryOnScreen() {
             activeOpacity={0.7}
           >
             {personImage ? (
-              <Image source={{ uri: personImage.uri }} style={styles.imagePreview} resizeMode="cover" />
+              <Image
+                source={{ uri: personImage.uri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
             ) : (
               <View style={styles.imagePlaceholder}>
                 <Camera size={32} color="#9CA3AF" />
@@ -276,7 +306,11 @@ export default function VirtualTryOnScreen() {
           {/* Product image */}
           <View style={[styles.imageBox, styles.productBox]}>
             {clothImage ? (
-              <Image source={{ uri: clothImage }} style={styles.imagePreview} resizeMode="cover" />
+              <Image
+                source={{ uri: clothImage }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
             ) : (
               <View style={styles.imagePlaceholder}>
                 <Shirt size={32} color="#9CA3AF" />
@@ -286,7 +320,9 @@ export default function VirtualTryOnScreen() {
             <View style={[styles.overlayBadge, styles.productBadge]}>
               <Shirt size={12} color="#fff" />
               <Text style={[styles.overlayBadgeText, { marginLeft: 4 }]}>
-                {clothColor ? `${colorTranslations[clothColor] || clothColor}` : "Sản phẩm"}
+                {clothColor
+                  ? `${colorTranslations[clothColor] || clothColor}`
+                  : "Sản phẩm"}
               </Text>
             </View>
           </View>
@@ -294,12 +330,20 @@ export default function VirtualTryOnScreen() {
 
         {/* Section 2: Action button */}
         <TouchableOpacity
-          style={[styles.primaryButton, !canTryOn && styles.primaryButtonDisabled]}
+          style={[
+            styles.primaryButton,
+            !canTryOn && styles.primaryButtonDisabled,
+          ]}
           onPress={handleTryOn}
           disabled={!canTryOn || state === "loading"}
           activeOpacity={0.8}
         >
-          <Text style={[styles.primaryButtonText, !canTryOn && styles.primaryButtonTextDisabled]}>
+          <Text
+            style={[
+              styles.primaryButtonText,
+              !canTryOn && styles.primaryButtonTextDisabled,
+            ]}
+          >
             Bắt đầu thử đồ
           </Text>
         </TouchableOpacity>

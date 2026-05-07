@@ -1,7 +1,14 @@
-
 import { useAuth } from "@/src/auth/AuthContext";
-import { useRouter } from "expo-router";
-import { getRevenueReport, RevenueReport, fetchAiReports, saveAiReport, deleteAiReport, AiReport } from "@/src/services/admin/revenue";
+import Echarts from "@/src/components/admin/EchartsWrapper";
+import {
+  AiReport,
+  deleteAiReport,
+  fetchAiReports,
+  getRevenueReport,
+  RevenueReport,
+  saveAiReport,
+} from "@/src/services/admin/revenue";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   endOfDay,
   endOfMonth,
@@ -11,27 +18,25 @@ import {
   startOfMonth,
   startOfYear,
 } from "date-fns";
+import { useRouter } from "expo-router";
 import {
   AlertCircle,
   BarChart3,
+  BookMarked,
+  Bot,
   Calendar,
   CheckCircle2,
+  Clock,
+  CreditCard,
   Download,
   Package2,
-  ShoppingCart,
-  TrendingUp,
-  CreditCard,
-  ChevronUp,
-  ChevronDown,
-  Sparkles,
-  Bot,
-  X,
-  BookMarked,
-  Trash2,
-  Clock,
   Save,
+  ShoppingCart,
+  Sparkles,
+  Trash2,
+  TrendingUp,
+  X
 } from "lucide-react-native";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -47,7 +52,6 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import Echarts from "@/src/components/admin/EchartsWrapper";
 import * as XLSX from "xlsx";
 
 // ─────────────────────────────────────────────
@@ -69,7 +73,10 @@ const MAX_SAVED_REPORTS = 5;
 // ─────────────────────────────────────────────
 // Date-fns helpers
 // ─────────────────────────────────────────────
-function computeDateRange(range: TimeRange, now = new Date()): { startDate: Date; endDate: Date } {
+function computeDateRange(
+  range: TimeRange,
+  now = new Date(),
+): { startDate: Date; endDate: Date } {
   switch (range) {
     case "day":
       return { startDate: startOfDay(now), endDate: endOfDay(now) };
@@ -94,14 +101,25 @@ const Shimmer = ({ width, height, borderRadius = 8, style }: any) => {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.8, duration: 800, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 800, useNativeDriver: true }),
-      ])
+        Animated.timing(opacity, {
+          toValue: 0.8,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]),
     ).start();
   }, [opacity]);
   return (
     <Animated.View
-      style={[{ width, height, borderRadius, backgroundColor: "#E5E7EB", opacity }, style]}
+      style={[
+        { width, height, borderRadius, backgroundColor: "#E5E7EB", opacity },
+        style,
+      ]}
     />
   );
 };
@@ -109,7 +127,15 @@ const Shimmer = ({ width, height, borderRadius = 8, style }: any) => {
 // ─────────────────────────────────────────────
 // KPI Card
 // ─────────────────────────────────────────────
-const KPICard = ({ title, value, subtitle, icon: Icon, color, iconBg, isLoading }: any) => (
+const KPICard = ({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color,
+  iconBg,
+  isLoading,
+}: any) => (
   <View style={styles.kpiCard}>
     <View style={styles.kpiCardTop}>
       <View style={[styles.kpiIcon, { backgroundColor: iconBg }]}>
@@ -129,27 +155,51 @@ const KPICard = ({ title, value, subtitle, icon: Icon, color, iconBg, isLoading 
 // ─────────────────────────────────────────────
 // Filter Button (Segmented)
 // ─────────────────────────────────────────────
-const SegBtn = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
+const SegBtn = ({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) => (
   <TouchableOpacity
     style={[styles.segBtn, active && styles.segBtnActive]}
     onPress={onPress}
     activeOpacity={0.7}
   >
-    <Text style={[styles.segBtnText, active && styles.segBtnTextActive]}>{label}</Text>
+    <Text style={[styles.segBtnText, active && styles.segBtnTextActive]}>
+      {label}
+    </Text>
   </TouchableOpacity>
 );
 
 // ─────────────────────────────────────────────
 // Simple date input (web/mobile compatible)
 // ─────────────────────────────────────────────
-const DateField = ({ label, value, onChange, disabled }: {
-  label: string; value: Date; onChange: (d: Date) => void; disabled: boolean;
+const DateField = ({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: Date;
+  onChange: (d: Date) => void;
+  disabled: boolean;
 }) => {
   const str = format(value, "yyyy-MM-dd");
   return (
     <View style={[styles.dateField, disabled && styles.dateFieldDisabled]}>
-      <Calendar size={14} color={disabled ? "#CBD5E1" : "#6366F1"} style={{ marginRight: 6 }} />
-      <Text style={[styles.dateFieldLabel, disabled && { color: "#CBD5E1" }]}>{label}: </Text>
+      <Calendar
+        size={14}
+        color={disabled ? "#CBD5E1" : "#6366F1"}
+        style={{ marginRight: 6 }}
+      />
+      <Text style={[styles.dateFieldLabel, disabled && { color: "#CBD5E1" }]}>
+        {label}:{" "}
+      </Text>
       {Platform.OS === "web" && !disabled ? (
         <input
           type="date"
@@ -176,7 +226,11 @@ const DateField = ({ label, value, onChange, disabled }: {
           onChangeText={(t) => {
             const parts = t.split("/");
             if (parts.length === 3) {
-              const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+              const d = new Date(
+                Number(parts[2]),
+                Number(parts[1]) - 1,
+                Number(parts[0]),
+              );
               if (!isNaN(d.getTime())) onChange(d);
             }
           }}
@@ -190,7 +244,9 @@ const DateField = ({ label, value, onChange, disabled }: {
 // Main Screen
 // ─────────────────────────────────────────────
 const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(v || 0);
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(
+    v || 0,
+  );
 
 export default function AdminRevenueScreen() {
   const { role } = useAuth();
@@ -210,18 +266,20 @@ export default function AdminRevenueScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [compareMode, setCompareMode] = useState(false);
-  const [prevReportData, setPrevReportData] = useState<RevenueReport | null>(null);
+  const [prevReportData, setPrevReportData] = useState<RevenueReport | null>(
+    null,
+  );
 
   // ── Derived values from RPC ──
   const TOP_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
-  const revenueIn  = reportData?.revenue_in  ?? 0;
+  const revenueIn = reportData?.revenue_in ?? 0;
   const revenueOut = reportData?.revenue_out ?? 0;
-  const profit     = reportData?.profit      ?? 0;
-  const trendData  = reportData?.trend_data  ?? [];
+  const profit = reportData?.profit ?? 0;
+  const trendData = reportData?.trend_data ?? [];
   const topProducts = reportData?.top_products ?? [];
   const paymentMethods = reportData?.payment_methods ?? [];
   const heatmapData = reportData?.heatmap ?? [];
-  
+
   const prevTrendData = prevReportData?.trend_data ?? [];
 
   const totalOrders = trendData.reduce((acc, r) => acc + (r.orders || 0), 0);
@@ -238,27 +296,30 @@ export default function AdminRevenueScreen() {
   }, []);
 
   // ── Fetch ──
-  const handleFilterChange = useCallback(async (start: Date, end: Date, compare: boolean) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getRevenueReport(start, end);
-      setReportData(data);
-      if (compare) {
-        const diff = end.getTime() - start.getTime();
-        const prevEnd = new Date(start.getTime() - 1);
-        const prevStart = new Date(prevEnd.getTime() - diff);
-        const prevData = await getRevenueReport(prevStart, prevEnd);
-        setPrevReportData(prevData);
-      } else {
-        setPrevReportData(null);
+  const handleFilterChange = useCallback(
+    async (start: Date, end: Date, compare: boolean) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getRevenueReport(start, end);
+        setReportData(data);
+        if (compare) {
+          const diff = end.getTime() - start.getTime();
+          const prevEnd = new Date(start.getTime() - 1);
+          const prevStart = new Date(prevEnd.getTime() - diff);
+          const prevData = await getRevenueReport(prevStart, prevEnd);
+          setPrevReportData(prevData);
+        } else {
+          setPrevReportData(null);
+        }
+      } catch (e: any) {
+        setError(e.message ?? "Lỗi tải dữ liệu");
+      } finally {
+        setLoading(false);
       }
-    } catch (e: any) {
-      setError(e.message ?? "Lỗi tải dữ liệu");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     handleFilterChange(filter.startDate, filter.endDate, compareMode);
@@ -266,8 +327,14 @@ export default function AdminRevenueScreen() {
 
   // ── Export state ──
   const [exporting, setExporting] = useState(false);
-  const [toast, setToast] = useState<{ visible: boolean; message: string; type: "info" | "success" | "error" }>({
-    visible: false, message: "", type: "info",
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: "info" | "success" | "error";
+  }>({
+    visible: false,
+    message: "",
+    type: "info",
   });
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -280,12 +347,21 @@ export default function AdminRevenueScreen() {
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
+  const [selectedReport, setSelectedReport] = useState<SavedReport | null>(
+    null,
+  );
 
-  const showToast = (message: string, type: "info" | "success" | "error" = "info", duration = 2800) => {
+  const showToast = (
+    message: string,
+    type: "info" | "success" | "error" = "info",
+    duration = 2800,
+  ) => {
     if (toastTimeout.current) clearTimeout(toastTimeout.current);
     setToast({ visible: true, message, type });
-    toastTimeout.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), duration);
+    toastTimeout.current = setTimeout(
+      () => setToast((t) => ({ ...t, visible: false })),
+      duration,
+    );
   };
 
   // ── Load saved reports từ Supabase ──
@@ -313,24 +389,30 @@ export default function AdminRevenueScreen() {
       Alert.alert("Thành công", "Đã lưu báo cáo AI vào hệ thống.");
     } catch (err: any) {
       showToast("Lưu thất bại: " + (err?.message ?? "Lỗi kết nối"), "error");
-      Alert.alert("Lỗi", "Không thể lưu báo cáo: " + (err?.message ?? "Lỗi kết nối"));
+      Alert.alert(
+        "Lỗi",
+        "Không thể lưu báo cáo: " + (err?.message ?? "Lỗi kết nối"),
+      );
     } finally {
       setSavingReport(false);
     }
   }, [aiInsight, filter, revenueIn, revenueOut, totalOrders, aovValue]);
 
   // ── Xóa báo cáo khỏi Supabase ──
-  const handleDeleteReport = useCallback(async (id: string) => {
-    try {
-      await deleteAiReport(id);
-      const updated = savedReports.filter((r) => r.id !== id);
-      setSavedReports(updated);
-      if (selectedReport?.id === id) setSelectedReport(null);
-      showToast("Đã xóa báo cáo.", "info");
-    } catch (err: any) {
-      showToast("Xóa thất bại: " + (err?.message ?? "Lỗi kết nối"), "error");
-    }
-  }, [savedReports, selectedReport]);
+  const handleDeleteReport = useCallback(
+    async (id: string) => {
+      try {
+        await deleteAiReport(id);
+        const updated = savedReports.filter((r) => r.id !== id);
+        setSavedReports(updated);
+        if (selectedReport?.id === id) setSelectedReport(null);
+        showToast("Đã xóa báo cáo.", "info");
+      } catch (err: any) {
+        showToast("Xóa thất bại: " + (err?.message ?? "Lỗi kết nối"), "error");
+      }
+    },
+    [savedReports, selectedReport],
+  );
 
   // ── AI Insight ──
   const handleGenerateAIInsight = useCallback(async () => {
@@ -348,9 +430,13 @@ export default function AdminRevenueScreen() {
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const startStr = format(filter.startDate, "dd/MM/yyyy");
-      const endStr   = format(filter.endDate,   "dd/MM/yyyy");
-      const top3 = topProducts.slice(0, 3).map((p, i) => `${i + 1}. ${p.name} — ${formatCurrency(p.revenue)}`).join("\n");
-      const cancelRate = revenueIn > 0 ? ((revenueOut / revenueIn) * 100).toFixed(1) : "0";
+      const endStr = format(filter.endDate, "dd/MM/yyyy");
+      const top3 = topProducts
+        .slice(0, 3)
+        .map((p, i) => `${i + 1}. ${p.name} — ${formatCurrency(p.revenue)}`)
+        .join("\n");
+      const cancelRate =
+        revenueIn > 0 ? ((revenueOut / revenueIn) * 100).toFixed(1) : "0";
 
       const prompt = `Bạn là chuyên gia phân tích tài chính thương mại điện tử.
 Dưới đây là dữ liệu bán hàng từ ${startStr} đến ${endStr}:
@@ -373,11 +459,21 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
       const text = result.response.text();
       setAiInsight(text);
     } catch (err: any) {
-      setAiInsight(`Đã xảy ra lỗi khi phân tích: ${err.message ?? "Lỗi không xác định"}`);
+      setAiInsight(
+        `Đã xảy ra lỗi khi phân tích: ${err.message ?? "Lỗi không xác định"}`,
+      );
     } finally {
       setAiLoading(false);
     }
-  }, [reportData, filter, revenueIn, revenueOut, totalOrders, aovValue, topProducts]);
+  }, [
+    reportData,
+    filter,
+    revenueIn,
+    revenueOut,
+    totalOrders,
+    aovValue,
+    topProducts,
+  ]);
 
   // ── Excel Export ──
   const handleExportExcel = useCallback(async () => {
@@ -393,7 +489,7 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
     showToast("Đang tạo file Excel...", "info");
     try {
       const startStr = format(filter.startDate, "dd-MM-yyyy");
-      const endStr   = format(filter.endDate,   "dd-MM-yyyy");
+      const endStr = format(filter.endDate, "dd-MM-yyyy");
       const fileName = `Bao_cao_doanh_thu_${startStr}_den_${endStr}.xlsx`;
 
       // ── Sheet 1: Tổng quan ──
@@ -432,11 +528,22 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
       XLSX.writeFile(wb, fileName);
       showToast(`✓ Đã xuất "${fileName}" thành công!`, "success", 4000);
     } catch (err: any) {
-      showToast("Lỗi khi xuất file: " + (err?.message ?? "Không xác định"), "error");
+      showToast(
+        "Lỗi khi xuất file: " + (err?.message ?? "Không xác định"),
+        "error",
+      );
     } finally {
       setExporting(false);
     }
-  }, [reportData, filter, revenueIn, revenueOut, profit, trendData, topProducts]);
+  }, [
+    reportData,
+    filter,
+    revenueIn,
+    revenueOut,
+    profit,
+    trendData,
+    topProducts,
+  ]);
 
   // ── Chart options ──
   // trendData: [{date: "DD/MM", amount: number}] — from RPC directly
@@ -465,7 +572,11 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
       lineStyle: { width: 3, color: "#6366F1" },
       areaStyle: {
         color: {
-          type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+          type: "linear",
+          x: 0,
+          y: 0,
+          x2: 0,
+          y2: 1,
           colorStops: [
             { offset: 0, color: "rgba(99,102,241,0.2)" },
             { offset: 1, color: "rgba(99,102,241,0.0)" },
@@ -510,7 +621,13 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
       }`,
     },
     legend: { show: compareMode, bottom: 0 },
-    grid: { left: "1%", right: "1%", bottom: compareMode ? "10%" : "2%", top: "10%", containLabel: true },
+    grid: {
+      left: "1%",
+      right: "1%",
+      bottom: compareMode ? "10%" : "2%",
+      top: "10%",
+      containLabel: true,
+    },
     xAxis: {
       type: "category",
       boundaryGap: false,
@@ -551,7 +668,13 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
              + '<div style="font-weight:800;font-size:14px;color:#6EE7B7">' + p.value + ' đơn</div>';
       }`,
     },
-    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    grid: {
+      left: "1%",
+      right: "1%",
+      bottom: "2%",
+      top: "10%",
+      containLabel: true,
+    },
     xAxis: {
       type: "category",
       boundaryGap: false,
@@ -577,7 +700,11 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         lineStyle: { width: 3, color: "#10B981" },
         areaStyle: {
           color: {
-            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
             colorStops: [
               { offset: 0, color: "rgba(16,185,129,0.25)" },
               { offset: 1, color: "rgba(16,185,129,0.0)" },
@@ -586,7 +713,13 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         },
         emphasis: {
           focus: "series",
-          itemStyle: { color: "#059669", borderWidth: 3, borderColor: "#fff", shadowBlur: 8, shadowColor: "rgba(16,185,129,0.4)" },
+          itemStyle: {
+            color: "#059669",
+            borderWidth: 3,
+            borderColor: "#fff",
+            shadowBlur: 8,
+            shadowColor: "rgba(16,185,129,0.4)",
+          },
         },
       },
     ],
@@ -607,7 +740,13 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
              + '<div style="font-weight:800;font-size:14px">' + v + '</div>';
       }`,
     },
-    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
+    grid: {
+      left: "1%",
+      right: "1%",
+      bottom: "2%",
+      top: "10%",
+      containLabel: true,
+    },
     xAxis: {
       type: "category",
       data: topProducts.map((r) => r.name),
@@ -636,7 +775,11 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
           value: r.revenue,
           itemStyle: {
             color: {
-              type: "linear", x: 0, y: 0, x2: 0, y2: 1,
+              type: "linear",
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
               colorStops: [
                 { offset: 0, color: TOP_COLORS[i % TOP_COLORS.length] },
                 { offset: 1, color: TOP_COLORS[i % TOP_COLORS.length] + "66" },
@@ -667,7 +810,7 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         data: paymentMethods.map((pm, i) => {
           let name = pm.method;
           let color = TOP_COLORS[i % TOP_COLORS.length];
-          
+
           if (pm.method === "VNPay") {
             name = "Thanh toán VNPay";
             color = "#2563EB"; // Blue
@@ -677,7 +820,7 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
           } else if (!pm.method) {
             name = "Khác";
           }
-          
+
           return {
             value: pm.amount,
             name: name,
@@ -699,20 +842,43 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         return '<div>' + p.name + '</div><div style="font-weight:800;color:#F59E0B">' + v + '/đơn</div>';
       }`,
     },
-    grid: { left: "1%", right: "1%", bottom: "2%", top: "10%", containLabel: true },
-    xAxis: { type: "category", data: chartLabels, axisLine: { show: false }, axisTick: { show: false } },
-    yAxis: { type: "value", splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } } },
+    grid: {
+      left: "1%",
+      right: "1%",
+      bottom: "2%",
+      top: "10%",
+      containLabel: true,
+    },
+    xAxis: {
+      type: "category",
+      data: chartLabels,
+      axisLine: { show: false },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { type: "dashed", color: "#F3F4F6" } },
+    },
     series: [
       {
         type: "line",
         smooth: true,
-        data: trendData.map((r) => r.orders && r.orders > 0 ? Math.round(r.amount / r.orders) : 0),
+        data: trendData.map((r) =>
+          r.orders && r.orders > 0 ? Math.round(r.amount / r.orders) : 0,
+        ),
         itemStyle: { color: "#F59E0B" },
         lineStyle: { width: 3, color: "#F59E0B" },
         areaStyle: {
           color: {
-            type: "linear", x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{ offset: 0, color: "rgba(245,158,11,0.2)" }, { offset: 1, color: "rgba(245,158,11,0)" }],
+            type: "linear",
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: "rgba(245,158,11,0.2)" },
+              { offset: 1, color: "rgba(245,158,11,0)" },
+            ],
           },
         },
       },
@@ -729,7 +895,8 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
     xAxis: { type: "category", data: hours, splitArea: { show: true } },
     yAxis: { type: "category", data: days, splitArea: { show: true } },
     visualMap: {
-      min: 0, max: maxHeatmap,
+      min: 0,
+      max: maxHeatmap,
       calculable: true,
       orient: "horizontal",
       left: "center",
@@ -742,7 +909,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         type: "heatmap",
         data: heatmapData,
         label: { show: true, fontSize: 10 },
-        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: "rgba(0, 0, 0, 0.5)" } },
+        emphasis: {
+          itemStyle: { shadowBlur: 10, shadowColor: "rgba(0, 0, 0, 0.5)" },
+        },
       },
     ],
   };
@@ -758,7 +927,7 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
 
   if (role !== "admin") {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color="#6366F1" />
       </View>
     );
@@ -779,7 +948,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             <View style={styles.cardHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Xu hướng Doanh thu</Text>
-                <Text style={styles.cardSubtitle}>Biểu đồ đường theo từng ngày</Text>
+                <Text style={styles.cardSubtitle}>
+                  Biểu đồ đường theo từng ngày
+                </Text>
               </View>
               {loading && <ActivityIndicator size="small" color="#6366F1" />}
             </View>
@@ -790,7 +961,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             ) : (
               <View style={styles.emptyChart}>
                 <BarChart3 size={32} color="#E5E7EB" />
-                <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
+                <Text style={styles.emptyText}>
+                  Chưa có dữ liệu trong khoảng thời gian này
+                </Text>
               </View>
             )}
           </View>
@@ -801,7 +974,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             <View style={styles.cardHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Tỷ lệ Thanh toán</Text>
-                <Text style={styles.cardSubtitle}>Cơ cấu nguồn tiền thu về</Text>
+                <Text style={styles.cardSubtitle}>
+                  Cơ cấu nguồn tiền thu về
+                </Text>
               </View>
               {loading && <ActivityIndicator size="small" color="#6366F1" />}
             </View>
@@ -834,7 +1009,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             ) : (
               <View style={styles.emptyChart}>
                 <Package2 size={32} color="#E5E7EB" />
-                <Text style={styles.emptyText}>Chưa có dữ liệu trong khoảng thời gian này</Text>
+                <Text style={styles.emptyText}>
+                  Chưa có dữ liệu trong khoảng thời gian này
+                </Text>
               </View>
             )}
           </View>
@@ -845,7 +1022,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             <View style={styles.cardHeader}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Bản đồ nhiệt đơn hàng</Text>
-                <Text style={styles.cardSubtitle}>Tần suất theo giờ & ngày</Text>
+                <Text style={styles.cardSubtitle}>
+                  Tần suất theo giờ & ngày
+                </Text>
               </View>
               {loading && <ActivityIndicator size="small" color="#312E81" />}
             </View>
@@ -880,7 +1059,10 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         </View>
         <View style={{ flexDirection: "row", gap: 10, alignItems: "center" }}>
           <TouchableOpacity
-            style={[styles.exportBtn, { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" }]}
+            style={[
+              styles.exportBtn,
+              { backgroundColor: "#ECFDF5", borderColor: "#A7F3D0" },
+            ]}
             activeOpacity={0.8}
             onPress={() => setShowHistoryModal(true)}
           >
@@ -890,7 +1072,10 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.exportBtn, { backgroundColor: "#F5F0FF", borderColor: "#DDD6FE" }]}
+            style={[
+              styles.exportBtn,
+              { backgroundColor: "#F5F0FF", borderColor: "#DDD6FE" },
+            ]}
             activeOpacity={0.8}
             onPress={() => {
               setShowAiModal(true);
@@ -898,7 +1083,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             }}
           >
             <Sparkles size={16} color="#7C3AED" />
-            <Text style={[styles.exportBtnText, { color: "#7C3AED" }]}>Phân tích AI</Text>
+            <Text style={[styles.exportBtnText, { color: "#7C3AED" }]}>
+              Phân tích AI
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.exportBtn, exporting && styles.exportBtnDisabled]}
@@ -906,9 +1093,11 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             onPress={handleExportExcel}
             disabled={exporting}
           >
-            {exporting
-              ? <ActivityIndicator size="small" color="#6366F1" />
-              : <Download size={16} color="#6366F1" />}
+            {exporting ? (
+              <ActivityIndicator size="small" color="#6366F1" />
+            ) : (
+              <Download size={16} color="#6366F1" />
+            )}
             <Text style={styles.exportBtnText}>
               {exporting ? "Đang xuất..." : "Xuất Excel"}
             </Text>
@@ -927,28 +1116,44 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
           <View style={styles.aiModal}>
             {/* Modal Header */}
             <View style={styles.aiModalHeader}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
                 <View style={styles.aiModalIconWrap}>
                   <Bot size={20} color="#7C3AED" />
                 </View>
                 <View>
-                  <Text style={styles.aiModalTitle}>AI Phân tích Kinh doanh</Text>
+                  <Text style={styles.aiModalTitle}>
+                    AI Phân tích Kinh doanh
+                  </Text>
                   <Text style={styles.aiModalSubtitle}>
-                    {format(filter.startDate, "dd/MM/yyyy")} → {format(filter.endDate, "dd/MM/yyyy")}
+                    {format(filter.startDate, "dd/MM/yyyy")} →{" "}
+                    {format(filter.endDate, "dd/MM/yyyy")}
                   </Text>
                 </View>
               </View>
-              <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <View
+                style={{ flexDirection: "row", gap: 8, alignItems: "center" }}
+              >
                 {!aiLoading && aiInsight && (
                   <TouchableOpacity
-                    style={[styles.aiRefreshBtn, { backgroundColor: "#D1FAE5", gap: 4 }]}
+                    style={[
+                      styles.aiRefreshBtn,
+                      { backgroundColor: "#D1FAE5", gap: 4 },
+                    ]}
                     onPress={handleSaveReport}
                     disabled={savingReport}
                   >
-                    {savingReport
-                      ? <ActivityIndicator size="small" color="#059669" />
-                      : <Save size={13} color="#059669" />}
-                    <Text style={[styles.aiRefreshBtnText, { color: "#059669" }]}>Lưu</Text>
+                    {savingReport ? (
+                      <ActivityIndicator size="small" color="#059669" />
+                    ) : (
+                      <Save size={13} color="#059669" />
+                    )}
+                    <Text
+                      style={[styles.aiRefreshBtnText, { color: "#059669" }]}
+                    >
+                      Lưu
+                    </Text>
                   </TouchableOpacity>
                 )}
                 {!aiLoading && (
@@ -970,14 +1175,21 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
             </View>
 
             {/* Modal Body */}
-            <ScrollView style={styles.aiModalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.aiModalBody}
+              showsVerticalScrollIndicator={false}
+            >
               {aiLoading ? (
                 <View style={styles.aiLoadingWrap}>
                   <View style={styles.aiLoadingSpinner}>
                     <ActivityIndicator size="large" color="#7C3AED" />
                   </View>
-                  <Text style={styles.aiLoadingTitle}>AI đang đọc báo cáo tài chính...</Text>
-                  <Text style={styles.aiLoadingSubtitle}>Gemini đang phân tích dữ liệu và soạn nhận xét chuyên sâu</Text>
+                  <Text style={styles.aiLoadingTitle}>
+                    AI đang đọc báo cáo tài chính...
+                  </Text>
+                  <Text style={styles.aiLoadingSubtitle}>
+                    Gemini đang phân tích dữ liệu và soạn nhận xét chuyên sâu
+                  </Text>
                 </View>
               ) : aiInsight ? (
                 <View style={styles.aiInsightWrap}>
@@ -985,7 +1197,9 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
                 </View>
               ) : (
                 <View style={styles.aiLoadingWrap}>
-                  <Text style={styles.aiLoadingSubtitle}>Chưa có kết quả phân tích.</Text>
+                  <Text style={styles.aiLoadingSubtitle}>
+                    Chưa có kết quả phân tích.
+                  </Text>
                 </View>
               )}
             </ScrollView>
@@ -998,14 +1212,24 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         visible={showHistoryModal}
         transparent
         animationType="fade"
-        onRequestClose={() => { setShowHistoryModal(false); setSelectedReport(null); }}
+        onRequestClose={() => {
+          setShowHistoryModal(false);
+          setSelectedReport(null);
+        }}
       >
         <View style={styles.aiOverlay}>
           <View style={[styles.aiModal, { maxWidth: 640 }]}>
             {/* Header */}
             <View style={styles.aiModalHeader}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={[styles.aiModalIconWrap, { backgroundColor: "#D1FAE5" }]}>
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+              >
+                <View
+                  style={[
+                    styles.aiModalIconWrap,
+                    { backgroundColor: "#D1FAE5" },
+                  ]}
+                >
                   <BookMarked size={20} color="#059669" />
                 </View>
                 <View>
@@ -1017,28 +1241,42 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
               </View>
               <TouchableOpacity
                 style={styles.aiCloseBtn}
-                onPress={() => { setShowHistoryModal(false); setSelectedReport(null); }}
+                onPress={() => {
+                  setShowHistoryModal(false);
+                  setSelectedReport(null);
+                }}
               >
                 <X size={18} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
             {/* Body: 2 cột nếu có selectedReport */}
-            <View style={{ flexDirection: selectedReport ? "row" : "column", maxHeight: 480 }}>
+            <View
+              style={{
+                flexDirection: selectedReport ? "row" : "column",
+                maxHeight: 480,
+              }}
+            >
               {/* Danh sách báo cáo */}
               <ScrollView
                 style={[
                   styles.historyList,
-                  selectedReport && { width: 220, borderRightWidth: 1, borderRightColor: "#F3F4F6" }
+                  selectedReport && {
+                    width: 220,
+                    borderRightWidth: 1,
+                    borderRightColor: "#F3F4F6",
+                  },
                 ]}
                 showsVerticalScrollIndicator={false}
               >
                 {savedReports.length === 0 ? (
                   <View style={styles.aiLoadingWrap}>
                     <BookMarked size={36} color="#D1D5DB" />
-                    <Text style={styles.aiLoadingTitle}>Chưa có báo cáo nào</Text>
+                    <Text style={styles.aiLoadingTitle}>
+                      Chưa có báo cáo nào
+                    </Text>
                     <Text style={styles.aiLoadingSubtitle}>
-                      Tạo phân tích AI rồi nhấn nút "Lưu" để lưu lại
+                      Tạo phân tích AI rồi nhấn nút &quot;Lưu&quot; để lưu lại
                     </Text>
                   </View>
                 ) : (
@@ -1047,25 +1285,61 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
                       key={rpt.id}
                       style={[
                         styles.historyItem,
-                        selectedReport?.id === rpt.id && styles.historyItemActive,
+                        selectedReport?.id === rpt.id &&
+                          styles.historyItemActive,
                       ]}
                       onPress={() => setSelectedReport(rpt)}
                       activeOpacity={0.7}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.historyItemTitle} numberOfLines={1}>{rpt.title}</Text>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 }}>
+                        <Text style={styles.historyItemTitle} numberOfLines={1}>
+                          {rpt.title}
+                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: 4,
+                            marginTop: 3,
+                          }}
+                        >
                           <Clock size={10} color="#9CA3AF" />
                           <Text style={styles.historyItemDate}>
-                            {rpt.created_at ? format(new Date(rpt.created_at), "HH:mm dd/MM/yyyy") : "--"}
+                            {rpt.created_at
+                              ? format(
+                                  new Date(rpt.created_at),
+                                  "HH:mm dd/MM/yyyy",
+                                )
+                              : "--"}
                           </Text>
                         </View>
-                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            flexWrap: "wrap",
+                            gap: 4,
+                            marginTop: 6,
+                          }}
+                        >
                           <View style={styles.historyKpiBadge}>
-                            <Text style={styles.historyKpiText}>{formatCurrency(rpt.kpis.revenueIn)}</Text>
+                            <Text style={styles.historyKpiText}>
+                              {formatCurrency(rpt.kpis.revenueIn)}
+                            </Text>
                           </View>
-                          <View style={[styles.historyKpiBadge, { backgroundColor: "#D1FAE5" }]}>
-                            <Text style={[styles.historyKpiText, { color: "#065F46" }]}>{rpt.kpis.totalOrders} đơn</Text>
+                          <View
+                            style={[
+                              styles.historyKpiBadge,
+                              { backgroundColor: "#D1FAE5" },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.historyKpiText,
+                                { color: "#065F46" },
+                              ]}
+                            >
+                              {rpt.kpis.totalOrders} đơn
+                            </Text>
                           </View>
                         </View>
                       </View>
@@ -1083,24 +1357,95 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
 
               {/* Nội dung chi tiết báo cáo được chọn */}
               {selectedReport && (
-                <ScrollView style={styles.historyDetail} showsVerticalScrollIndicator={false}>
-                  <Text style={styles.historyDetailPeriod}>{selectedReport.period}</Text>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                    <View style={[styles.historyKpiBadge, { paddingHorizontal: 10, paddingVertical: 5 }]}>
-                      <Text style={[styles.historyKpiText, { fontSize: 11 }]}>Doanh thu: {formatCurrency(selectedReport.kpis.revenueIn)}</Text>
+                <ScrollView
+                  style={styles.historyDetail}
+                  showsVerticalScrollIndicator={false}
+                >
+                  <Text style={styles.historyDetailPeriod}>
+                    {selectedReport.period}
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.historyKpiBadge,
+                        { paddingHorizontal: 10, paddingVertical: 5 },
+                      ]}
+                    >
+                      <Text style={[styles.historyKpiText, { fontSize: 11 }]}>
+                        Doanh thu:{" "}
+                        {formatCurrency(selectedReport.kpis.revenueIn)}
+                      </Text>
                     </View>
-                    <View style={[styles.historyKpiBadge, { backgroundColor: "#FEE2E2", paddingHorizontal: 10, paddingVertical: 5 }]}>
-                      <Text style={[styles.historyKpiText, { color: "#991B1B", fontSize: 11 }]}>Hoàn/Hủy: {formatCurrency(selectedReport.kpis.revenueOut)}</Text>
+                    <View
+                      style={[
+                        styles.historyKpiBadge,
+                        {
+                          backgroundColor: "#FEE2E2",
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.historyKpiText,
+                          { color: "#991B1B", fontSize: 11 },
+                        ]}
+                      >
+                        Hoàn/Hủy:{" "}
+                        {formatCurrency(selectedReport.kpis.revenueOut)}
+                      </Text>
                     </View>
-                    <View style={[styles.historyKpiBadge, { backgroundColor: "#D1FAE5", paddingHorizontal: 10, paddingVertical: 5 }]}>
-                      <Text style={[styles.historyKpiText, { color: "#065F46", fontSize: 11 }]}>{selectedReport.kpis.totalOrders} đơn</Text>
+                    <View
+                      style={[
+                        styles.historyKpiBadge,
+                        {
+                          backgroundColor: "#D1FAE5",
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.historyKpiText,
+                          { color: "#065F46", fontSize: 11 },
+                        ]}
+                      >
+                        {selectedReport.kpis.totalOrders} đơn
+                      </Text>
                     </View>
-                    <View style={[styles.historyKpiBadge, { backgroundColor: "#FEF3C7", paddingHorizontal: 10, paddingVertical: 5 }]}>
-                      <Text style={[styles.historyKpiText, { color: "#92400E", fontSize: 11 }]}>AOV: {formatCurrency(selectedReport.kpis.aovValue)}</Text>
+                    <View
+                      style={[
+                        styles.historyKpiBadge,
+                        {
+                          backgroundColor: "#FEF3C7",
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.historyKpiText,
+                          { color: "#92400E", fontSize: 11 },
+                        ]}
+                      >
+                        AOV: {formatCurrency(selectedReport.kpis.aovValue)}
+                      </Text>
                     </View>
                   </View>
                   <View style={styles.aiInsightWrap}>
-                    <Text style={styles.aiInsightText}>{selectedReport.content}</Text>
+                    <Text style={styles.aiInsightText}>
+                      {selectedReport.content}
+                    </Text>
                   </View>
                 </ScrollView>
               )}
@@ -1148,10 +1493,16 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
           <Text style={styles.periodText}>
             {formatDisplay(filter.startDate)} → {formatDisplay(filter.endDate)}
           </Text>
-          {loading && <ActivityIndicator size="small" color="#6366F1" style={{ marginLeft: 8 }} />}
+          {loading && (
+            <ActivityIndicator
+              size="small"
+              color="#6366F1"
+              style={{ marginLeft: 8 }}
+            />
+          )}
         </View>
-        <TouchableOpacity 
-          style={styles.compareToggle} 
+        <TouchableOpacity
+          style={styles.compareToggle}
           onPress={() => setCompareMode(!compareMode)}
         >
           <View style={[styles.checkbox, compareMode && styles.checkboxActive]}>
@@ -1228,13 +1579,15 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
       </View>
 
       {/* ── Bottom Row: Top Products + Heatmap ── */}
-      <View style={{ flexDirection: isDesktop ? "row" : "column", gap: 16, marginTop: 16 }}>
-        <View style={{ flex: 1 }}>
-          {renderChart("top")}
-        </View>
-        <View style={{ flex: 1 }}>
-          {renderChart("heatmap")}
-        </View>
+      <View
+        style={{
+          flexDirection: isDesktop ? "row" : "column",
+          gap: 16,
+          marginTop: 16,
+        }}
+      >
+        <View style={{ flex: 1 }}>{renderChart("top")}</View>
+        <View style={{ flex: 1 }}>{renderChart("heatmap")}</View>
       </View>
 
       {/* ── Toast Notification ── */}
@@ -1243,13 +1596,13 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
           style={[
             styles.toast,
             toast.type === "success" && styles.toastSuccess,
-            toast.type === "error"   && styles.toastError,
+            toast.type === "error" && styles.toastError,
           ]}
           pointerEvents="none"
         >
           {toast.type === "success" && <CheckCircle2 size={16} color="#fff" />}
-          {toast.type === "error"   && <AlertCircle  size={16} color="#fff" />}
-          {toast.type === "info"    && <Download     size={16} color="#fff" />}
+          {toast.type === "error" && <AlertCircle size={16} color="#fff" />}
+          {toast.type === "info" && <Download size={16} color="#fff" />}
           <Text style={styles.toastText}>{toast.message}</Text>
         </View>
       )}
@@ -1261,28 +1614,35 @@ Viết bằng tiếng Việt, ngắn gọn, súc tích, trực tiếp vào vấn
         </View>
         <View style={styles.tableHeader}>
           <Text style={[styles.thText, { flex: 1.2 }]}>Ngày</Text>
-          <Text style={[styles.thText, { flex: 2, textAlign: "right" }]}>Doanh thu</Text>
+          <Text style={[styles.thText, { flex: 2, textAlign: "right" }]}>
+            Doanh thu
+          </Text>
         </View>
-        {loading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <View key={i} style={styles.tableRow}>
-                <Shimmer width="100%" height={36} />
-              </View>
-            ))
-          : trendData.length > 0
-          ? trendData.map((r, i) => (
-              <View key={i} style={[styles.tableRow, i % 2 === 0 && styles.tableRowEven]}>
-                <Text style={[styles.tdText, { flex: 1.2 }]}>{r.date}</Text>
-                <Text style={[styles.tdRevenue, { flex: 2, textAlign: "right" }]}>
-                  {formatCurrency(r.amount)}
-                </Text>
-              </View>
-            ))
-          : (
-            <View style={styles.emptyChart}>
-              <Text style={styles.emptyText}>Không có dữ liệu trong khoảng thời gian này</Text>
+        {loading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <View key={i} style={styles.tableRow}>
+              <Shimmer width="100%" height={36} />
             </View>
-          )}
+          ))
+        ) : trendData.length > 0 ? (
+          trendData.map((r, i) => (
+            <View
+              key={i}
+              style={[styles.tableRow, i % 2 === 0 && styles.tableRowEven]}
+            >
+              <Text style={[styles.tdText, { flex: 1.2 }]}>{r.date}</Text>
+              <Text style={[styles.tdRevenue, { flex: 2, textAlign: "right" }]}>
+                {formatCurrency(r.amount)}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyChart}>
+            <Text style={styles.emptyText}>
+              Không có dữ liệu trong khoảng thời gian này
+            </Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -1303,7 +1663,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerSub: { color: "#9CA3AF", fontSize: 13, fontWeight: "500" },
-  headerTitle: { color: "#111827", fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+  headerTitle: {
+    color: "#111827",
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
   exportBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1369,7 +1734,12 @@ const styles = StyleSheet.create({
   },
   dateFieldDisabled: { backgroundColor: "#F9FAFB", borderColor: "#F3F4F6" },
   dateFieldLabel: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
-  dateFieldInput: { fontSize: 13, fontWeight: "600", color: "#111827", flex: 1 },
+  dateFieldInput: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+    flex: 1,
+  },
   dateSep: {
     width: 16,
     height: 1.5,
@@ -1419,7 +1789,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   kpiCardTop: { marginBottom: 12 },
-  kpiIcon: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  kpiIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   kpiLabel: { fontSize: 13, color: "#6B7280", fontWeight: "500" },
   kpiValue: { fontSize: 22, fontWeight: "800", marginTop: 4 },
   kpiSub: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
@@ -1444,8 +1820,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
-  cardSubtitle: { fontSize: 12, color: "#9CA3AF", fontWeight: "500", marginTop: 2 },
-  emptyChart: { height: 160, alignItems: "center", justifyContent: "center", gap: 10 },
+  cardSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  emptyChart: {
+    height: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
   emptyText: { color: "#9CA3AF", fontSize: 14, textAlign: "center" },
 
   // Table
@@ -1456,9 +1842,18 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F3F4F6",
     marginBottom: 4,
   },
-  thText: { fontSize: 11, fontWeight: "700", color: "#9CA3AF", textTransform: "uppercase" },
+  thText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+  },
   tableRow: { flexDirection: "row", alignItems: "center", paddingVertical: 11 },
-  tableRowEven: { backgroundColor: "#FAFAFA", borderRadius: 8, paddingHorizontal: 4 },
+  tableRowEven: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 8,
+    paddingHorizontal: 4,
+  },
   tdText: { fontSize: 13, color: "#374151", fontWeight: "500" },
   tdRevenue: { fontSize: 13, color: "#6366F1", fontWeight: "700" },
   tdOrders: { fontSize: 13, color: "#10B981", fontWeight: "700" },
@@ -1505,7 +1900,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   aiModalTitle: { fontSize: 16, fontWeight: "800", color: "#111827" },
-  aiModalSubtitle: { fontSize: 12, color: "#9CA3AF", fontWeight: "500", marginTop: 2 },
+  aiModalSubtitle: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    fontWeight: "500",
+    marginTop: 2,
+  },
   aiCloseBtn: {
     width: 36,
     height: 36,
@@ -1542,8 +1942,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  aiLoadingTitle: { fontSize: 16, fontWeight: "700", color: "#111827", textAlign: "center" },
-  aiLoadingSubtitle: { fontSize: 13, color: "#9CA3AF", textAlign: "center", lineHeight: 20 },
+  aiLoadingTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "center",
+  },
+  aiLoadingSubtitle: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    textAlign: "center",
+    lineHeight: 20,
+  },
   aiInsightWrap: {
     backgroundColor: "#FDFAFF",
     borderRadius: 16,
@@ -1634,7 +2044,7 @@ const styles = StyleSheet.create({
     maxWidth: 420,
   },
   toastSuccess: { backgroundColor: "#059669" },
-  toastError:   { backgroundColor: "#DC2626" },
+  toastError: { backgroundColor: "#DC2626" },
   toastText: { color: "#fff", fontSize: 13, fontWeight: "600", flexShrink: 1 },
 
   // Permission guard
@@ -1652,8 +2062,22 @@ const styles = StyleSheet.create({
   permText: { fontSize: 14, color: "#6B7280", textAlign: "center" },
 
   // Compare Toggle
-  compareToggle: { flexDirection: "row", alignItems: "center", gap: 6, marginLeft: "auto" },
-  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: "#D1D5DB", alignItems: "center", justifyContent: "center", backgroundColor: "#FFF" },
+  compareToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginLeft: "auto",
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+  },
   checkboxActive: { backgroundColor: "#6366F1", borderColor: "#6366F1" },
   compareText: { fontSize: 13, color: "#4B5563", fontWeight: "600" },
 

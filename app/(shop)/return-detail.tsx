@@ -1,33 +1,31 @@
-import { LinearGradient } from "expo-linear-gradient";
-import CommonHeader from "@/src/components/layout/Header";
-import {
-  getReturnDetail,
-  cancelReturn,
-  RETURN_STATUS_LABELS,
-  RETURN_STATUS_COLORS,
-} from "@/src/services/returns";
+import { CommonHeader } from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import {
   COLOR_TRANSLATIONS,
   getProductImageByColor,
 } from "@/src/services/product";
+import {
+  cancelReturn,
+  getReturnDetail,
+  RETURN_STATUS_COLORS,
+  RETURN_STATUS_LABELS,
+} from "@/src/services/returns";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronLeft,
-  Clock,
-  PackageX,
-  RotateCcw,
   X,
   XCircle,
 } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
   Image,
   Modal,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -48,6 +46,7 @@ const COLORS = {
   border: "#EEEEEE",
   success: "#22C55E",
   danger: "#EF4444",
+  warning: "#F59E0B",
 };
 
 const TIMELINE_STEPS = [
@@ -65,13 +64,9 @@ export default function ReturnDetailScreen() {
   const [returnData, setReturnData] = useState<any>(null);
   const [user, setUser] = useState<any>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  [cancelling, setCancelling] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
-  useEffect(() => {
-    init();
-  }, [params.returnId]);
-
-  const init = async () => {
+  const init = useCallback(async () => {
     try {
       const {
         data: { user: currentUser },
@@ -85,7 +80,11 @@ export default function ReturnDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.returnId]);
+
+  useEffect(() => {
+    init();
+  }, [init]);
 
   const handleCancel = async () => {
     try {
@@ -124,7 +123,10 @@ export default function ReturnDetailScreen() {
         <StatusBar barStyle="dark-content" />
         <CommonHeader
           renderLeft={() => (
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backBtn}
+            >
               <ChevronLeft size={28} color={COLORS.secondary} />
             </TouchableOpacity>
           )}
@@ -150,7 +152,10 @@ export default function ReturnDetailScreen() {
 
       <CommonHeader
         renderLeft={() => (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backBtn}
+          >
             <ChevronLeft size={28} color={COLORS.secondary} />
           </TouchableOpacity>
         )}
@@ -182,7 +187,9 @@ export default function ReturnDetailScreen() {
             <Text style={[styles.statusLabel, { color: statusColor }]}>
               {statusLabel}
             </Text>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <View
+              style={[styles.statusDot, { backgroundColor: statusColor }]}
+            />
           </View>
           <Text style={styles.statusDate}>
             Ngày tạo: {formatDate(returnData?.created_at)}
@@ -231,7 +238,9 @@ export default function ReturnDetailScreen() {
                       <Text
                         style={[
                           styles.stepLabel,
-                          isCompleted ? styles.stepLabelActive : styles.stepLabelInactive,
+                          isCompleted
+                            ? styles.stepLabelActive
+                            : styles.stepLabelInactive,
                           isCurrent && styles.stepLabelCurrent,
                         ]}
                       >
@@ -241,7 +250,9 @@ export default function ReturnDetailScreen() {
                         <Text style={styles.stepHint}>Đang xử lý...</Text>
                       )}
                       {isCompleted && !isCurrent && step.key === status && (
-                        <Text style={styles.stepTime}>{formatDate(returnData?.[getTimestampField(status)])}</Text>
+                        <Text style={styles.stepTime}>
+                          {formatDate(returnData?.[getTimestampField(status)])}
+                        </Text>
                       )}
                     </View>
                   </View>
@@ -253,11 +264,20 @@ export default function ReturnDetailScreen() {
 
         {/* Rejected/Cancelled Info */}
         {isRejectedOrCancelled && (
-          <View style={[styles.sectionCard, { borderLeftWidth: 4, borderLeftColor: statusColor }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View
+            style={[
+              styles.sectionCard,
+              { borderLeftWidth: 4, borderLeftColor: statusColor },
+            ]}
+          >
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+            >
               <AlertTriangle size={20} color={statusColor} />
               <Text style={[styles.rejectedTitle, { color: statusColor }]}>
-                {status === "rejected" ? "Yêu cầu bị từ chối" : "Yêu cầu đã hủy"}
+                {status === "rejected"
+                  ? "Yêu cầu bị từ chối"
+                  : "Yêu cầu đã hủy"}
               </Text>
             </View>
             {returnData?.rejection_reason && (
@@ -276,16 +296,14 @@ export default function ReturnDetailScreen() {
               item.products?.images?.[0] ||
               getProductImageByColor(
                 item.products,
-                item.order_items?.selected_variant?.color
+                item.order_items?.selected_variant?.color,
               );
 
             return (
               <View key={idx} style={styles.detailItem}>
                 <Image
                   source={{
-                    uri:
-                      img ||
-                      "https://via.placeholder.com/60",
+                    uri: img || "https://via.placeholder.com/60",
                   }}
                   style={styles.detailItemImage}
                 />
@@ -300,7 +318,9 @@ export default function ReturnDetailScreen() {
                     , {item.order_items?.selected_variant?.size}
                   </Text>
                   <View style={styles.detailItemRow}>
-                    <Text style={styles.detailItemQty}>SL: {item.quantity}</Text>
+                    <Text style={styles.detailItemQty}>
+                      SL: {item.quantity}
+                    </Text>
                     <Text style={styles.detailItemRefund}>
                       {Number(item.refund_amount).toLocaleString("vi-VN")}₫
                     </Text>
@@ -318,7 +338,9 @@ export default function ReturnDetailScreen() {
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Loại yêu cầu:</Text>
             <Text style={styles.infoValue}>
-              {returnData?.request_type === "exchange" ? "Đổi hàng" : "Trả hàng hoàn tiền"}
+              {returnData?.request_type === "exchange"
+                ? "Đổi hàng"
+                : "Trả hàng hoàn tiền"}
             </Text>
           </View>
 
@@ -340,8 +362,8 @@ export default function ReturnDetailScreen() {
               {returnData?.refund_method === "bank_transfer"
                 ? "Chuyển khoản ngân hàng"
                 : returnData?.refund_method === "wallet"
-                ? "Ví điện tử"
-                : "Nguyên phương thức TT"}
+                  ? "Ví điện tử"
+                  : "Nguyên phương thức TT"}
             </Text>
           </View>
 
@@ -356,14 +378,26 @@ export default function ReturnDetailScreen() {
               {returnData?.bank_account_name && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Chủ TK:</Text>
-                  <Text style={styles.infoValue}>{returnData.bank_account_name}</Text>
+                  <Text style={styles.infoValue}>
+                    {returnData.bank_account_name}
+                  </Text>
                 </View>
               )}
             </>
           )}
 
           {returnData?.admin_notes && (
-            <View style={[styles.infoRow, { borderTopWidth: 1, borderTopColor: "#F0F0F0", paddingTop: 10, marginTop: 8 }]}>
+            <View
+              style={[
+                styles.infoRow,
+                {
+                  borderTopWidth: 1,
+                  borderTopColor: "#F0F0F0",
+                  paddingTop: 10,
+                  marginTop: 8,
+                },
+              ]}
+            >
               <Text style={styles.infoLabel}>Ghi chú shop:</Text>
               <Text style={styles.infoValueDesc}>{returnData.admin_notes}</Text>
             </View>
@@ -403,7 +437,10 @@ export default function ReturnDetailScreen() {
 
       {/* Cancel Confirmation Modal */}
       <Modal visible={showCancelModal} transparent animationType="fade">
-        <Pressable style={styles.modalOverlay} onPress={() => setShowCancelModal(false)} />
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowCancelModal(false)}
+        />
         <View style={styles.cancelModalContent}>
           <AlertTriangle size={40} color={COLORS.warning} />
           <Text style={styles.cancelModalTitle}>Xác nhận hủy?</Text>
@@ -437,11 +474,16 @@ export default function ReturnDetailScreen() {
 
 function getTimestampField(status: string): string {
   switch (status) {
-    case "approved": return "approved_at";
-    case "shipping_back": return "shipped_back_at";
-    case "completed": return "completed_at";
-    case "refunded": return "refunded_at";
-    default: return "created_at";
+    case "approved":
+      return "approved_at";
+    case "shipping_back":
+      return "shipped_back_at";
+    case "completed":
+      return "completed_at";
+    case "refunded":
+      return "refunded_at";
+    default:
+      return "created_at";
   }
 }
 
@@ -496,7 +538,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  timelineDotActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
+  timelineDotActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
   timelineDotCurrent: {
     borderColor: COLORS.primary,
     backgroundColor: "#fff",
@@ -559,9 +604,19 @@ const styles = StyleSheet.create({
     color: COLORS.success,
   },
 
-  infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   infoLabel: { fontSize: 13, color: COLORS.textSecondary, width: 130 },
-  infoValue: { fontSize: 13, fontWeight: "500", color: COLORS.secondary, flex: 1, textAlign: "right" },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: COLORS.secondary,
+    flex: 1,
+    textAlign: "right",
+  },
   infoValueDesc: {
     fontSize: 13,
     color: COLORS.textSecondary,
@@ -593,7 +648,12 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: { color: COLORS.danger, fontSize: 15, fontWeight: "600" },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   cancelModalContent: {
     backgroundColor: "#fff",
     borderRadius: 20,
@@ -601,7 +661,12 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH * 0.82,
     alignItems: "center",
   },
-  cancelModalTitle: { fontSize: 18, fontWeight: "bold", color: COLORS.secondary, marginTop: 14 },
+  cancelModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.secondary,
+    marginTop: 14,
+  },
   cancelModalDesc: {
     fontSize: 14,
     color: COLORS.textSecondary,
@@ -609,7 +674,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 21,
   },
-  cancelModalActions: { flexDirection: "row", gap: 12, marginTop: 24, width: "100%" },
+  cancelModalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
   cancelModalNo: {
     flex: 1,
     paddingVertical: 12,
@@ -617,7 +687,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     alignItems: "center",
   },
-  cancelModalNoText: { fontSize: 14, fontWeight: "600", color: COLORS.textSecondary },
+  cancelModalNoText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
   cancelModalYes: {
     flex: 1,
     paddingVertical: 12,

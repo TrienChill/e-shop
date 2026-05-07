@@ -1,12 +1,36 @@
-import { InvoiceOrderData, InvoiceTemplate } from "@/src/components/admin/InvoiceTemplate";
+import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import {
+  InvoiceOrderData,
+  InvoiceTemplate,
+} from "@/src/components/admin/InvoiceTemplate";
 import { hexToRgba } from "@/src/context/AppearanceContext";
 import { supabase } from "@/src/lib/supabase";
-import { listOrders, pushOrderToGHN, updateOrderStatus, deleteOrders } from "@/src/services/admin/orders";
-import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, Clock, Download, ExternalLink, Package, Plus, Search, Settings, Settings2, Trash2, Truck, XCircle } from "lucide-react-native";
-import * as XLSX from 'xlsx';
-import { useRouter } from "expo-router";
-import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
+import {
+  deleteOrders,
+  listOrders,
+  pushOrderToGHN,
+  updateOrderStatus,
+} from "@/src/services/admin/orders";
 import { encodeOrderId } from "@/src/utils/orderId";
+import { useRouter } from "expo-router";
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  Clock,
+  Download,
+  ExternalLink,
+  Package,
+  Plus,
+  Search,
+  Settings,
+  Settings2,
+  Trash2,
+  Truck,
+  XCircle,
+} from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +46,7 @@ import {
   View,
 } from "react-native";
 import { useReactToPrint } from "react-to-print";
+import * as XLSX from "xlsx";
 
 const STATUS_LABELS: any = {
   pending: "Chờ xử lý",
@@ -51,7 +76,6 @@ const STATUS_TABS = [
   { id: "cancelled", label: "Đã hủy", icon: XCircle },
 ];
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Screen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -72,24 +96,29 @@ export default function AdminOrdersScreen() {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
 
   // Column Visibility State
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    id: true,
-    date: true,
-    customer: true,
-    phone: true,
-    payment: true,
-    amount: true,
-    tracking: true,
-    status: true,
-    actions: true,
-  });
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+    {
+      id: true,
+      date: true,
+      customer: true,
+      phone: true,
+      payment: true,
+      amount: true,
+      tracking: true,
+      status: true,
+      actions: true,
+    },
+  );
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   const [showPageSizeDropdown, setShowPageSizeDropdown] = useState(false);
 
   // Sorting State
-  const [sortConfig, setSortConfig] = useState<{ key: string | null, direction: 'asc' | 'desc' | null }>({
-    key: 'created_at',
-    direction: 'desc'
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null;
+    direction: "asc" | "desc" | null;
+  }>({
+    key: "created_at",
+    direction: "desc",
   });
 
   const togglePageSize = (size: number) => {
@@ -99,7 +128,9 @@ export default function AdminOrdersScreen() {
   };
 
   // Per-order loading state
-  const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
+  const [processingOrderId, setProcessingOrderId] = useState<string | null>(
+    null,
+  );
 
   // GHN Result Modal
   const [ghnModal, setGhnModal] = useState<{
@@ -123,7 +154,7 @@ export default function AdminOrdersScreen() {
     }
 
     // Prepare data for XLSX
-    const data = sortedOrders.map(order => ({
+    const data = sortedOrders.map((order) => ({
       "Mã đơn": encodeOrderId(order.id),
       "Ngày đặt": new Date(order.created_at).toLocaleString("vi-VN"),
       "Tên khách": order.receiver_name || "N/A",
@@ -131,12 +162,12 @@ export default function AdminOrdersScreen() {
       "Phương thức TT": order.payment_method || "N/A",
       "Tổng tiền": order.total_amount || 0,
       "Mã vận đơn GHN": order.ghn_order_code || "N/A",
-      "Trạng thái": STATUS_LABELS[order.status] || order.status
+      "Trạng thái": STATUS_LABELS[order.status] || order.status,
     }));
 
     // Create worksheet
     const ws = XLSX.utils.json_to_sheet(data);
-    
+
     // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Danh sách đơn hàng");
@@ -149,7 +180,9 @@ export default function AdminOrdersScreen() {
     if (selectedOrders.length === 0) return;
 
     if (typeof window !== "undefined") {
-      const confirmDelete = window.confirm(`Bạn có chắc chắn muốn xóa ${selectedOrders.length} đơn hàng đã chọn? Hành động này không thể hoàn tác.`);
+      const confirmDelete = window.confirm(
+        `Bạn có chắc chắn muốn xóa ${selectedOrders.length} đơn hàng đã chọn? Hành động này không thể hoàn tác.`,
+      );
       if (!confirmDelete) return;
     }
 
@@ -169,7 +202,8 @@ export default function AdminOrdersScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   // Print Logic
-  const [selectedPrintOrder, setSelectedPrintOrder] = useState<InvoiceOrderData | null>(null);
+  const [selectedPrintOrder, setSelectedPrintOrder] =
+    useState<InvoiceOrderData | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const reactToPrintFn = useReactToPrint({
@@ -219,7 +253,10 @@ export default function AdminOrdersScreen() {
    * Đẩy đơn lên GHN và cập nhật trạng thái.
    * Checkout đã bắt buộc có mã GHN → push thẳng, không cần modal chỉnh sửa.
    */
-  const attemptGHNPushAndUpdateStatus = async (order: any, newStatus: string) => {
+  const attemptGHNPushAndUpdateStatus = async (
+    order: any,
+    newStatus: string,
+  ) => {
     setProcessingOrderId(order.id);
     try {
       const trackingCode = await pushOrderToGHN(order);
@@ -231,12 +268,16 @@ export default function AdminOrdersScreen() {
       const continueWithout =
         typeof window !== "undefined" &&
         window.confirm(
-          `⚠️ Lỗi khi đẩy đơn lên GHN:\n${ghnErr.message}\n\nTiếp tục chuyển trạng thái mà không có mã vận đơn?`
+          `⚠️ Lỗi khi đẩy đơn lên GHN:\n${ghnErr.message}\n\nTiếp tục chuyển trạng thái mà không có mã vận đơn?`,
         );
       if (continueWithout) {
         await updateOrderStatus(order.id, newStatus);
         await fetchOrders();
-        setGhnModal({ visible: true, success: false, errorMsg: ghnErr.message });
+        setGhnModal({
+          visible: true,
+          success: false,
+          errorMsg: ghnErr.message,
+        });
       }
     } finally {
       setProcessingOrderId(null);
@@ -311,10 +352,18 @@ export default function AdminOrdersScreen() {
 
   const filteredOrders = orders.filter((order) => {
     const query = searchQuery.toLowerCase();
-    const matchId = String(order.id || "").toLowerCase().includes(query);
-    const matchName = String(order.receiver_name || "").toLowerCase().includes(query);
-    const matchPhone = String(order.phone_contact || "").toLowerCase().includes(query);
-    const matchGHN = String(order.ghn_order_code || "").toLowerCase().includes(query);
+    const matchId = String(order.id || "")
+      .toLowerCase()
+      .includes(query);
+    const matchName = String(order.receiver_name || "")
+      .toLowerCase()
+      .includes(query);
+    const matchPhone = String(order.phone_contact || "")
+      .toLowerCase()
+      .includes(query);
+    const matchGHN = String(order.ghn_order_code || "")
+      .toLowerCase()
+      .includes(query);
     const matchesSearch = matchId || matchName || matchPhone || matchGHN;
     const matchesTab = activeTab === "all" || order.status === activeTab;
     return matchesTab && matchesSearch;
@@ -333,10 +382,10 @@ export default function AdminOrdersScreen() {
       if (bValue === null || bValue === undefined) return -1;
 
       if (aValue < bValue) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
+        return sortConfig.direction === "asc" ? -1 : 1;
       }
       if (aValue > bValue) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
+        return sortConfig.direction === "asc" ? 1 : -1;
       }
       return 0;
     });
@@ -353,24 +402,27 @@ export default function AdminOrdersScreen() {
     setSortConfig((prev) => {
       // If same key
       if (prev.key === key) {
-        if (prev.direction === 'desc') return { key, direction: 'asc' };
-        if (prev.direction === 'asc') return { key: null, direction: null };
+        if (prev.direction === "desc") return { key, direction: "asc" };
+        if (prev.direction === "asc") return { key: null, direction: null };
       }
       // If new key or currently none
-      return { key, direction: 'desc' };
+      return { key, direction: "desc" };
     });
   };
 
   const SortIndicator = ({ columnKey }: { columnKey: string }) => {
-    if (sortConfig.key !== columnKey) return (
-      <View style={{ flexDirection: 'column', alignItems: 'center' }}>
-        <ArrowUp size={8} color="#D1D5DB" />
-        <ArrowDown size={8} color="#D1D5DB" style={{ marginTop: -2 }} />
-      </View>
+    if (sortConfig.key !== columnKey)
+      return (
+        <View style={{ flexDirection: "column", alignItems: "center" }}>
+          <ArrowUp size={8} color="#D1D5DB" />
+          <ArrowDown size={8} color="#D1D5DB" style={{ marginTop: -2 }} />
+        </View>
+      );
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp size={14} color="#2563EB" />
+    ) : (
+      <ArrowDown size={14} color="#2563EB" />
     );
-    return sortConfig.direction === 'asc' ?
-      <ArrowUp size={14} color="#2563EB" /> :
-      <ArrowDown size={14} color="#2563EB" />;
   };
 
   // Reset page when filters change
@@ -408,15 +460,30 @@ export default function AdminOrdersScreen() {
 
         {/* TABS */}
         <View style={styles.tabsContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabsScroll}
+          >
             {STATUS_TABS.map((tab) => (
               <Pressable
                 key={tab.id}
                 onPress={() => setActiveTab(tab.id)}
-                style={StyleSheet.flatten([styles.tab, activeTab === tab.id && styles.tabActive])}
+                style={StyleSheet.flatten([
+                  styles.tab,
+                  activeTab === tab.id && styles.tabActive,
+                ])}
               >
-                <tab.icon size={16} color={activeTab === tab.id ? "#2563EB" : "#9CA3AF"} />
-                <Text style={StyleSheet.flatten([styles.tabText, activeTab === tab.id && styles.tabTextActive])}>
+                <tab.icon
+                  size={16}
+                  color={activeTab === tab.id ? "#2563EB" : "#9CA3AF"}
+                />
+                <Text
+                  style={StyleSheet.flatten([
+                    styles.tabText,
+                    activeTab === tab.id && styles.tabTextActive,
+                  ])}
+                >
                   {tab.label}
                 </Text>
               </Pressable>
@@ -440,7 +507,7 @@ export default function AdminOrdersScreen() {
               />
             </View>
             <View style={styles.toolbarActions}>
-              <View style={{ position: 'relative' }}>
+              <View style={{ position: "relative" }}>
                 {showColumnDropdown && (
                   <Pressable
                     style={styles.dropdownOverlay}
@@ -459,23 +526,35 @@ export default function AdminOrdersScreen() {
                   <View style={styles.columnDropdown}>
                     <Text style={styles.dropdownTitle}>Tùy chỉnh cột</Text>
                     {[
-                      { id: 'id', label: 'Mã đơn' },
-                      { id: 'date', label: 'Ngày đặt' },
-                      { id: 'customer', label: 'Tên khách' },
-                      { id: 'phone', label: 'Số điện thoại' },
-                      { id: 'payment', label: 'Thanh toán' },
-                      { id: 'amount', label: 'Tổng tiền' },
-                      { id: 'tracking', label: 'Mã vận đơn' },
-                      { id: 'status', label: 'Trạng thái' },
-                      { id: 'actions', label: 'Thao tác' },
-                    ].map(col => (
+                      { id: "id", label: "Mã đơn" },
+                      { id: "date", label: "Ngày đặt" },
+                      { id: "customer", label: "Tên khách" },
+                      { id: "phone", label: "Số điện thoại" },
+                      { id: "payment", label: "Thanh toán" },
+                      { id: "amount", label: "Tổng tiền" },
+                      { id: "tracking", label: "Mã vận đơn" },
+                      { id: "status", label: "Trạng thái" },
+                      { id: "actions", label: "Thao tác" },
+                    ].map((col) => (
                       <Pressable
                         key={col.id}
                         style={styles.dropdownItem}
-                        onPress={() => setVisibleColumns(prev => ({ ...prev, [col.id]: !prev[col.id] }))}
+                        onPress={() =>
+                          setVisibleColumns((prev) => ({
+                            ...prev,
+                            [col.id]: !prev[col.id],
+                          }))
+                        }
                       >
-                        <View style={StyleSheet.flatten([styles.checkboxSmall, visibleColumns[col.id] && styles.checkboxSelected])}>
-                          {visibleColumns[col.id] && <Check size={10} color="white" />}
+                        <View
+                          style={StyleSheet.flatten([
+                            styles.checkboxSmall,
+                            visibleColumns[col.id] && styles.checkboxSelected,
+                          ])}
+                        >
+                          {visibleColumns[col.id] && (
+                            <Check size={10} color="white" />
+                          )}
                         </View>
                         <Text style={styles.dropdownItemText}>{col.label}</Text>
                       </Pressable>
@@ -484,26 +563,39 @@ export default function AdminOrdersScreen() {
                 )}
               </View>
 
-              <Pressable style={styles.toolbarButton} onPress={handleExportExcel}>
+              <Pressable
+                style={styles.toolbarButton}
+                onPress={handleExportExcel}
+              >
                 <Download size={18} color="#374151" />
                 <Text style={styles.toolbarButtonText}>Xuất Excel</Text>
               </Pressable>
 
-              <Pressable 
-                style={StyleSheet.flatten([styles.toolbarButton, styles.toolbarButtonPrimary])} 
-                onPress={() => router.push('/(admin)/orders/create')}
+              <Pressable
+                style={StyleSheet.flatten([
+                  styles.toolbarButton,
+                  styles.toolbarButtonPrimary,
+                ])}
+                onPress={() => router.push("/(admin)/orders/create")}
               >
                 <Plus size={18} color="white" />
-                <Text style={styles.toolbarButtonPrimaryText}>Tạo đơn hàng</Text>
+                <Text style={styles.toolbarButtonPrimaryText}>
+                  Tạo đơn hàng
+                </Text>
               </Pressable>
 
               {selectedOrders.length > 0 && (
-                <Pressable 
-                  style={StyleSheet.flatten([styles.toolbarButton, styles.toolbarButtonDelete])} 
+                <Pressable
+                  style={StyleSheet.flatten([
+                    styles.toolbarButton,
+                    styles.toolbarButtonDelete,
+                  ])}
                   onPress={handleDeleteSelected}
                 >
                   <Trash2 size={18} color="#EF4444" />
-                  <Text style={styles.toolbarButtonDeleteText}>Xóa đơn đã chọn ({selectedOrders.length})</Text>
+                  <Text style={styles.toolbarButtonDeleteText}>
+                    Xóa đơn đã chọn ({selectedOrders.length})
+                  </Text>
                 </Pressable>
               )}
             </View>
@@ -514,23 +606,32 @@ export default function AdminOrdersScreen() {
             <View style={styles.columnCheck}>
               <Pressable
                 onPress={() => {
-                  if (selectedOrders.length === paginatedOrders.length) setSelectedOrders([]);
-                  else setSelectedOrders(paginatedOrders.map(o => o.id));
+                  if (selectedOrders.length === paginatedOrders.length)
+                    setSelectedOrders([]);
+                  else setSelectedOrders(paginatedOrders.map((o) => o.id));
                 }}
                 style={({ pressed }) => [
                   styles.checkbox,
-                  selectedOrders.length === paginatedOrders.length && selectedOrders.length > 0 && styles.checkboxSelected,
-                  pressed && { transform: [{ scale: 0.9 }] }
+                  selectedOrders.length === paginatedOrders.length &&
+                    selectedOrders.length > 0 &&
+                    styles.checkboxSelected,
+                  pressed && { transform: [{ scale: 0.9 }] },
                 ]}
               >
-                {selectedOrders.length === paginatedOrders.length && selectedOrders.length > 0 && <Check size={12} color="white" />}
+                {selectedOrders.length === paginatedOrders.length &&
+                  selectedOrders.length > 0 && (
+                    <Check size={12} color="white" />
+                  )}
               </Pressable>
             </View>
 
             {visibleColumns.id && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnId, styles.headerSortable])}
-                onPress={() => toggleSort('id')}
+                style={StyleSheet.flatten([
+                  styles.columnId,
+                  styles.headerSortable,
+                ])}
+                onPress={() => toggleSort("id")}
               >
                 <Text style={styles.headerText}>MÃ ĐƠN</Text>
                 <SortIndicator columnKey="id" />
@@ -539,8 +640,11 @@ export default function AdminOrdersScreen() {
 
             {visibleColumns.date && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnDate, styles.headerSortable])}
-                onPress={() => toggleSort('created_at')}
+                style={StyleSheet.flatten([
+                  styles.columnDate,
+                  styles.headerSortable,
+                ])}
+                onPress={() => toggleSort("created_at")}
               >
                 <Text style={styles.headerText}>NGÀY ĐẶT</Text>
                 <SortIndicator columnKey="created_at" />
@@ -549,8 +653,11 @@ export default function AdminOrdersScreen() {
 
             {visibleColumns.customer && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnCustomer, styles.headerSortable])}
-                onPress={() => toggleSort('receiver_name')}
+                style={StyleSheet.flatten([
+                  styles.columnCustomer,
+                  styles.headerSortable,
+                ])}
+                onPress={() => toggleSort("receiver_name")}
               >
                 <Text style={styles.headerText}>TÊN KHÁCH</Text>
                 <SortIndicator columnKey="receiver_name" />
@@ -559,8 +666,11 @@ export default function AdminOrdersScreen() {
 
             {visibleColumns.phone && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnPhone, styles.headerSortable])}
-                onPress={() => toggleSort('phone_contact')}
+                style={StyleSheet.flatten([
+                  styles.columnPhone,
+                  styles.headerSortable,
+                ])}
+                onPress={() => toggleSort("phone_contact")}
               >
                 <Text style={styles.headerText}>SỐ ĐIỆN THOẠI</Text>
                 <SortIndicator columnKey="phone_contact" />
@@ -569,8 +679,11 @@ export default function AdminOrdersScreen() {
 
             {visibleColumns.payment && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnPhone, styles.headerSortable])}
-                onPress={() => toggleSort('payment_method')}
+                style={StyleSheet.flatten([
+                  styles.columnPhone,
+                  styles.headerSortable,
+                ])}
+                onPress={() => toggleSort("payment_method")}
               >
                 <Text style={styles.headerText}>THANH TOÁN</Text>
                 <SortIndicator columnKey="payment_method" />
@@ -579,33 +692,69 @@ export default function AdminOrdersScreen() {
 
             {visibleColumns.amount && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnAmount, styles.headerSortable, styles.justifyEnd])}
-                onPress={() => toggleSort('total_amount')}
+                style={StyleSheet.flatten([
+                  styles.columnAmount,
+                  styles.headerSortable,
+                  styles.justifyEnd,
+                ])}
+                onPress={() => toggleSort("total_amount")}
               >
-                <Text style={StyleSheet.flatten([styles.headerText, styles.textRight])}>TỔNG TIỀN</Text>
+                <Text
+                  style={StyleSheet.flatten([
+                    styles.headerText,
+                    styles.textRight,
+                  ])}
+                >
+                  TỔNG TIỀN
+                </Text>
                 <SortIndicator columnKey="total_amount" />
               </Pressable>
             )}
 
             {visibleColumns.tracking && (
               <View style={styles.columnTracking}>
-                <Text style={StyleSheet.flatten([styles.headerText, styles.textCenter])}>MÃ VẬN ĐƠN GHN</Text>
+                <Text
+                  style={StyleSheet.flatten([
+                    styles.headerText,
+                    styles.textCenter,
+                  ])}
+                >
+                  MÃ VẬN ĐƠN GHN
+                </Text>
               </View>
             )}
 
             {visibleColumns.status && (
               <Pressable
-                style={StyleSheet.flatten([styles.columnStatus, styles.headerSortable, styles.justifyCenter])}
-                onPress={() => toggleSort('status')}
+                style={StyleSheet.flatten([
+                  styles.columnStatus,
+                  styles.headerSortable,
+                  styles.justifyCenter,
+                ])}
+                onPress={() => toggleSort("status")}
               >
-                <Text style={StyleSheet.flatten([styles.headerText, styles.textCenter])}>TRẠNG THÁI</Text>
+                <Text
+                  style={StyleSheet.flatten([
+                    styles.headerText,
+                    styles.textCenter,
+                  ])}
+                >
+                  TRẠNG THÁI
+                </Text>
                 <SortIndicator columnKey="status" />
               </Pressable>
             )}
 
             {visibleColumns.actions && (
               <View style={styles.columnActions}>
-                <Text style={StyleSheet.flatten([styles.headerText, styles.textRight])}>THAO TÁC</Text>
+                <Text
+                  style={StyleSheet.flatten([
+                    styles.headerText,
+                    styles.textRight,
+                  ])}
+                >
+                  THAO TÁC
+                </Text>
               </View>
             )}
           </View>
@@ -625,49 +774,64 @@ export default function AdminOrdersScreen() {
               <View>
                 {paginatedOrders.length === 0 ? (
                   <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>Không tìm thấy đơn hàng nào.</Text>
+                    <Text style={styles.emptyText}>
+                      Không tìm thấy đơn hàng nào.
+                    </Text>
                   </View>
                 ) : (
                   paginatedOrders.map((order) => {
                     const isProcessingThis = processingOrderId === order.id;
                     return (
-                      <AdminDataWrapper 
-                        key={order.id} 
-                        onPress={() => router.push(`/(admin)/orders/${order.id}` as any)}
+                      <AdminDataWrapper
+                        key={order.id}
+                        onPress={() =>
+                          router.push(`/(admin)/orders/${order.id}` as any)
+                        }
                         style={[
                           styles.row,
-                          selectedOrders.includes(order.id) && { backgroundColor: '#F3F4F6' }
+                          selectedOrders.includes(order.id) && {
+                            backgroundColor: "#F3F4F6",
+                          },
                         ]}
                       >
                         {/* Checkbox */}
                         <View style={styles.columnCheck}>
                           <Pressable
                             onPress={() => {
-                              setSelectedOrders(prev =>
-                                prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
+                              setSelectedOrders((prev) =>
+                                prev.includes(order.id)
+                                  ? prev.filter((id) => id !== order.id)
+                                  : [...prev, order.id],
                               );
                             }}
                             style={({ pressed }) => [
                               styles.checkbox,
-                              selectedOrders.includes(order.id) && styles.checkboxSelected,
-                              pressed && { transform: [{ scale: 0.9 }] }
+                              selectedOrders.includes(order.id) &&
+                                styles.checkboxSelected,
+                              pressed && { transform: [{ scale: 0.9 }] },
                             ]}
                           >
-                            {selectedOrders.includes(order.id) && <Check size={12} color="white" />}
+                            {selectedOrders.includes(order.id) && (
+                              <Check size={12} color="white" />
+                            )}
                           </Pressable>
                         </View>
 
                         {/* Mã đơn */}
                         {visibleColumns.id && (
                           <View style={styles.columnId}>
-                            <Text style={styles.orderId}>{encodeOrderId(order.id)}</Text>
+                            <Text style={styles.orderId}>
+                              {encodeOrderId(order.id)}
+                            </Text>
                           </View>
                         )}
 
                         {visibleColumns.date && (
                           <View style={styles.columnDate}>
                             <Text style={styles.orderDate}>
-                              {new Date(order.created_at).toLocaleString("vi-VN")}
+                              {new Date(order.created_at).toLocaleString(
+                                "vi-VN",
+                              )}
                             </Text>
                           </View>
                         )}
@@ -675,26 +839,51 @@ export default function AdminOrdersScreen() {
                         {/* Tên khách */}
                         {visibleColumns.customer && (
                           <View style={styles.columnCustomer}>
-                            <Text style={styles.customerName}>{order.receiver_name || "N/A"}</Text>
+                            <Text style={styles.customerName}>
+                              {order.receiver_name || "N/A"}
+                            </Text>
                           </View>
                         )}
 
                         {/* Số điện thoại */}
                         {visibleColumns.phone && (
                           <View style={styles.columnPhone}>
-                            <Text style={styles.customerPhone}>{order.phone_contact}</Text>
+                            <Text style={styles.customerPhone}>
+                              {order.phone_contact}
+                            </Text>
                           </View>
                         )}
 
                         {/* Thanh toán */}
                         {visibleColumns.payment && (
                           <View style={styles.columnPhone}>
-                            <Text style={[styles.customerName, order.payment_method === "VNPay" && { color: "#2563EB", fontWeight: "600" }]}>
-                              {order.payment_method === "VNPay" ? "VNPay" : "COD"}
+                            <Text
+                              style={[
+                                styles.customerName,
+                                order.payment_method === "VNPay" && {
+                                  color: "#2563EB",
+                                  fontWeight: "600",
+                                },
+                              ]}
+                            >
+                              {order.payment_method === "VNPay"
+                                ? "VNPay"
+                                : "COD"}
                             </Text>
                             {order.payment_method === "VNPay" && (
-                              <Text style={{ fontSize: 11, color: order.payment_status === "paid" ? "#10B981" : "#EF4444", marginTop: 2 }}>
-                                {order.payment_status === "paid" ? "Đã TT" : "Chưa TT"}
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color:
+                                    order.payment_status === "paid"
+                                      ? "#10B981"
+                                      : "#EF4444",
+                                  marginTop: 2,
+                                }}
+                              >
+                                {order.payment_status === "paid"
+                                  ? "Đã TT"
+                                  : "Chưa TT"}
                               </Text>
                             )}
                           </View>
@@ -711,14 +900,22 @@ export default function AdminOrdersScreen() {
 
                         {/* Mã vận đơn GHN */}
                         {visibleColumns.tracking && (
-                          <View style={StyleSheet.flatten([styles.columnTracking, styles.itemsCenter])}>
+                          <View
+                            style={StyleSheet.flatten([
+                              styles.columnTracking,
+                              styles.itemsCenter,
+                            ])}
+                          >
                             {order.ghn_order_code ? (
                               <View style={styles.trackingContainer}>
-                                <Text style={styles.trackingCode}>{order.ghn_order_code}</Text>
+                                <Text style={styles.trackingCode}>
+                                  {order.ghn_order_code}
+                                </Text>
                                 <Pressable
                                   onPress={() => {
                                     const url = `https://tracking.ghn.dev/?order_code=${order.ghn_order_code}`;
-                                    if (typeof window !== "undefined") window.open(url, "_blank");
+                                    if (typeof window !== "undefined")
+                                      window.open(url, "_blank");
                                   }}
                                   style={styles.trackingLink}
                                 >
@@ -733,15 +930,29 @@ export default function AdminOrdersScreen() {
 
                         {/* Trạng thái */}
                         {visibleColumns.status && (
-                          <View style={StyleSheet.flatten([styles.columnStatus, styles.itemsCenter])}>
-                            <View style={StyleSheet.flatten([
-                              styles.statusBadge,
-                              { backgroundColor: hexToRgba(STATUS_COLORS[order.status] ?? '#000000', 0.12) }
-                            ])}>
-                              <Text style={StyleSheet.flatten([
-                                styles.statusText,
-                                { color: STATUS_COLORS[order.status] }
-                              ])}>
+                          <View
+                            style={StyleSheet.flatten([
+                              styles.columnStatus,
+                              styles.itemsCenter,
+                            ])}
+                          >
+                            <View
+                              style={StyleSheet.flatten([
+                                styles.statusBadge,
+                                {
+                                  backgroundColor: hexToRgba(
+                                    STATUS_COLORS[order.status] ?? "#000000",
+                                    0.12,
+                                  ),
+                                },
+                              ])}
+                            >
+                              <Text
+                                style={StyleSheet.flatten([
+                                  styles.statusText,
+                                  { color: STATUS_COLORS[order.status] },
+                                ])}
+                              >
                                 {STATUS_LABELS[order.status] || order.status}
                               </Text>
                             </View>
@@ -750,25 +961,43 @@ export default function AdminOrdersScreen() {
 
                         {/* Hành động */}
                         {visibleColumns.actions && (
-                          <View style={StyleSheet.flatten([styles.columnActions, styles.actionsContainer])}>
+                          <View
+                            style={StyleSheet.flatten([
+                              styles.columnActions,
+                              styles.actionsContainer,
+                            ])}
+                          >
                             {isProcessingThis ? (
                               <View style={styles.buttonLoading}>
-                                <ActivityIndicator size="small" color="#2563EB" />
-                                <Text style={styles.buttonLoadingText}>Đang xử lý...</Text>
+                                <ActivityIndicator
+                                  size="small"
+                                  color="#2563EB"
+                                />
+                                <Text style={styles.buttonLoadingText}>
+                                  Đang xử lý...
+                                </Text>
                               </View>
                             ) : (
                               <>
-                                <ActionButton onPress={() => handlePrintDraft(order)} label="In HĐ" color="#1F2937" />
+                                <ActionButton
+                                  onPress={() => handlePrintDraft(order)}
+                                  label="In HĐ"
+                                  color="#1F2937"
+                                />
                                 {order.status === "pending" && (
                                   <ActionButton
-                                    onPress={() => handleUpdateStatus(order, "processing")}
+                                    onPress={() =>
+                                      handleUpdateStatus(order, "processing")
+                                    }
                                     label="Duyệt →GHN"
                                     color="#2563EB"
                                   />
                                 )}
                                 {order.status === "processing" && (
                                   <ActionButton
-                                    onPress={() => handleUpdateStatus(order, "shipping")}
+                                    onPress={() =>
+                                      handleUpdateStatus(order, "shipping")
+                                    }
                                     label="Giao"
                                     color="#8B5CF6"
                                   />
@@ -776,20 +1005,28 @@ export default function AdminOrdersScreen() {
                                 {order.status === "shipping" && (
                                   <>
                                     <ActionButton
-                                      onPress={() => handleUpdateStatus(order, "completed")}
+                                      onPress={() =>
+                                        handleUpdateStatus(order, "completed")
+                                      }
                                       label="Xong"
                                       color="#10B981"
                                     />
                                     <ActionButton
-                                      onPress={() => promptDeliveryFailed(order)}
+                                      onPress={() =>
+                                        promptDeliveryFailed(order)
+                                      }
                                       label="Giao thất bại"
                                       color="#F97316"
                                     />
                                   </>
                                 )}
-                                {["pending", "processing"].includes(order.status) && (
+                                {["pending", "processing"].includes(
+                                  order.status,
+                                ) && (
                                   <ActionButton
-                                    onPress={() => handleUpdateStatus(order, "cancelled")}
+                                    onPress={() =>
+                                      handleUpdateStatus(order, "cancelled")
+                                    }
                                     label="Hủy"
                                     color="#EF4444"
                                     outline
@@ -810,7 +1047,8 @@ export default function AdminOrdersScreen() {
           {/* FOOTER PAGINATION */}
           <View style={styles.tableFooter}>
             <Text style={styles.footerInfo}>
-              Hiển thị {totalItems === 0 ? 0 : startIndex + 1}-{endIndex} trong tổng số {totalItems} kết quả
+              Hiển thị {totalItems === 0 ? 0 : startIndex + 1}-{endIndex} trong
+              tổng số {totalItems} kết quả
             </Text>
 
             <View style={styles.footerRight}>
@@ -839,7 +1077,12 @@ export default function AdminOrdersScreen() {
                           setShowPageSizeDropdown(false);
                         }}
                       >
-                        <Text style={[styles.rowsMenuText, pageSize === val && styles.rowsMenuTextActive]}>
+                        <Text
+                          style={[
+                            styles.rowsMenuText,
+                            pageSize === val && styles.rowsMenuTextActive,
+                          ]}
+                        >
                           {val}
                         </Text>
                       </Pressable>
@@ -851,8 +1094,13 @@ export default function AdminOrdersScreen() {
               {/* Nút phân trang */}
               <View style={styles.paginationButtons}>
                 <Pressable
-                  style={[styles.pageBtn, currentPage === 1 && styles.pageBtnDisabled]}
-                  onPress={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  style={[
+                    styles.pageBtn,
+                    currentPage === 1 && styles.pageBtnDisabled,
+                  ]}
+                  onPress={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
                   disabled={currentPage === 1}
                 >
                   <Text style={styles.pageBtnText}>Trước</Text>
@@ -860,9 +1108,21 @@ export default function AdminOrdersScreen() {
 
                 {[...Array(totalPages)].map((_, i) => {
                   const pageNum = i + 1;
-                  if (totalPages > 7 && (pageNum < currentPage - 2 || pageNum > currentPage + 2) && pageNum !== 1 && pageNum !== totalPages) {
-                    if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
-                      return <Text key={pageNum} style={styles.paginationEllipsis}>...</Text>;
+                  if (
+                    totalPages > 7 &&
+                    (pageNum < currentPage - 2 || pageNum > currentPage + 2) &&
+                    pageNum !== 1 &&
+                    pageNum !== totalPages
+                  ) {
+                    if (
+                      pageNum === currentPage - 3 ||
+                      pageNum === currentPage + 3
+                    ) {
+                      return (
+                        <Text key={pageNum} style={styles.paginationEllipsis}>
+                          ...
+                        </Text>
+                      );
                     }
                     return null;
                   }
@@ -870,9 +1130,18 @@ export default function AdminOrdersScreen() {
                     <Pressable
                       key={pageNum}
                       onPress={() => setCurrentPage(pageNum)}
-                      style={[styles.pageNumber, currentPage === pageNum && styles.pageNumberActive]}
+                      style={[
+                        styles.pageNumber,
+                        currentPage === pageNum && styles.pageNumberActive,
+                      ]}
                     >
-                      <Text style={[styles.pageNumberText, currentPage === pageNum && styles.pageNumberTextActive]}>
+                      <Text
+                        style={[
+                          styles.pageNumberText,
+                          currentPage === pageNum &&
+                            styles.pageNumberTextActive,
+                        ]}
+                      >
                         {pageNum}
                       </Text>
                     </Pressable>
@@ -880,8 +1149,14 @@ export default function AdminOrdersScreen() {
                 })}
 
                 <Pressable
-                  style={[styles.pageBtn, (currentPage === totalPages || totalPages === 0) && styles.pageBtnDisabled]}
-                  onPress={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  style={[
+                    styles.pageBtn,
+                    (currentPage === totalPages || totalPages === 0) &&
+                      styles.pageBtnDisabled,
+                  ]}
+                  onPress={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
                   disabled={currentPage === totalPages || totalPages === 0}
                 >
                   <Text style={styles.pageBtnText}>Sau</Text>
@@ -898,7 +1173,7 @@ export default function AdminOrdersScreen() {
           onPress={scrollToTop}
           style={({ hovered }: any) => [
             styles.scrollTopButton,
-            hovered && styles.scrollTopButtonHover
+            hovered && styles.scrollTopButtonHover,
           ]}
         >
           <ArrowUp size={24} color="white" />
@@ -911,8 +1186,6 @@ export default function AdminOrdersScreen() {
           <InvoiceTemplate ref={printRef} order={selectedPrintOrder} />
         </div>
       )}
-
-
 
       {/* ── GHN Result Modal ── */}
       <Modal
@@ -929,24 +1202,35 @@ export default function AdminOrdersScreen() {
                   <Check size={32} color="white" />
                 </View>
                 <Text style={styles.modalTitle}>Đẩy GHN thành công! 🎉</Text>
-                <Text style={styles.modalSubtitle}>Mã vận đơn của đơn hàng:</Text>
+                <Text style={styles.modalSubtitle}>
+                  Mã vận đơn của đơn hàng:
+                </Text>
                 <View style={styles.trackingCodeBox}>
-                  <Text style={styles.trackingCodeLarge}>{ghnModal.trackingCode}</Text>
+                  <Text style={styles.trackingCodeLarge}>
+                    {ghnModal.trackingCode}
+                  </Text>
                 </View>
                 <Text style={styles.modalHint}>
-                  GHN đã nhận đơn và sẽ cử shipper đến lấy hàng. Khách có thể tra cứu tại GHN Tracking.
+                  GHN đã nhận đơn và sẽ cử shipper đến lấy hàng. Khách có thể
+                  tra cứu tại GHN Tracking.
                 </Text>
                 <Pressable
                   style={styles.modalBtn}
                   onPress={() => {
                     const url = `https://tracking.ghn.dev/?order_code=${ghnModal.trackingCode}`;
-                    if (typeof window !== "undefined") window.open(url, "_blank");
+                    if (typeof window !== "undefined")
+                      window.open(url, "_blank");
                   }}
                 >
                   <ExternalLink size={16} color="white" />
                   <Text style={styles.modalBtnText}>Xem trên GHN Tracking</Text>
                 </Pressable>
-                <Pressable style={styles.modalBtnOutline} onPress={() => setGhnModal({ visible: false, success: false })}>
+                <Pressable
+                  style={styles.modalBtnOutline}
+                  onPress={() =>
+                    setGhnModal({ visible: false, success: false })
+                  }
+                >
                   <Text style={styles.modalBtnOutlineText}>Đóng</Text>
                 </Pressable>
               </>
@@ -958,9 +1242,15 @@ export default function AdminOrdersScreen() {
                 <Text style={styles.modalTitle}>Không thể đẩy lên GHN</Text>
                 <Text style={styles.modalErrorMsg}>{ghnModal.errorMsg}</Text>
                 <Text style={styles.modalHint}>
-                  Đơn hàng đã cập nhật trạng thái nhưng chưa có mã vận đơn. Bạn có thể thử lại bằng nút "Giao".
+                  Đơn hàng đã cập nhật trạng thái nhưng chưa có mã vận đơn. Bạn
+                  có thể thử lại bằng nút &quot;Giao&quot;.
                 </Text>
-                <Pressable style={styles.modalBtnOutline} onPress={() => setGhnModal({ visible: false, success: false })}>
+                <Pressable
+                  style={styles.modalBtnOutline}
+                  onPress={() =>
+                    setGhnModal({ visible: false, success: false })
+                  }
+                >
                   <Text style={styles.modalBtnOutlineText}>Đóng</Text>
                 </Pressable>
               </>
@@ -977,30 +1267,52 @@ export default function AdminOrdersScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <View style={[styles.modalIconError, { backgroundColor: "#F97316" }]}>
+            <View
+              style={[styles.modalIconError, { backgroundColor: "#F97316" }]}
+            >
               <AlertTriangle size={32} color="white" />
             </View>
             <Text style={styles.modalTitle}>Khách không nhận hàng</Text>
-            <Text style={styles.modalSubtitle}>Vui lòng nhập lý do giao thất bại (VD: Khách thuê bao, sai địa chỉ...)</Text>
+            <Text style={styles.modalSubtitle}>
+              Vui lòng nhập lý do giao thất bại (VD: Khách thuê bao, sai địa
+              chỉ...)
+            </Text>
 
             <TextInput
-              style={{ width: "100%", height: 100, marginBottom: 20, textAlignVertical: "top", padding: 12, borderRadius: 12, borderWidth: 1, borderColor: "#E5E7EB", outlineStyle: "none" as any }}
+              style={{
+                width: "100%",
+                height: 100,
+                marginBottom: 20,
+                textAlignVertical: "top",
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                outlineStyle: "none" as any,
+              }}
               placeholder="Nhập lý do (ít nhất 5 ký tự)..."
               multiline
               value={failModal.reason}
-              onChangeText={(text) => setFailModal({ ...failModal, reason: text })}
+              onChangeText={(text) =>
+                setFailModal({ ...failModal, reason: text })
+              }
             />
 
-            <Pressable style={[styles.modalBtn, { backgroundColor: "#F97316" }]} onPress={handleSubmitDeliveryFailed}>
+            <Pressable
+              style={[styles.modalBtn, { backgroundColor: "#F97316" }]}
+              onPress={handleSubmitDeliveryFailed}
+            >
               <Text style={styles.modalBtnText}>Xác nhận thất bại</Text>
             </Pressable>
-            <Pressable style={styles.modalBtnOutline} onPress={() => setFailModal({ ...failModal, visible: false })}>
+            <Pressable
+              style={styles.modalBtnOutline}
+              onPress={() => setFailModal({ ...failModal, visible: false })}
+            >
               <Text style={styles.modalBtnOutlineText}>Hủy</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
-
     </ScrollView>
   );
 }
@@ -1009,17 +1321,24 @@ function ActionButton({ onPress, label, color, outline = false }: any) {
   return (
     <Pressable
       onPress={onPress}
-      style={({ hovered }: any) => StyleSheet.flatten([
-        styles.actionButton,
-        {
-          backgroundColor: outline ? "transparent" : color,
-          borderWidth: outline ? 1 : 0,
-          borderColor: color,
-          opacity: hovered ? 0.8 : 1
-        }
-      ])}
+      style={({ hovered }: any) =>
+        StyleSheet.flatten([
+          styles.actionButton,
+          {
+            backgroundColor: outline ? "transparent" : color,
+            borderWidth: outline ? 1 : 0,
+            borderColor: color,
+            opacity: hovered ? 0.8 : 1,
+          },
+        ])
+      }
     >
-      <Text style={StyleSheet.flatten([styles.actionButtonText, { color: outline ? color : "white" }])}>
+      <Text
+        style={StyleSheet.flatten([
+          styles.actionButtonText,
+          { color: outline ? color : "white" },
+        ])}
+      >
         {label}
       </Text>
     </Pressable>
@@ -1055,30 +1374,56 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "space-between", marginBottom: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 32,
   },
-  title: { fontSize: 30, fontWeight: "800", color: "#111827", letterSpacing: -0.5 },
+  title: {
+    fontSize: 30,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: -0.5,
+  },
   subtitle: { fontSize: 14, color: "#6B7280", marginTop: 4 },
   tabsContainer: { marginBottom: 24 },
   tabsScroll: { gap: 12 },
   tab: {
-    flexDirection: "row", alignItems: "center", backgroundColor: "white",
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12,
-    borderWidth: 1, borderColor: "#E5E7EB", gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 8,
   },
   tabActive: { borderColor: "#2563EB", backgroundColor: "#EFF6FF" },
   tabText: { fontSize: 13, fontWeight: "600", color: "#6B7280" },
   tabTextActive: { color: "#2563EB" },
-  loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 80 },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 80,
+  },
   errorContainer: { padding: 40, alignItems: "center" },
   errorText: { color: "#EF4444", marginTop: 16, fontWeight: "700" },
   tableHeader: {
-    flexDirection: "row", backgroundColor: "#F9FAFB",
-    borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
-    paddingHorizontal: 24, paddingVertical: 16,
+    flexDirection: "row",
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  headerText: { fontWeight: "700", color: "#4B5563", fontSize: 12, textTransform: "uppercase" },
+  headerText: {
+    fontWeight: "700",
+    color: "#4B5563",
+    fontSize: 12,
+    textTransform: "uppercase",
+  },
   headerSortable: { flexDirection: "row", alignItems: "center", gap: 4 },
   justifyEnd: { justifyContent: "flex-end" },
   justifyCenter: { justifyContent: "center" },
@@ -1189,7 +1534,7 @@ const styles = StyleSheet.create({
       },
       default: {
         elevation: 5,
-      }
+      },
     }),
   },
   dropdownTitle: {
@@ -1222,9 +1567,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   row: {
-    flexDirection: "row", alignItems: "center",
-    borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
-    paddingHorizontal: 24, paddingVertical: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
   columnId: { flex: 0.8 },
   columnDate: { flex: 1.1 },
@@ -1244,132 +1592,278 @@ const styles = StyleSheet.create({
   amountText: { fontWeight: "700", color: "#2563EB", textAlign: "right" },
   trackingContainer: { flexDirection: "row", alignItems: "center", gap: 6 },
   trackingCode: {
-    fontSize: 12, fontWeight: "700", color: "#065F46",
-    backgroundColor: "#D1FAE5", paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 6, fontFamily: "monospace" as any,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#065F46",
+    backgroundColor: "#D1FAE5",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    fontFamily: "monospace" as any,
   },
   trackingLink: { padding: 2 },
   noTracking: { fontSize: 14, color: "#D1D5DB", fontWeight: "500" },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 9999 },
-  statusText: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.5 },
-  actionsContainer: { flexDirection: "row", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   actionButton: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8,
-    alignItems: "center", justifyContent: "center", minWidth: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 50,
   },
   actionButtonText: { fontSize: 11, fontWeight: "700" },
   buttonLoading: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    paddingHorizontal: 12, paddingVertical: 8,
-    backgroundColor: "#EFF6FF", borderRadius: 8,
-    minWidth: 120, justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 8,
+    minWidth: 120,
+    justifyContent: "center",
   },
   buttonLoadingText: { fontSize: 12, fontWeight: "600", color: "#2563EB" },
-  emptyContainer: { paddingVertical: 80, alignItems: "center", justifyContent: "center" },
+  emptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   emptyText: { color: "#9CA3AF", fontSize: 14 },
   mobilePlaceholder: { padding: 40 },
   scrollTopButton: {
-    position: "absolute", bottom: 40, right: 40,
-    width: 56, height: 56, borderRadius: 28, backgroundColor: "#111827",
-    alignItems: "center", justifyContent: "center",
-    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)", elevation: 8,
+    position: "absolute",
+    bottom: 40,
+    right: 40,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#111827",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 8px rgba(0, 0, 0, 0.3)",
+    elevation: 8,
   },
   scrollTopButtonHover: { backgroundColor: "#374151", marginTop: -2 },
 
   // ── GHN Address Fixer ──
   fixerHeader: {
-    flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 16,
   },
   fixerIconBox: {
-    width: 48, height: 48, borderRadius: 12, backgroundColor: "#2563EB",
-    alignItems: "center", justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
   },
   fixerTitle: { fontSize: 18, fontWeight: "800", color: "#111827" },
   fixerSubtitle: { fontSize: 13, color: "#6B7280", marginTop: 2 },
   fixerHint: {
-    fontSize: 13, color: "#6B7280", backgroundColor: "#F3F4F6",
-    padding: 12, borderRadius: 8, marginBottom: 4,
+    fontSize: 13,
+    color: "#6B7280",
+    backgroundColor: "#F3F4F6",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
   },
   fixerHint2: {
-    fontSize: 13, color: "#6B7280", marginBottom: 16,
+    fontSize: 13,
+    color: "#6B7280",
+    marginBottom: 16,
   },
   pickerRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   pickerCol: { flex: 1 },
-  pickerLabel: { fontSize: 12, fontWeight: "700", color: "#374151", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
-  pickerSearch: {
-    height: 36, borderWidth: 1, borderColor: "#E5E7EB",
-    borderRadius: 8, paddingHorizontal: 10, fontSize: 13,
-    backgroundColor: "white", marginBottom: 6, outlineStyle: "none" as any,
+  pickerLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
-  pickerList: { height: 220, borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 8, backgroundColor: "white" },
+  pickerSearch: {
+    height: 36,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    backgroundColor: "white",
+    marginBottom: 6,
+    outlineStyle: "none" as any,
+  },
+  pickerList: {
+    height: 220,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    backgroundColor: "white",
+  },
   pickerItem: {
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: "#F9FAFB",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F9FAFB",
   },
   pickerItemActive: { backgroundColor: "#EFF6FF" },
   pickerItemText: { fontSize: 13, color: "#374151" },
   pickerItemTextActive: { color: "#2563EB", fontWeight: "700" },
-  pickerEmpty: { padding: 12, fontSize: 12, color: "#9CA3AF", textAlign: "center", marginTop: 8 },
-  selectedSummary: {
-    backgroundColor: "#F0FDF4", borderWidth: 1, borderColor: "#10B981",
-    borderRadius: 8, padding: 12, marginBottom: 12,
+  pickerEmpty: {
+    padding: 12,
+    fontSize: 12,
+    color: "#9CA3AF",
+    textAlign: "center",
+    marginTop: 8,
   },
-  selectedSummaryText: { fontSize: 13, fontWeight: "600", color: "#065F46", marginBottom: 4 },
-  selectedSummaryCode: { fontSize: 11, color: "#6B7280", fontFamily: "monospace" as any },
+  selectedSummary: {
+    backgroundColor: "#F0FDF4",
+    borderWidth: 1,
+    borderColor: "#10B981",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  selectedSummaryText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+  selectedSummaryCode: {
+    fontSize: 11,
+    color: "#6B7280",
+    fontFamily: "monospace" as any,
+  },
   fixerError: {
-    backgroundColor: "#FEF2F2", borderRadius: 8, padding: 12, marginBottom: 12,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
   },
   fixerErrorText: { fontSize: 13, color: "#EF4444" },
   fixerActions: { flexDirection: "row", gap: 12, justifyContent: "flex-end" },
 
   // ── GHN Result Modal ──
   modalOverlay: {
-    flex: 1, backgroundColor: "rgba(0,0,0,0.5)",
-    alignItems: "center", justifyContent: "center",
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalCard: {
-    backgroundColor: "white", borderRadius: 24, padding: 40, width: 440,
+    backgroundColor: "white",
+    borderRadius: 24,
+    padding: 40,
+    width: 440,
     alignItems: "center",
-    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)", elevation: 20,
+    boxShadow: "0 20px 40px rgba(0, 0, 0, 0.25)",
+    elevation: 20,
   },
   modalIconSuccess: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: "#10B981",
-    alignItems: "center", justifyContent: "center", marginBottom: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#10B981",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
   },
   modalIconError: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: "#EF4444",
-    alignItems: "center", justifyContent: "center", marginBottom: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
   },
-  modalTitle: { fontSize: 20, fontWeight: "800", color: "#111827", marginBottom: 8, textAlign: "center" },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
+    marginBottom: 8,
+    textAlign: "center",
+  },
   modalSubtitle: { fontSize: 14, color: "#6B7280", marginBottom: 12 },
   trackingCodeBox: {
-    backgroundColor: "#F0FDF4", borderWidth: 2, borderColor: "#10B981",
-    borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12,
-    marginBottom: 16, width: "100%", alignItems: "center",
+    backgroundColor: "#F0FDF4",
+    borderWidth: 2,
+    borderColor: "#10B981",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginBottom: 16,
+    width: "100%",
+    alignItems: "center",
   },
   trackingCodeLarge: {
-    fontSize: 22, fontWeight: "800", color: "#065F46",
-    letterSpacing: 2, fontFamily: "monospace" as any,
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#065F46",
+    letterSpacing: 2,
+    fontFamily: "monospace" as any,
   },
   modalHint: {
-    fontSize: 13, color: "#6B7280", textAlign: "center",
-    lineHeight: 20, marginBottom: 24, paddingHorizontal: 8,
+    fontSize: 13,
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 24,
+    paddingHorizontal: 8,
   },
   modalErrorMsg: {
-    fontSize: 13, color: "#EF4444", textAlign: "center",
-    marginBottom: 12, backgroundColor: "#FEF2F2",
-    padding: 12, borderRadius: 8, width: "100%",
+    fontSize: 13,
+    color: "#EF4444",
+    textAlign: "center",
+    marginBottom: 12,
+    backgroundColor: "#FEF2F2",
+    padding: 12,
+    borderRadius: 8,
+    width: "100%",
   },
   modalBtn: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "#2563EB", borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 14,
-    width: "100%", justifyContent: "center", marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#2563EB",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    width: "100%",
+    justifyContent: "center",
+    marginBottom: 12,
   },
   modalBtnText: { color: "white", fontWeight: "700", fontSize: 15 },
   modalBtnOutline: {
-    borderWidth: 1, borderColor: "#E5E7EB", borderRadius: 12,
-    paddingHorizontal: 24, paddingVertical: 14, width: "100%", alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    width: "100%",
+    alignItems: "center",
   },
   modalBtnOutlineText: { color: "#374151", fontWeight: "600", fontSize: 15 },
 
