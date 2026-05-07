@@ -5,16 +5,15 @@ import {
   isRoleAllowedOnPlatform,
 } from "@/src/auth/authLogger";
 import type { UserRole } from "@/src/auth/types";
+import { AlertButton, AlertDialog } from "@/src/components/AlertDialog";
 import { supabase } from "@/src/lib/supabase";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   InteractionManager,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -26,30 +25,27 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import { AlertDialog, AlertButton } from "@/src/components/AlertDialog";
 
 const { width } = Dimensions.get("window");
 
 const COLORS = {
-  bg: '#F9FAFB',
-  surface: '#FFFFFF',
-  card: '#FFFFFF',
-  accent: '#2563EB',
-  accentLight: '#3B82F6',
-  accentGlow: 'rgba(37, 99, 235, 0.15)',
-  text: '#111827',
-  textSub: '#4B5563',
-  textMuted: '#9CA3AF',
-  border: '#E5E7EB',
-  borderFocus: '#2563EB',
-  inputBg: '#F3F4F6',
-  success: '#10B981',
-  error: '#EF4444',
-  googleRed: '#EA4335',
-  facebookBlue: '#1877F2',
+  bg: "#F9FAFB",
+  surface: "#FFFFFF",
+  card: "#FFFFFF",
+  accent: "#2563EB",
+  accentLight: "#3B82F6",
+  accentGlow: "rgba(37, 99, 235, 0.15)",
+  text: "#111827",
+  textSub: "#4B5563",
+  textMuted: "#9CA3AF",
+  border: "#E5E7EB",
+  borderFocus: "#2563EB",
+  inputBg: "#F3F4F6",
+  success: "#10B981",
+  error: "#EF4444",
+  googleRed: "#EA4335",
+  facebookBlue: "#1877F2",
 };
-
-
 
 const App = () => {
   const [email, setEmail] = useState("");
@@ -68,7 +64,7 @@ const App = () => {
     title: string,
     message: string,
     buttons: AlertButton[],
-    onClose?: () => void
+    onClose?: () => void,
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -85,7 +81,7 @@ const App = () => {
     try {
       const { data: lockStatus, error: rpcError } = await supabase.rpc(
         "check_user_lock_status",
-        { p_email: email.trim().toLowerCase() }
+        { p_email: email.trim().toLowerCase() },
       );
 
       if (rpcError) {
@@ -105,7 +101,8 @@ const App = () => {
           setTimeout(() => {
             showAlert(
               "Tài khoản đã bị khóa",
-              lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa bởi Quản trị viên.",
+              lockStatus.lock_reason ||
+                "Tài khoản của bạn đã bị khóa bởi Quản trị viên.",
               [
                 {
                   text: "Đã hiểu",
@@ -115,14 +112,16 @@ const App = () => {
                     router.push({
                       pathname: "/locked-account",
                       params: {
-                        reason: lockStatus.lock_reason || "Tài khoản của bạn đã bị khóa.",
+                        reason:
+                          lockStatus.lock_reason ||
+                          "Tài khoản của bạn đã bị khóa.",
                         locked_at: lockStatus.locked_at || "",
                       },
                     });
                   },
                 },
               ],
-              () => {}
+              () => {},
             );
           }, 300);
         });
@@ -147,7 +146,7 @@ const App = () => {
           showAlert(
             "Chưa xác thực email",
             "Vui lòng kiểm tra hộp thư (hoặc Spam) để xác thực tài khoản trước khi đăng nhập.",
-            [{ text: "Đã hiểu", style: "default" }]
+            [{ text: "Đã hiểu", style: "default" }],
           );
         } else {
           showAlert("Đăng nhập thất bại", error.message, [
@@ -178,7 +177,8 @@ const App = () => {
               setTimeout(() => {
                 showAlert(
                   "Tài khoản đã bị khóa",
-                  fullProfileData.lock_reason || "Tài khoản của bạn đã bị khóa.",
+                  fullProfileData.lock_reason ||
+                    "Tài khoản của bạn đã bị khóa.",
                   [
                     {
                       text: "Đã hiểu",
@@ -189,14 +189,16 @@ const App = () => {
                         router.replace({
                           pathname: "/locked-account",
                           params: {
-                            reason: fullProfileData.lock_reason || "Tài khoản của bạn đã bị khóa.",
+                            reason:
+                              fullProfileData.lock_reason ||
+                              "Tài khoản của bạn đã bị khóa.",
                             locked_at: fullProfileData.locked_at || "",
                           },
                         });
                       },
                     },
                   ],
-                  () => {}
+                  () => {},
                 );
               }, 300);
             });
@@ -206,13 +208,18 @@ const App = () => {
 
           const role = (fullProfileData?.role as UserRole | null) ?? null;
           if (!isRoleAllowedOnPlatform(role, platform)) {
-            authLogger.rolePolicyViolation({ userId, role: role!, email, platform });
+            authLogger.rolePolicyViolation({
+              userId,
+              role: role!,
+              email,
+              platform,
+            });
             await supabase.auth.signOut();
             setLoading(false);
             showAlert(
               "Không được phép đăng nhập",
               getRolePlatformErrorMessage(role!),
-              [{ text: "Đã hiểu", style: "default" }]
+              [{ text: "Đã hiểu", style: "default" }],
             );
             return;
           }
@@ -234,7 +241,6 @@ const App = () => {
       ]);
     }
   }
-
 
   const { redirect } = useLocalSearchParams<{ redirect?: string }>();
   function handleGuestContinue() {
@@ -267,7 +273,11 @@ const App = () => {
             <View style={styles.logoWrapper}>
               <View style={styles.logoGlow} />
               <View style={styles.logoCircle}>
-                <Icon name="cart-outline" size={36} color={COLORS.accentLight} />
+                <Icon
+                  name="cart-outline"
+                  size={36}
+                  color={COLORS.accentLight}
+                />
               </View>
             </View>
             <Text style={styles.appName}>E-Shop</Text>
@@ -290,7 +300,9 @@ const App = () => {
                   name="email-outline"
                   size={20}
                   color={
-                    focusedInput === "email" ? COLORS.accentLight : COLORS.textMuted
+                    focusedInput === "email"
+                      ? COLORS.accentLight
+                      : COLORS.textMuted
                   }
                   style={styles.inputIcon}
                 />
@@ -312,7 +324,9 @@ const App = () => {
             <View style={styles.inputGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.label}>Mật khẩu</Text>
-                <TouchableOpacity onPress={() => router.push("/forgot-password" as any)}>
+                <TouchableOpacity
+                  onPress={() => router.push("/forgot-password" as any)}
+                >
                   <Text style={styles.forgotText}>Quên mật khẩu?</Text>
                 </TouchableOpacity>
               </View>
@@ -326,7 +340,9 @@ const App = () => {
                   name="lock-outline"
                   size={20}
                   color={
-                    focusedInput === "password" ? COLORS.accentLight : COLORS.textMuted
+                    focusedInput === "password"
+                      ? COLORS.accentLight
+                      : COLORS.textMuted
                   }
                   style={styles.inputIcon}
                 />
@@ -364,7 +380,12 @@ const App = () => {
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>
-                  <Icon name="login" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Icon
+                    name="login"
+                    size={20}
+                    color="#FFFFFF"
+                    style={{ marginRight: 8 }}
+                  />
                   <Text style={styles.primaryBtnText}>Đăng Nhập</Text>
                 </>
               )}
@@ -376,17 +397,26 @@ const App = () => {
               onPress={handleGuestContinue}
               activeOpacity={0.7}
             >
-              <Icon name="account-outline" size={18} color={COLORS.textSub} style={{ marginRight: 6 }} />
-              <Text style={styles.guestBtnText}>Tiếp tục với tư cách Khách</Text>
+              <Icon
+                name="account-outline"
+                size={18}
+                color={COLORS.textSub}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.guestBtnText}>
+                Tiếp tục với tư cách Khách
+              </Text>
             </TouchableOpacity>
-
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               Chưa có tài khoản?{" "}
-              <Text style={styles.footerLink} onPress={() => router.push("/register" as any)}>
+              <Text
+                style={styles.footerLink}
+                onPress={() => router.push("/register" as any)}
+              >
                 Đăng ký ngay
               </Text>
             </Text>
@@ -419,7 +449,7 @@ const styles = StyleSheet.create({
     width: width * 0.8,
     height: width * 0.8,
     borderRadius: width * 0.4,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    backgroundColor: "rgba(37, 99, 235, 0.08)",
     top: -width * 0.3,
     right: -width * 0.2,
   },
@@ -428,7 +458,7 @@ const styles = StyleSheet.create({
     width: width * 0.6,
     height: width * 0.6,
     borderRadius: width * 0.3,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
     bottom: -width * 0.1,
     left: -width * 0.2,
   },
@@ -537,7 +567,7 @@ const styles = StyleSheet.create({
   },
   inputWrapperFocused: {
     borderColor: COLORS.borderFocus,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   inputIcon: {
     marginRight: 10,
@@ -565,7 +595,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   primaryBtnText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.3,
@@ -606,8 +636,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     letterSpacing: 0.8,
   },
-
-
 
   // Footer
   footer: {
