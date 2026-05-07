@@ -1,5 +1,6 @@
 import { supabase } from "@/src/lib/supabase";
 import { calculateDiscountedPrice } from "@/src/services/product";
+import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, Check, Grid, Heart, List, Minus, Plus, Search, ShoppingBag, ShoppingCart, X } from "lucide-react-native";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
@@ -414,10 +415,12 @@ export default function CategoriesScreen() {
         </View>
         <View style={isGrid ? styles.productGridInfo : styles.productListInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.productPrice}>{(item.finalPrice || item.price).toLocaleString('vi-VN')} đ</Text>
-            {item.is_sale && <Text style={styles.oldPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>}
-          </View>
+          <PriceDisplay
+            originalPrice={item.price}
+            finalPrice={item.finalPrice}
+            hasDiscount={item.is_sale}
+            size={isGrid ? "sm" : "md"}
+          />
           {!isGrid && <Text style={styles.productDesc} numberOfLines={2}>Khám phá ngay sản phẩm cao cấp, chất lượng đảm bảo...</Text>}
         </View>
       </TouchableOpacity>
@@ -654,10 +657,13 @@ export default function CategoriesScreen() {
                               {item.is_sale && <View style={[webS.badge, { backgroundColor: '#EF4444' }]}><Text style={webS.badgeText}>SALE</Text></View>}
                               {item.is_out_of_stock && <View style={[webS.badge, { backgroundColor: '#9CA3AF' }]}><Text style={webS.badgeText}>HẾT HÀNG</Text></View>}
                             </View>
-                            <View style={webS.listPriceRow}>
-                              <Text style={webS.listPrice}>{(item.finalPrice || item.price).toLocaleString('vi-VN')} đ</Text>
-                              {item.is_sale && <Text style={webS.listOldPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>}
-                            </View>
+                            <PriceDisplay
+                              originalPrice={item.price}
+                              finalPrice={item.finalPrice}
+                              hasDiscount={item.is_sale}
+                              size="sm"
+                              justify="flex-start"
+                            />
                           </View>
                           <View style={webS.listActions}>
                             <TouchableOpacity style={webS.actionCircle} onPress={() => toggleWishlist(item.id)}>
@@ -700,10 +706,12 @@ export default function CategoriesScreen() {
                         </View>
                         <View style={webS.gridCardInfo}>
                           <Text style={webS.gridCardName} numberOfLines={2}>{item.name}</Text>
-                          <View style={webS.gridPriceRow}>
-                            <Text style={webS.gridPrice}>{(item.finalPrice || item.price).toLocaleString('vi-VN')} đ</Text>
-                            {item.is_sale && <Text style={webS.gridOldPrice}>{item.price.toLocaleString('vi-VN')} đ</Text>}
-                          </View>
+                          <PriceDisplay
+                            originalPrice={item.price}
+                            finalPrice={item.finalPrice}
+                            hasDiscount={item.is_sale}
+                            size="sm"
+                          />
                         </View>
                       </TouchableOpacity>
                     );
@@ -1075,7 +1083,7 @@ const webS = StyleSheet.create({
   sectionHeading: { fontSize: 26, fontWeight: '900', color: '#111', paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
   subGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 16, paddingBottom: 40 },
   subCard: { width: '22%' as any, backgroundColor: '#fff', borderRadius: 20, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.07, shadowRadius: 12, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
-  subCardImg: { width: '100%', aspectRatio: 1.1 },
+  subCardImg: { width: '100%', aspectRatio: 1.1, resizeMode: 'cover' },
   subCardInfo: { padding: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
   subCardName: { fontSize: 15, fontWeight: '700', color: '#1F2937', textAlign: 'center' },
 
@@ -1108,9 +1116,9 @@ const webS = StyleSheet.create({
   emptyText: { fontSize: 16, color: '#9CA3AF' },
 
   // Grid card
-  gridCard: { flex: 1, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
-  gridCardImgWrap: { width: '100%', aspectRatio: 0.9, position: 'relative' },
-  gridCardImg: { width: '100%', height: '100%' },
+  gridCard: { flex: 1, maxWidth: '24%', backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F0F0F4' },
+  gridCardImgWrap: { width: '100%', aspectRatio: 0.75, position: 'relative', backgroundColor: '#F8F8F8', overflow: 'hidden' },
+  gridCardImg: { width: '100%', height: '100%', resizeMode: 'cover' },
   gridBadges: { position: 'absolute', top: 10, left: 10, gap: 4 },
   gridQuickActions: { position: 'absolute', bottom: 10, right: 10, flexDirection: 'column', gap: 6 },
   gridCardInfo: { padding: 12 },

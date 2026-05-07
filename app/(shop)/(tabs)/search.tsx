@@ -4,8 +4,6 @@ import { supabase } from "@/src/lib/supabase";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { FilterModal } from "@/src/components/search/FilterModal";
 import {
-  Camera,
-
   Filter,
   Search as SearchIcon,
   Trash2,
@@ -228,9 +226,6 @@ export default function SearchScreen() {
               onSubmitEditing={() => performSearch(searchPhrase)}
               returnKeyType="search"
             />
-            <TouchableOpacity>
-              <Camera size={20} color="#3B82F6" />
-            </TouchableOpacity>
           </View>
           {showResults && (
             <TouchableOpacity style={styles.filterBtn} onPress={() => setIsFilterVisible(true)}>

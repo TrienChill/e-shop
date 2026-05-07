@@ -395,7 +395,6 @@ const HomeScreen = () => {
             onPress={() => router.push("/(shop)/(tabs)/search")}
           >
             <Text style={styles.searchText}>Tìm kiếm...</Text>
-            <MaterialIcons name="photo-camera" size={24} color="#0055FF" />
           </TouchableOpacity>
 
           <TouchableOpacity

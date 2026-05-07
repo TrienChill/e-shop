@@ -22,6 +22,8 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -47,6 +49,11 @@ export default function RecentlyViewedScreen() {
   const [currentMonth, setCurrentMonth] = useState(new Date()); 
   const [recentViews, setRecentViews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { width: winWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === "web" && winWidth >= 1024;
+  const numColumns = isWeb ? 4 : 2;
+
 
   // --- REALTIME HOOKS ---
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -137,7 +144,7 @@ export default function RecentlyViewedScreen() {
   };
 
   const filteredProducts = useMemo(() => {
-    return recentViews.filter((p) => {
+    return recentViews.filter((p: any) => {
         const viewDate = p.viewed_at ? new Date(p.viewed_at) : new Date();
         viewDate.setHours(0, 0, 0, 0);
 
@@ -398,10 +405,11 @@ export default function RecentlyViewedScreen() {
         </View>
       ) : (
         <FlatList
+          key={numColumns}
           data={filteredProducts}
           renderItem={renderProductItem}
           keyExtractor={(item) => String(item.id)}
-          numColumns={2}
+          numColumns={numColumns}
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
@@ -485,11 +493,13 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   columnWrapper: {
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    gap: 16,
     marginBottom: 24,
   },
   productCard: {
-    width: COLUMN_WIDTH,
+    flex: 1,
+    maxWidth: Platform.OS === "web" ? "24%" : "48%",
   },
   productImage: {
     width: "100%",

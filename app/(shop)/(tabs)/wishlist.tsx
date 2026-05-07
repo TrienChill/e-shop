@@ -13,10 +13,12 @@ import {
   Image,
   Dimensions,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,6 +39,10 @@ export default function WishlistScreen() {
   const [wishlistItems, setWishlistItems] = useState<any[]>([]);
   const [popularProducts, setPopularProducts] = useState<any[]>([]);
   const [recentViews, setRecentViews] = useState<any[]>([]);
+
+  const { width: winWidth } = useWindowDimensions();
+  const isWeb = Platform.OS === "web" && winWidth >= 1024;
+
 
   // States for Add to Cart Modal
   const [isModalVisible, setModalVisible] = useState(false);
@@ -628,11 +634,12 @@ const styles = StyleSheet.create({
   popularGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    gap: 12,
     marginTop: 10,
   },
   popularCardGrid: {
-    width: "48%", // Chia đôi màn hình
+    width: Platform.OS === "web" ? "23.5%" : "48%",
     backgroundColor: "#fff",
     borderRadius: 16,
     padding: 8,
