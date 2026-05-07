@@ -7,18 +7,18 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
-  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   useWindowDimensions,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
+import { useAuth } from "@/src/auth/AuthContext";
 import { PriceDisplay } from "@/src/components/common/PriceDisplay";
 import { supabase } from "@/src/lib/supabase";
 import { Banner, getActiveBanners } from "@/src/services/banner";
@@ -31,27 +31,33 @@ import {
 } from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Headset } from "lucide-react-native";
-import { useAuth } from "@/src/auth/AuthContext";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 
 const { width } = Dimensions.get("window");
 
 // ==================== MOCK DATA ====================
-
-
 
 // Removed JUST_FOR_YOU mock data
 // ==================== COMPONENTS ====================
 
 const HomeScreen = () => {
   const { width: windowWidth } = useWindowDimensions();
-  const isWeb = Platform.OS === 'web';
+  const isWeb = Platform.OS === "web";
 
   // Responsive calculations
-  const responsivePadding = windowWidth > 1200 ? 100 : windowWidth > 900 ? 60 : windowWidth > 600 ? 24 : 16;
-  const popularColumns = windowWidth > 1200 ? 4 : windowWidth > 900 ? 3 : windowWidth > 600 ? 2 : 2;
-  const justForYouColumns = windowWidth > 1200 ? 5 : windowWidth > 900 ? 4 : windowWidth > 600 ? 3 : 2;
+  const responsivePadding =
+    windowWidth > 1200
+      ? 100
+      : windowWidth > 900
+        ? 60
+        : windowWidth > 600
+          ? 24
+          : 16;
+  const popularColumns =
+    windowWidth > 1200 ? 4 : windowWidth > 900 ? 3 : windowWidth > 600 ? 2 : 2;
+  const justForYouColumns =
+    windowWidth > 1200 ? 5 : windowWidth > 900 ? 4 : windowWidth > 600 ? 3 : 2;
 
   // Hide mobile header on web - WebHeader is in _layout
   const showMobileHeader = !isWeb;
@@ -60,10 +66,13 @@ const HomeScreen = () => {
 
   const handleSupportChat = () => {
     if (!session) {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         window.alert("Vui lòng đăng nhập để liên hệ hỗ trợ viên!");
       } else {
-        Alert.alert("Yêu cầu đăng nhập", "Vui lòng đăng nhập để liên hệ hỗ trợ viên!");
+        Alert.alert(
+          "Yêu cầu đăng nhập",
+          "Vui lòng đăng nhập để liên hệ hỗ trợ viên!",
+        );
       }
       return;
     }
@@ -81,63 +90,65 @@ const HomeScreen = () => {
   // just-for-you (cart_items/wishlist),
   // most-popular (có khả năng phụ thuộc reviews/view history).
   useSupabaseRealtime({
-    table: 'wishlist',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+    table: "wishlist",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'orders',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+    table: "orders",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'order_items',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+    table: "order_items",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'reviews',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1),
+    table: "reviews",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'product_view_history',
+    table: "product_view_history",
     onUpdate: (payload) => {
       // view history thường update liên tục; chỉ re-fetch khi có lượt xem mới
-      if (payload.eventType === 'INSERT') setRefreshTrigger(prev => prev + 1);
+      if (payload.eventType === "INSERT") setRefreshTrigger((prev) => prev + 1);
     },
   });
 
   // --- REALTIME HOOKS ---
   // Với sản phẩm: nếu DELETE thì lọc ngay ra khỏi tất cả state, không cần re-fetch
   useSupabaseRealtime({
-    table: 'products',
+    table: "products",
     onUpdate: (payload) => {
-      if (payload.eventType === 'DELETE') {
+      if (payload.eventType === "DELETE") {
         const deletedId = payload.old?.id;
         if (deletedId) {
-          setTopProducts(prev => prev.filter(p => p.id !== deletedId));
-          setNewItems(prev => prev.filter(p => p.id !== deletedId));
-          setPopularItems(prev => prev.filter(p => p.id !== deletedId));
-          setFlashSaleProducts(prev => prev.filter(p => p.id !== deletedId));
-          setJustForYouItems(prev => prev.filter(p => p.id !== deletedId));
+          setTopProducts((prev) => prev.filter((p) => p.id !== deletedId));
+          setNewItems((prev) => prev.filter((p) => p.id !== deletedId));
+          setPopularItems((prev) => prev.filter((p) => p.id !== deletedId));
+          setFlashSaleProducts((prev) =>
+            prev.filter((p) => p.id !== deletedId),
+          );
+          setJustForYouItems((prev) => prev.filter((p) => p.id !== deletedId));
         }
       } else {
         // INSERT hoặc UPDATE: re-fetch để lấy dữ liệu mới nhất
-        setRefreshTrigger(prev => prev + 1);
+        setRefreshTrigger((prev) => prev + 1);
       }
-    }
+    },
   });
   useSupabaseRealtime({
-    table: 'banners',
+    table: "banners",
     onUpdate: () => {
       getActiveBanners()
         .then((data) => setBanners(data))
         .catch((err) => console.error("Lỗi realtime banners:", err));
-    }
+    },
   });
   useSupabaseRealtime({
-    table: 'cart_items',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "cart_items",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
   useSupabaseRealtime({
-    table: 'product_discounts',
+    table: "product_discounts",
     onUpdate: () => {
       Promise.all([
         getTopSellingProducts().catch((err) => {
@@ -160,13 +171,7 @@ const HomeScreen = () => {
           console.error("Lỗi realtime just for you:", err);
           return [];
         }),
-      ]).then(([
-        top,
-        latest,
-        popular,
-        flash,
-        justForYou,
-      ]) => {
+      ]).then(([top, latest, popular, flash, justForYou]) => {
         setTopProducts(top);
         setNewItems(latest);
         setPopularItems(popular);
@@ -177,11 +182,11 @@ const HomeScreen = () => {
         hasMoreRef.current = true;
         setJustForYouItems(justForYou);
       });
-    }
+    },
   });
   useSupabaseRealtime({
-    table: 'product_variants',
-    onUpdate: () => setRefreshTrigger(prev => prev + 1)
+    table: "product_variants",
+    onUpdate: () => setRefreshTrigger((prev) => prev + 1),
   });
 
   useEffect(() => {
@@ -263,8 +268,8 @@ const HomeScreen = () => {
       hasMoreRef.current = false;
     } else {
       setJustForYouItems((prev) => {
-        const existIds = new Set(prev.map(i => i.id));
-        const filtered = moreData.filter(i => !existIds.has(i.id));
+        const existIds = new Set(prev.map((i) => i.id));
+        const filtered = moreData.filter((i) => !existIds.has(i.id));
         return [...prev, ...filtered];
       });
       pageRef.current = nextPage;
@@ -357,7 +362,10 @@ const HomeScreen = () => {
 
       if (error) throw error;
 
-      const total = (data || []).reduce((sum, item) => sum + (item.quantity || 0), 0);
+      const total = (data || []).reduce(
+        (sum, item) => sum + (item.quantity || 0),
+        0,
+      );
       setCartCount(total);
     } catch (error) {
       console.error("Lỗi lấy số lượng giỏ hàng:", error);
@@ -412,17 +420,24 @@ const HomeScreen = () => {
       <ScrollView
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={400}
-        contentContainerStyle={isWeb ? { paddingHorizontal: responsivePadding } : undefined}
+        contentContainerStyle={
+          isWeb ? { paddingHorizontal: responsivePadding } : undefined
+        }
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 300) {
+          if (
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - 300
+          ) {
             loadMoreJustForYou();
           }
         }}
       >
         {/* ========== BANNER SECTION ========== */}
         {banners.length > 0 && (
-          <View style={[styles.bannerContainer, isWeb && { paddingHorizontal: 0 }]}>
+          <View
+            style={[styles.bannerContainer, isWeb && { paddingHorizontal: 0 }]}
+          >
             <ScrollView
               ref={bannerScrollRef}
               horizontal
@@ -434,32 +449,56 @@ const HomeScreen = () => {
               {displayBanners.map((banner, index) => (
                 <TouchableOpacity
                   key={`${banner.id}-${banner.updated_at}-${index}`}
-                  style={[styles.bannerContent, { width: isWeb ? Math.min(windowWidth - responsivePadding * 2, 1200) : width - 32 }]}
+                  style={[
+                    styles.bannerContent,
+                    {
+                      width: isWeb
+                        ? Math.min(windowWidth - responsivePadding * 2, 1200)
+                        : width - 32,
+                    },
+                  ]}
                   activeOpacity={0.9}
                   onPress={() => {
-                    if (banner.action_type === "product" && banner.action_value) {
-                      router.push(`/(shop)/product/${banner.action_value}` as any);
-                    } else if (banner.action_type === "category" && banner.action_value) {
+                    if (
+                      banner.action_type === "product" &&
+                      banner.action_value
+                    ) {
+                      router.push(
+                        `/(shop)/product/${banner.action_value}` as any,
+                      );
+                    } else if (
+                      banner.action_type === "category" &&
+                      banner.action_value
+                    ) {
                       router.push({
                         pathname: "/(shop)/(tabs)/categories",
                         params: { categoryId: banner.action_value },
                       } as any);
-                    } else if (banner.action_type === "external_url" && banner.action_value) {
+                    } else if (
+                      banner.action_type === "external_url" &&
+                      banner.action_value
+                    ) {
                       import("react-native").then(({ Linking }) => {
                         Linking.openURL(banner.action_value!).catch(() =>
-                          console.warn("Không thể mở URL:", banner.action_value)
+                          console.warn(
+                            "Không thể mở URL:",
+                            banner.action_value,
+                          ),
                         );
                       });
                     }
                     // action_type === "none": không làm gì
                     // 👇 THÊM ĐOẠN NÀY ĐỂ BẮT SỰ KIỆN CHIẾN DỊCH 👇
-                    else if (banner.action_type === "campaign" && banner.action_value) {
+                    else if (
+                      banner.action_type === "campaign" &&
+                      banner.action_value
+                    ) {
                       router.push({
                         pathname: "/(shop)/campaign",
                         params: {
                           ids: banner.action_value, // Truyền chuỗi ID (VD: "1,4,10") sang trang mới
-                          title: banner.title       // Truyền thêm tiêu đề để làm Header
-                        }
+                          title: banner.title, // Truyền thêm tiêu đề để làm Header
+                        },
                       } as any);
                     }
                   }}
@@ -488,7 +527,7 @@ const HomeScreen = () => {
                     styles.paginationDot,
                     (index === activeBannerIndex ||
                       (index === 0 && activeBannerIndex === banners.length)) &&
-                    styles.paginationDotActive,
+                      styles.paginationDotActive,
                   ]}
                 />
               ))}
@@ -608,22 +647,33 @@ const HomeScreen = () => {
               return (
                 <View key={product.id} style={styles.flashSaleCard}>
                   <Image
-                    source={{ uri: product.images?.[0] || 'https://via.placeholder.com/150' }}
+                    source={{
+                      uri:
+                        product.images?.[0] ||
+                        "https://via.placeholder.com/150",
+                    }}
                     style={styles.flashSaleImage}
                     resizeMode="cover"
                   />
                   <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>{product.discountBadgeText || "SALE"}</Text>
+                    <Text style={styles.discountText}>
+                      {product.discountBadgeText || "SALE"}
+                    </Text>
                   </View>
                 </View>
-              )
+              );
             })}
           </View>
         </TouchableOpacity>
 
         {/* ========== MOST POPULAR SECTION ========== */}
         <View style={[styles.section, isWeb && { paddingHorizontal: 0 }]}>
-          <View style={[styles.sectionHeader, isWeb && { paddingHorizontal: responsivePadding }]}>
+          <View
+            style={[
+              styles.sectionHeader,
+              isWeb && { paddingHorizontal: responsivePadding },
+            ]}
+          >
             <Text style={styles.sectionTitle}>Nổi tiếng nhất</Text>
             <TouchableOpacity
               style={styles.seeAllButton}
@@ -634,77 +684,91 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={[
-            styles.popularGrid,
-            isWeb && {
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              paddingHorizontal: responsivePadding,
-              gap: 16,
-            }
-          ]}>
-            {popularItems.slice(0, isWeb ? popularColumns * 2 : 4).map((item) => {
-              const cardWidth = isWeb
-                ? (windowWidth - responsivePadding * 2 - 16 * (popularColumns - 1)) / popularColumns
-                : (width - 44) / 2;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.popularCard,
-                    isWeb && {
-                      width: cardWidth,
-                      marginBottom: 16,
-                    }
-                  ]}
-                  onPress={() => router.push(`/(shop)/product/${item.id}`)}
-                >
-                  <Image
-                    source={{ uri: item.images?.[0] || item.image }}
+          <View
+            style={[
+              styles.popularGrid,
+              isWeb && {
+                flexDirection: "row",
+                flexWrap: "wrap",
+                paddingHorizontal: responsivePadding,
+                gap: 16,
+              },
+            ]}
+          >
+            {popularItems
+              .slice(0, isWeb ? popularColumns * 2 : 4)
+              .map((item) => {
+                const cardWidth = isWeb
+                  ? (windowWidth -
+                      responsivePadding * 2 -
+                      16 * (popularColumns - 1)) /
+                    popularColumns
+                  : (width - 44) / 2;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
                     style={[
-                      styles.popularImage,
-                      isWeb && { height: cardWidth * 0.75 }
+                      styles.popularCard,
+                      isWeb && {
+                        width: cardWidth,
+                        marginBottom: 16,
+                      },
                     ]}
-                    resizeMode="cover"
-                  />
-
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      paddingHorizontal: 4,
-                      marginTop: 4,
-                    }}
+                    onPress={() => router.push(`/(shop)/product/${item.id}`)}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <MaterialIcons name="star" size={12} color="#f59e0b" />
-                      <Text style={{ fontSize: 11, color: "#666" }}>
-                        {item.average_rating || 0}
+                    <Image
+                      source={{ uri: item.images?.[0] || item.image }}
+                      style={[
+                        styles.popularImage,
+                        isWeb && { height: cardWidth * 0.75 },
+                      ]}
+                      resizeMode="cover"
+                    />
+
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        paddingHorizontal: 4,
+                        marginTop: 4,
+                      }}
+                    >
+                      <View
+                        style={{ flexDirection: "row", alignItems: "center" }}
+                      >
+                        <MaterialIcons name="star" size={12} color="#f59e0b" />
+                        <Text style={{ fontSize: 11, color: "#666" }}>
+                          {item.average_rating || 0}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11, color: "#999" }}>
+                        {item.view_count || 0} lượt xem
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: "#999" }}>
-                      {item.view_count || 0} lượt xem
-                    </Text>
-                  </View>
 
-                  <Text style={styles.popularName} numberOfLines={2}>
-                    {item.name}
-                  </Text>
-                  <PriceDisplay
-                    hasDiscount={item.hasDiscount}
-                    finalPrice={item.finalPrice}
-                    originalPrice={item.originalPrice}
-                    size="md"
-                  />
-                </TouchableOpacity>
-              );
-            })}
+                    <Text style={styles.popularName} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    <PriceDisplay
+                      hasDiscount={item.hasDiscount}
+                      finalPrice={item.finalPrice}
+                      originalPrice={item.originalPrice}
+                      size="md"
+                    />
+                  </TouchableOpacity>
+                );
+              })}
           </View>
         </View>
 
         {/* ========== JUST FOR YOU SECTION ========== */}
         <View style={[styles.section, { marginBottom: isWeb ? 40 : 100 }]}>
-          <View style={[styles.justForYouHeader, isWeb && { paddingHorizontal: responsivePadding }]}>
+          <View
+            style={[
+              styles.justForYouHeader,
+              isWeb && { paddingHorizontal: responsivePadding },
+            ]}
+          >
             <MaterialIcons name="star" size={20} color="#2563eb" />
             <Text style={styles.sectionTitle}>Dành cho bạn</Text>
           </View>
@@ -715,13 +779,20 @@ const HomeScreen = () => {
             numColumns={justForYouColumns}
             keyExtractor={(item) => String(item.id)}
             scrollEnabled={false}
-            columnWrapperStyle={isWeb ? {
-              paddingHorizontal: responsivePadding,
-              gap: 16,
-            } : undefined}
+            columnWrapperStyle={
+              isWeb
+                ? {
+                    paddingHorizontal: responsivePadding,
+                    gap: 16,
+                  }
+                : undefined
+            }
             renderItem={({ item }) => {
               const cardWidth = isWeb
-                ? (windowWidth - responsivePadding * 2 - 16 * (justForYouColumns - 1)) / justForYouColumns
+                ? (windowWidth -
+                    responsivePadding * 2 -
+                    16 * (justForYouColumns - 1)) /
+                  justForYouColumns
                 : (width - 44) / 2;
               return (
                 <TouchableOpacity
@@ -731,15 +802,20 @@ const HomeScreen = () => {
                       flex: 1,
                       maxWidth: cardWidth,
                       marginBottom: 16,
-                    }
+                    },
                   ]}
                   onPress={() => router.push(`/(shop)/product/${item.id}`)}
                 >
                   <Image
-                    source={{ uri: item.images?.[0] || item.image || "https://via.placeholder.com/400" }}
+                    source={{
+                      uri:
+                        item.images?.[0] ||
+                        item.image ||
+                        "https://via.placeholder.com/400",
+                    }}
                     style={[
                       styles.justForYouImage,
-                      isWeb && { height: cardWidth * 0.8 }
+                      isWeb && { height: cardWidth * 0.8 },
                     ]}
                     resizeMode="cover"
                   />
@@ -755,16 +831,24 @@ const HomeScreen = () => {
                 </TouchableOpacity>
               );
             }}
-            contentContainerStyle={!isWeb ? {
-              paddingHorizontal: 16,
-              gap: 12,
-            } : undefined}
+            contentContainerStyle={
+              !isWeb
+                ? {
+                    paddingHorizontal: 16,
+                    gap: 12,
+                  }
+                : undefined
+            }
             style={isWeb ? { flex: 1 } : undefined}
           />
 
           {/* Vòng quay tải thêm nằm dưới lưới Just for you */}
           {isLoadingMore.current && (
-            <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 20 }} />
+            <ActivityIndicator
+              size="large"
+              color="#2563eb"
+              style={{ marginTop: 20 }}
+            />
           )}
         </View>
       </ScrollView>
@@ -1149,24 +1233,24 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#1f2937",
   },
-  
+
   // Nút Hỗ trợ khách hàng (FAB)
   fabSupport: {
-    position: 'absolute',
-    bottom: Platform.OS === 'web' ? 100 : 156, // Nằm trên nút Chat AI (nếu có)
+    position: "absolute",
+    bottom: Platform.OS === "web" ? 180 : 156, // Nằm trên nút Chat AI (nếu có)
     right: 24,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#10B981', // Màu xanh ngọc
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
+    backgroundColor: "#10B981", // Màu xanh ngọc
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 8,
-    zIndex: 9998,
+    zIndex: 10000,
   },
 });
 

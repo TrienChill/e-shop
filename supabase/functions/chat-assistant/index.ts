@@ -95,7 +95,7 @@ serve(async (req: any) => {
 
     // --- RAG STEP 3: Gemini Chat response ---
     console.log("[STEP 3] Generating response...");
-    const systemPrompt = `Ban la Stylist ao cua cua hang thoi trang TrienChill.
+    const systemPrompt = `Ban la Stylist ao cua cua hang thoi trang E-Shop.
 Hay tu van cho khach dua TREN NGU CANH SAU DAY:
 
 DANH SACH SAN PHAM:
