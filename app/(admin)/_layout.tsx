@@ -152,7 +152,7 @@ function AdminLayoutWeb() {
               <Pressable
                 style={styles.profileLeft}
                 onPress={() => router.push('/(admin)/profile' as any)}
-                className="web:hover:opacity-80"
+                className="transition-colors duration-200 rounded-lg p-1 web:hover:bg-gray-100"
               >
                 <View style={[
                   styles.avatarCircle,
@@ -168,9 +168,12 @@ function AdminLayoutWeb() {
                 </View>
               </Pressable>
               <Pressable
-                style={[styles.settingsIconBtn, isSettingsActive && { backgroundColor: hexToRgba(primaryColor, 0.15) }]}
+                style={[
+                  styles.settingsIconBtn, 
+                  isSettingsActive && { backgroundColor: hexToRgba(primaryColor, 0.15) },
+                ]}
                 onPress={() => router.push('/(admin)/settings' as any)}
-                className="web:hover:bg-white/10"
+                className="transition-colors duration-200 web:hover:bg-gray-100"
               >
                 <SlidersHorizontal size={16} color={isSettingsActive ? primaryColor : '#6B7280'} />
               </Pressable>
@@ -179,7 +182,7 @@ function AdminLayoutWeb() {
           <Pressable 
             style={styles.footerLink} 
             onPress={() => signOut()}
-            className="web:hover:bg-white/5 py-2 px-2 rounded-lg transition-colors"
+            className="py-2 px-3 rounded-lg transition-all duration-200 web:hover:bg-gray-100"
           >
             <LogOut size={18} color="#9CA3AF" />
             <Text style={styles.footerLinkText}>Đăng xuất</Text>
@@ -193,7 +196,7 @@ function AdminLayoutWeb() {
               }
               router.replace("/(shop)/(tabs)");
             }}
-            className="web:hover:bg-white/5 py-2 px-2 rounded-lg transition-colors"
+            className="py-2 px-3 rounded-lg transition-all duration-200 web:hover:bg-gray-100"
           >
             <Store size={18} color="#9CA3AF" />
             <Text style={styles.footerLinkText}>Về cửa hàng</Text>
@@ -215,18 +218,31 @@ function SidebarLink({
 }: {
   href: string; label: string; icon: any; active: boolean; primaryColor: string;
 }) {
+  const [isHovered, setIsHovered] = React.useState(false);
+
   return (
     <Link href={href as any} asChild>
       <Pressable 
+        onHoverIn={() => setIsHovered(true)}
+        onHoverOut={() => setIsHovered(false)}
         style={StyleSheet.flatten([
           styles.menuItem, 
           active && styles.menuItemActive,
-          // active && { borderLeftColor: primaryColor } // Optional: Use primary color for accent
+          active && { borderLeftColor: primaryColor, backgroundColor: hexToRgba(primaryColor, 0.04) },
+          isHovered && !active && { backgroundColor: "#F3F4F6", borderLeftColor: "#E5E7EB" }
         ])}
-        className="web:hover:bg-gray-50 transition-colors duration-200"
+        className="transition-all duration-200 web:hover:translate-x-1"
       >
-        <Icon size={18} color={active ? "#111827" : "#6B7280"} strokeWidth={active ? 2.5 : 2} />
-        <Text style={StyleSheet.flatten([styles.menuItemText, active && styles.menuItemTextActive])}>
+        <Icon 
+          size={18} 
+          color={active ? primaryColor : (isHovered ? "#374151" : "#6B7280")} 
+          strokeWidth={active ? 2.5 : 2} 
+        />
+        <Text style={[
+          styles.menuItemText, 
+          active && { color: primaryColor, fontWeight: "700" },
+          isHovered && !active && { color: "#111827" }
+        ]}>
           {label}
         </Text>
       </Pressable>
