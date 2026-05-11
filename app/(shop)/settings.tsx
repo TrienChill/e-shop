@@ -2,16 +2,15 @@ import { useAuth } from "@/src/auth/AuthContext";
 import CommonHeader from "@/src/components/layout/Header";
 import { supabase } from "@/src/lib/supabase";
 import { router, usePathname } from "expo-router";
-import { 
-  ArrowLeft, 
-  User, 
-  MapPin, 
-  CreditCard, 
-  LogOut, 
-  Globe, 
-  Info, 
+import {
+  ArrowLeft,
+  ChevronRight,
+  Globe,
+  Info,
+  LogOut,
+  MapPin,
   Shield,
-  ChevronRight 
+  User
 } from "lucide-react-native";
 import React, { useState } from "react";
 import {
@@ -41,13 +40,13 @@ interface NavItem {
   isDestructive?: boolean;
 }
 
-const SettingsSidebar = ({ 
-  activeKey, 
+const SettingsSidebar = ({
+  activeKey,
   onSelect,
   onLogout,
-  isAdmin 
-}: { 
-  activeKey: string; 
+  isAdmin
+}: {
+  activeKey: string;
   onSelect: (key: string) => void;
   onLogout: () => void;
   isAdmin: boolean;
@@ -57,14 +56,13 @@ const SettingsSidebar = ({
   const navItems: NavItem[] = [
     { key: "profile", label: "Hồ sơ", icon: User, group: "Cá nhân", onPress: () => router.push("/edit-profile") },
     { key: "address", label: "Địa chỉ nhận hàng", icon: MapPin, group: "Cá nhân", onPress: () => router.push("/edit-address") },
-    { key: "payment", label: "Phương thức thanh toán", icon: CreditCard, group: "Cá nhân", onPress: () => router.push("/payment-methods") },
     { key: "language", label: "Ngôn ngữ", icon: Globe, group: "Tài khoản" },
     { key: "about", label: "Về E-Shop", icon: Info, group: "Tài khoản" },
-    ...(isAdmin ? [{ 
-      key: "admin", 
-      label: "Trang quản trị", 
-      icon: Shield, 
-      group: "Tài khoản", 
+    ...(isAdmin ? [{
+      key: "admin",
+      label: "Trang quản trị",
+      icon: Shield,
+      group: "Tài khoản",
       onPress: () => {
         if (typeof window !== 'undefined' && window.localStorage) {
           window.localStorage.setItem("admin_mode", "admin");
@@ -134,7 +132,7 @@ const WebSettingsContent = ({ onLogout, isAdmin }: { onLogout: () => void; isAdm
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView 
+    <ScrollView
       style={webContentStyles.contentArea}
       contentContainerStyle={[webContentStyles.contentInner, { paddingTop: insets.top + 24 }]}
       showsVerticalScrollIndicator={false}
@@ -160,18 +158,12 @@ const WebSettingsContent = ({ onLogout, isAdmin }: { onLogout: () => void; isAdm
             <Text style={webContentStyles.quickLinkDesc}>Quản lý địa chỉ giao hàng</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={webContentStyles.quickLinkCard} onPress={() => router.push("/payment-methods")}>
-            <View style={webContentStyles.quickLinkIcon}>
-              <CreditCard size={24} color="#0055FF" />
-            </View>
-            <Text style={webContentStyles.quickLinkTitle}>Thanh toán</Text>
-            <Text style={webContentStyles.quickLinkDesc}>Phương thức thanh toán</Text>
-          </TouchableOpacity>
+
         </View>
 
         <View style={webContentStyles.accountSection}>
           <Text style={webContentStyles.sectionTitle}>Tài khoản</Text>
-          
+
           <TouchableOpacity style={webContentStyles.accountItem}>
             <View style={webContentStyles.accountItemLeft}>
               <Globe size={20} color="#6B7280" />
@@ -183,7 +175,7 @@ const WebSettingsContent = ({ onLogout, isAdmin }: { onLogout: () => void; isAdm
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={webContentStyles.accountItem}>
+          <TouchableOpacity style={webContentStyles.accountItem} onPress={() => router.push("/(shop)/about")}>
             <View style={webContentStyles.accountItemLeft}>
               <Info size={20} color="#6B7280" />
               <Text style={webContentStyles.accountItemLabel}>Về E-Shop</Text>
@@ -192,7 +184,7 @@ const WebSettingsContent = ({ onLogout, isAdmin }: { onLogout: () => void; isAdm
           </TouchableOpacity>
 
           {isAdmin && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={webContentStyles.accountItem}
               onPress={() => {
                 if (typeof window !== 'undefined' && window.localStorage) {
@@ -288,9 +280,9 @@ const SettingsScreen = () => {
       <View style={webStyles.container}>
         <StatusBar barStyle="dark-content" />
         <View style={webStyles.layout}>
-          <SettingsSidebar 
-            activeKey={activeNav} 
-            onSelect={setActiveNav} 
+          <SettingsSidebar
+            activeKey={activeNav}
+            onSelect={setActiveNav}
             onLogout={logout}
             isAdmin={isAdminOrStaff}
           />
@@ -331,34 +323,29 @@ const SettingsScreen = () => {
             label="Địa chỉ nhận hàng"
             onPress={() => router.push("/edit-address")}
           />
-          <SettingItem
-            label="Phương thức thanh toán"
-            onPress={() => router.push("/payment-methods")}
-          />
+
         </View>
 
         <SectionHeader title="Tài khoản" />
         <View style={styles.sectionContainer}>
           {isAdminOrStaff && (
-            <SettingItem 
-              label="Trang quản trị (Admin)" 
+            <SettingItem
+              label="Trang quản trị (Admin)"
               onPress={() => {
                 if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
                   window.localStorage.setItem("admin_mode", "admin");
                 }
                 router.push("/(admin)/dashboard");
-              }} 
+              }}
             />
           )}
           <SettingItem label="Ngôn ngữ" value="Tiếng Việt" onPress={() => { }} />
-          <SettingItem label="Về E-Shop" onPress={() => { }} />
+          <SettingItem label="Về E-Shop" onPress={() => router.push("/(shop)/about")} />
           <SettingItem label="Đăng xuất" onPress={logout} />
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.deleteBtn} activeOpacity={0.6}>
-            <Text style={styles.deleteText}>Xóa tài khoản của tôi</Text>
-          </TouchableOpacity>
+
 
           <View style={styles.versionInfo}>
             <Text style={styles.brandName}>{appName}</Text>
