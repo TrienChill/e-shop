@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system";
 import { EncodingType, readAsStringAsync } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -56,6 +57,9 @@ let globalResultUrl: string = "";
 let globalErrorMsg: string = "";
 let globalPersonImage: any = null;
 let globalClothImage: string = "";
+let globalProductId: string = "";
+let globalProductName: string = "";
+let globalSelectedColor: string = "";
 
 let setMountedState: React.Dispatch<React.SetStateAction<TryOnState>> | null = null;
 let setMountedResultUrl: React.Dispatch<React.SetStateAction<string>> | null = null;
@@ -63,9 +67,11 @@ let setMountedErrorMsg: React.Dispatch<React.SetStateAction<string>> | null = nu
 // ----------------------------------
 
 export default function VirtualTryOnScreen() {
-  const { productImageUrl, selectedColor } = useLocalSearchParams<{
+  const { productImageUrl, selectedColor, productId, productName } = useLocalSearchParams<{
     productImageUrl?: string;
     selectedColor?: string;
+    productId?: string;
+    productName?: string;
   }>();
   const router = useRouter();
 
@@ -92,6 +98,23 @@ export default function VirtualTryOnScreen() {
     if (setMountedState) setMountedState(newState);
     if (setMountedResultUrl) setMountedResultUrl(url);
     if (setMountedErrorMsg) setMountedErrorMsg(error);
+
+    // Lưu vào lịch sử khi có kết quả
+    if (newState === "result" && url && globalClothImage) {
+      AsyncStorage.getItem("tryOnHistory").then((existing) => {
+        const history = existing ? JSON.parse(existing) : [];
+        history.unshift({
+          id: Date.now().toString(),
+          productImageUrl: globalClothImage,
+          resultUrl: url,
+          productId: globalProductId,
+          productName: globalProductName,
+          selectedColor: globalSelectedColor,
+        });
+        // Giữ 20 ảnh gần nhất
+        AsyncStorage.setItem("tryOnHistory", JSON.stringify(history.slice(0, 20)));
+      }).catch(e => console.error("Lỗi lưu lịch sử thử đồ:", e));
+    }
   };
 
   useEffect(() => {
@@ -102,6 +125,9 @@ export default function VirtualTryOnScreen() {
     // Reset nếu vào thử sản phẩm mới khác sản phẩm cũ
     if (productImageUrl && productImageUrl !== globalClothImage && globalTryOnState !== "loading") {
       globalClothImage = productImageUrl;
+      globalProductId = productId || "";
+      globalProductName = productName || "";
+      globalSelectedColor = selectedColor || "";
       updateGlobalAndLocal("idle", "", "");
       setClothImage(productImageUrl);
     }

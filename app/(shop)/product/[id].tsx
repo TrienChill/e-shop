@@ -360,6 +360,8 @@ export default function ProductDetailScreen() {
       params: {
         productImageUrl: productImageForTryOn,
         selectedColor: selectedColor || "",
+        productId: id as string,
+        productName: product?.name || "",
       },
     });
   };
@@ -387,6 +389,8 @@ export default function ProductDetailScreen() {
           params: {
             productImageUrl: productImageForTryOn,
             selectedColor: color,
+            productId: id as string,
+            productName: product?.name || "",
           },
         });
       }

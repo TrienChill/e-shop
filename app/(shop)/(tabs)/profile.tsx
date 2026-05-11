@@ -271,6 +271,23 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* Lịch sử Thử đồ ảo */}
+        <TouchableOpacity 
+          style={[styles.announcementCard, { backgroundColor: "#EEF2FF", marginBottom: 32 }]} 
+          activeOpacity={0.9}
+          onPress={() => router.push("/(shop)/try-on-history")}
+        >
+          <View style={styles.announcementTextContainer}>
+            <Text style={[styles.announcementTitle, { color: "#312E81" }]}>Sản phẩm đã thử đồ</Text>
+            <Text style={[styles.announcementDesc, { color: "#4F46E5" }]}>
+              Xem lại những bức ảnh phối đồ thời trang tuyệt đẹp của bạn!
+            </Text>
+          </View>
+          <View style={[styles.arrowButton, { backgroundColor: "#4F46E5" }]}>
+            <ArrowRight size={20} color="white" strokeWidth={3} />
+          </View>
+        </TouchableOpacity>
+
         {/* Danh sách sản phẩm đã xem gần đây (Lấy 5 cái từ state recentViews đọc từ bảng mới) */}
         <RecentlyViewedSection
           items={recentViews}
