@@ -2,7 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -205,7 +204,7 @@ const RegisterScreen = () => {
 
       startResendCooldown();
       setStep('otp');
-    } catch (e) {
+    } catch {
       setErrorMsg('Đã xảy ra lỗi. Vui lòng thử lại.');
     } finally {
       setLoading(false);
@@ -234,7 +233,7 @@ const RegisterScreen = () => {
       }
 
       setStep('success');
-    } catch (e) {
+    } catch {
       setErrorMsg('Đã xảy ra lỗi khi xác thực. Vui lòng thử lại.');
     } finally {
       setLoading(false);

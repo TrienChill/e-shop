@@ -71,7 +71,7 @@ export default function ForgotPasswordScreen() {
       }
 
       setStep('sent');
-    } catch (e) {
+    } catch {
       setErrorMsg('Đã xảy ra lỗi. Vui lòng thử lại.');
     } finally {
       setLoading(false);

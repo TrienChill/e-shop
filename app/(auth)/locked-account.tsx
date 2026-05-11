@@ -1,5 +1,5 @@
 import { supabase } from "@/src/lib/supabase";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,13 +12,16 @@ import {
 } from "react-native";
 
 export default function LockedAccountScreen() {
-  const [lockReason, setLockReason] = useState<string | null>(null);
-  const [lockedAt, setLockedAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const params = useLocalSearchParams<{ reason?: string; locked_at?: string }>();
+  const [lockReason, setLockReason] = useState<string | null>(params.reason || null);
+  const [lockedAt, setLockedAt] = useState<string | null>(params.locked_at || null);
+  const [loading, setLoading] = useState(!params.reason);
 
   useEffect(() => {
-    fetchLockInfo();
-  }, []);
+    if (!params.reason) {
+      fetchLockInfo();
+    }
+  }, [params.reason]);
 
   const fetchLockInfo = async () => {
     try {
@@ -190,7 +193,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#dc2626",
     justifyContent: "center",
     alignItems: "center",
-    boxShadow: "0 8px 16px rgba(220, 38, 38, 0.3)",
+    shadowColor: "#dc2626",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
     elevation: 8,
   },
   lockIcon: {
@@ -242,7 +248,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 20,
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
     borderColor: "#f3f4f6",
