@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import { exportProductsToExcel } from "@/src/utils/excel";
 import ImportExcelModal from "@/src/components/admin/ImportExcelModal";
@@ -177,6 +178,11 @@ export default function AdminProductsScreen() {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  useSupabaseRealtime({
+    table: "products",
+    onUpdate: fetchProducts,
+  });
 
   const toggleActiveStatus = async (id: number, currentStatus: boolean) => {
     const confirmMessage = currentStatus

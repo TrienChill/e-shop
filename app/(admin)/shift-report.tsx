@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useAuth } from "@/src/auth/AuthContext";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import { supabase } from "@/src/lib/supabase";
@@ -79,6 +80,11 @@ export default function ShiftReportScreen() {
       fetchShiftData(selectedDate);
     }
   }, [selectedDate, authLoading, session]);
+
+  useSupabaseRealtime({
+    table: "orders",
+    onUpdate: () => fetchShiftData(selectedDate),
+  });
 
   if (authLoading) {
     return (

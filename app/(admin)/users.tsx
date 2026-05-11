@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import {
   CheckCircle2,
@@ -149,6 +150,11 @@ export default function AdminUserManagementScreen() {
     }
     fetchUsers();
   }, [role, authLoading]);
+
+  useSupabaseRealtime({
+    table: "profiles",
+    onUpdate: fetchUsers,
+  });
 
   // ─── Filter & Search ─────────────────────────────────────────────────────────
 

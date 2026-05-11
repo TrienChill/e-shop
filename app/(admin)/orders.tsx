@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import {
   InvoiceOrderData,
@@ -248,6 +249,11 @@ export default function AdminOrdersScreen() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  useSupabaseRealtime({
+    table: "orders",
+    onUpdate: fetchOrders,
+  });
 
   /**
    * Đẩy đơn lên GHN và cập nhật trạng thái.

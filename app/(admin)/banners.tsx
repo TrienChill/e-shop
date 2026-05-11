@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import {
   Banner,
@@ -82,6 +83,7 @@ export default function AdminBannersScreen() {
     fetchDropdownData();
   }, []);
 
+
   const fetchBanners = async () => {
     setLoading(true);
     try {
@@ -93,6 +95,11 @@ export default function AdminBannersScreen() {
       setLoading(false);
     }
   };
+
+  useSupabaseRealtime({
+    table: "banners",
+    onUpdate: fetchBanners,
+  });
 
   const fetchDropdownData = async () => {
     try {

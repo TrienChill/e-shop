@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useAuth } from "@/src/auth/AuthContext";
 import Echarts from "@/src/components/admin/EchartsWrapper";
 import {
@@ -324,6 +325,11 @@ export default function AdminRevenueScreen() {
   useEffect(() => {
     handleFilterChange(filter.startDate, filter.endDate, compareMode);
   }, [filter.startDate, filter.endDate, compareMode, handleFilterChange]);
+
+  useSupabaseRealtime({
+    table: "orders",
+    onUpdate: () => handleFilterChange(filter.startDate, filter.endDate, compareMode),
+  });
 
   // ── Export state ──
   const [exporting, setExporting] = useState(false);

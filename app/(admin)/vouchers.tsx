@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { useAuth } from "@/src/auth/AuthContext";
 import { AdminDataWrapper } from "@/src/components/admin/AdminDataWrapper";
 import AdminProductDiscountModal from "@/src/components/admin/AdminProductDiscountModal";
@@ -94,6 +95,11 @@ export default function AdminVouchersScreen() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useSupabaseRealtime({
+    table: "vouchers",
+    onUpdate: refresh,
+  });
 
   // Handler Vouchers
   const handleSaveVoucher = async (data: Partial<VoucherRow>) => {

@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import {
   MembershipLevel,
@@ -147,6 +148,11 @@ export default function AdminMembershipScreen() {
     }
     fetchLevels();
   }, [fetchLevels, role, authLoading]);
+
+  useSupabaseRealtime({
+    table: "membership_levels",
+    onUpdate: fetchLevels,
+  });
 
   // Fetch members for a specific level
   const fetchMembers = useCallback(async (levelId: string) => {

@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import { supabase } from "@/src/lib/supabase";
 import {
   approveReturn,
@@ -99,6 +100,11 @@ export default function AdminReturnsScreen() {
   useEffect(() => {
     fetchReturns();
   }, [activeTab]);
+
+  useSupabaseRealtime({
+    table: "returns",
+    onUpdate: fetchReturns,
+  });
 
   const handleAction = async (ret: any, actionKey: string) => {
     setProcessingId(ret.id);

@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -525,6 +526,11 @@ export default function AdminCategoriesScreen() {
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  useSupabaseRealtime({
+    table: "categories",
+    onUpdate: loadCategories,
+  });
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => {

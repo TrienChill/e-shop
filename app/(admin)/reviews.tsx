@@ -1,3 +1,4 @@
+import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import React, { useEffect, useState } from "react";
 import {
   View,
@@ -68,6 +69,11 @@ export default function AdminReviewsScreen() {
   useEffect(() => {
     loadReviews();
   }, [page, ratingFilter, visibleFilter]);
+
+  useSupabaseRealtime({
+    table: "reviews",
+    onUpdate: loadReviews,
+  });
 
   // Handle Actions
   const handleToggleVisibility = async (review: AdminReview) => {
