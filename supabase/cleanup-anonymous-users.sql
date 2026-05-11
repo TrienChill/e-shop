@@ -1,42 +1,72 @@
 -- =====================================================================
--- CRON JOB: Dọn dẹp Anonymous Users rác
--- Chạy trên Supabase Dashboard → SQL Editor
+-- PRODUCTION CLEANUP: Dọn dẹp Anonymous Users rác (Version 2)
+-- Đã sửa: xóa đúng thứ tự để tránh lỗi Foreign Key Constraint
 -- =====================================================================
 
--- 1. Bật extension pg_cron (chỉ cần chạy 1 lần)
-CREATE EXTENSION IF NOT EXISTS pg_cron;
+-- CÁCH 1: Chạy thủ công trên SQL Editor (Free Plan)
+-- ─────────────────────────────────────────────────────────────────────
 
--- 2. Tạo lịch dọn dẹp: mỗi Chủ nhật lúc 3:00 AM UTC
--- Xóa tất cả anonymous users:
---   - Được tạo quá 7 ngày trước
---   - KHÔNG có bất kỳ đơn hàng nào trong bảng orders
--- Khi user bị xóa, profile sẽ tự xóa theo nhờ ON DELETE CASCADE
+DO $$
+DECLARE
+  anon_ids UUID[];
+BEGIN
+  -- Lấy danh sách anonymous users cần xóa
+  SELECT ARRAY_AGG(id) INTO anon_ids
+  FROM auth.users
+  WHERE is_anonymous = true
+    AND created_at < NOW() - INTERVAL '7 days'
+    AND id NOT IN (
+      SELECT DISTINCT user_id 
+      FROM public.orders 
+      WHERE user_id IS NOT NULL
+    );
 
-SELECT cron.schedule(
-  'cleanup-anonymous-users',    -- Tên job
-  '0 3 * * 0',                  -- Cron: mỗi Chủ nhật 3:00 AM UTC
-  $$
-    DELETE FROM auth.users
-    WHERE is_anonymous = true
-      AND created_at < NOW() - INTERVAL '7 days'
-      AND id NOT IN (
-        SELECT DISTINCT user_id 
-        FROM public.orders 
-        WHERE user_id IS NOT NULL
-      );
-  $$
-);
+  IF anon_ids IS NULL OR array_length(anon_ids, 1) = 0 THEN
+    RAISE NOTICE 'Không có anonymous user nào cần xóa.';
+    RETURN;
+  END IF;
 
--- 3. Kiểm tra job đã được tạo chưa
-SELECT * FROM cron.job;
+  RAISE NOTICE 'Đang xóa % anonymous users...', array_length(anon_ids, 1);
 
--- 4. Xem lịch sử chạy job (sau khi đã chạy ít nhất 1 lần)
--- SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 20;
+  -- Bước 1: Xóa user_addresses
+  DELETE FROM public.user_addresses WHERE user_id = ANY(anon_ids);
+  
+  -- Bước 2: Xóa profiles
+  DELETE FROM public.profiles WHERE id = ANY(anon_ids);
+  
+  -- Bước 3: Xóa auth.users (sau khi đã xóa dữ liệu phụ thuộc)
+  DELETE FROM auth.users WHERE id = ANY(anon_ids);
+
+  RAISE NOTICE 'Đã xóa xong % anonymous users.', array_length(anon_ids, 1);
+END $$;
 
 -- =====================================================================
--- GHI CHÚ:
--- - pg_cron yêu cầu Supabase Pro plan trở lên
--- - Nếu dùng Free plan, có thể dùng Edge Function với cron trigger:
---   https://supabase.com/docs/guides/functions/schedule-functions
--- - Hoặc chạy thủ công câu DELETE ở trên mỗi tuần
--- =====================================================================
+-- CÁCH 2: Dùng pg_cron (Pro Plan trở lên)
+-- ─────────────────────────────────────────────────────────────────────
+
+-- Bật extension
+-- CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- Tạo cron job
+-- SELECT cron.schedule(
+--   'cleanup-anonymous-users-v2',
+--   '0 3 * * 0',  -- Mỗi Chủ nhật 3:00 AM UTC
+--   $$
+--     DO $inner$
+--     DECLARE anon_ids UUID[];
+--     BEGIN
+--       SELECT ARRAY_AGG(id) INTO anon_ids
+--       FROM auth.users
+--       WHERE is_anonymous = true
+--         AND created_at < NOW() - INTERVAL '7 days'
+--         AND id NOT IN (
+--           SELECT DISTINCT user_id FROM public.orders WHERE user_id IS NOT NULL
+--         );
+--       IF anon_ids IS NOT NULL THEN
+--         DELETE FROM public.user_addresses WHERE user_id = ANY(anon_ids);
+--         DELETE FROM public.profiles WHERE id = ANY(anon_ids);
+--         DELETE FROM auth.users WHERE id = ANY(anon_ids);
+--       END IF;
+--     END $inner$;
+--   $$
+-- );
