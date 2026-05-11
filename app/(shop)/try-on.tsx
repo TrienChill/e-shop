@@ -32,7 +32,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const API_URL = process.env.EXPO_PUBLIC_TRYON_API_URL || "";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
+const CONTENT_MAX_WIDTH = 600;
+const ACTUAL_WIDTH = Math.min(SCREEN_WIDTH, CONTENT_MAX_WIDTH);
+const IMAGE_BOX_SIZE = (ACTUAL_WIDTH - 48) / 2;
 
 // Màu sắc tiếng Việt
 const colorTranslations: Record<string, string> = {
@@ -512,6 +514,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
   },
   imageRow: {
     flexDirection: "row",
@@ -524,6 +529,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   personBox: {
     borderWidth: 2,
@@ -575,6 +585,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 24,
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   primaryButtonDisabled: {
     backgroundColor: "#D1D5DB",
@@ -614,10 +629,15 @@ const styles = StyleSheet.create({
   },
   resultImage: {
     width: "100%",
-    height: SCREEN_WIDTH * 1.2,
+    height: ACTUAL_WIDTH * 1.2,
     backgroundColor: "#E5E7EB",
     borderRadius: 16,
     marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
   resultActions: {
     flexDirection: "row",
