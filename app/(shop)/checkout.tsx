@@ -878,19 +878,26 @@ export default function CheckoutScreen() {
 
       // ── Update profile & address for anonymous user ────────────────────────────
       if (isGuest && currentUser) {
-        // Cập nhật profile: ghi tên, SĐT, email vào bảng profiles
-        await supabase
+        // Dùng upsert thay vì update để an toàn hơn:
+        // - Nếu profile đã tồn tại (do trigger handle_new_user) → UPDATE
+        // - Nếu chưa tồn tại → INSERT
+        // LƯU Ý: Bảng profiles không có cột email, chỉ có full_name và phone
+        const { error: profileError } = await supabase
           .from("profiles")
-          .update({
+          .upsert({
+            id: currentUser.id,
             full_name: customerName.trim(),
             phone: customerPhone.trim(),
-            email: customerEmail.trim() || null,
-          })
-          .eq("id", currentUser.id);
+            role: "user",
+          }, { onConflict: "id" });
+
+        if (profileError) {
+          console.warn("Lỗi upsert profile anonymous:", profileError.message);
+        }
 
         // Tạo địa chỉ giao hàng cho anonymous user
         if (guestFullAddress || customerAddress.trim()) {
-          await supabase.from("user_addresses").insert({
+          const { error: addrError } = await supabase.from("user_addresses").insert({
             user_id: currentUser.id,
             receiver_name: customerName.trim(),
             phone_number: customerPhone.trim(),
@@ -898,10 +905,13 @@ export default function CheckoutScreen() {
             district: guestFullAddress?.district || "",
             ward_commune: guestFullAddress?.ward || "",
             street_address: guestFullAddress?.street || customerAddress.trim(),
-            ghn_district_id: guestDistrictId,
-            ghn_ward_code: guestWardCode,
+            ghn_district_id: guestDistrictId ? Number(guestDistrictId) : null,
+            ghn_ward_code: guestWardCode || null,
             is_default: true,
           });
+          if (addrError) {
+            console.warn("Lỗi tạo địa chỉ anonymous:", addrError.message);
+          }
         }
       }
 

@@ -51,16 +51,16 @@ const OTPInput: React.FC<OTPInputProps> = ({ length = 6, value, onChange }) => {
   const handleChange = (text: string, index: number) => {
     const clean = text.replace(/[^0-9]/g, '');
     if (clean.length > 1) {
-      // Handle paste
-      const newVal = (value + clean).slice(0, length);
+      // Handle paste: thay thế từ vị trí index, không gộp vào value cũ
+      const newVal = clean.slice(0, length);
       onChange(newVal);
       const nextIndex = Math.min(newVal.length, length - 1);
       inputs.current[nextIndex]?.focus();
       return;
     }
-    const arr = value.split('');
+    const arr = value.padEnd(length, '').split('');
     arr[index] = clean;
-    const newVal = arr.join('').slice(0, length);
+    const newVal = arr.join('').slice(0, length).replace(/ /g, '');
     onChange(newVal);
     if (clean && index < length - 1) {
       inputs.current[index + 1]?.focus();
@@ -68,19 +68,27 @@ const OTPInput: React.FC<OTPInputProps> = ({ length = 6, value, onChange }) => {
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    if (e.nativeEvent.key === 'Backspace' && !value[index] && index > 0) {
-      inputs.current[index - 1]?.focus();
-      const arr = value.split('');
-      arr[index - 1] = '';
-      onChange(arr.join(''));
+    if (e.nativeEvent.key === 'Backspace') {
+      if (!value[index] && index > 0) {
+        inputs.current[index - 1]?.focus();
+        const arr = value.padEnd(length, '').split('');
+        arr[index - 1] = '';
+        onChange(arr.join('').trimEnd());
+      } else {
+        const arr = value.padEnd(length, '').split('');
+        arr[index] = '';
+        onChange(arr.join('').trimEnd());
+      }
     }
   };
 
   return (
     <View style={otpStyles.row}>
       {Array.from({ length }).map((_, i) => (
-        <View
+        <TouchableOpacity
           key={i}
+          activeOpacity={1}
+          onPress={() => inputs.current[i]?.focus()}
           style={[
             otpStyles.box,
             value[i] ? otpStyles.boxFilled : null,
@@ -95,9 +103,10 @@ const OTPInput: React.FC<OTPInputProps> = ({ length = 6, value, onChange }) => {
             onChangeText={(t) => handleChange(t, i)}
             onKeyPress={(e) => handleKeyPress(e, i)}
             selectTextOnFocus
-            caretHidden
+            caretHidden={false}
+            autoFocus={i === 0}
           />
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -119,6 +128,7 @@ const otpStyles = StyleSheet.create({
     borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   boxFilled: {
     borderColor: '#6C63FF',
@@ -127,9 +137,11 @@ const otpStyles = StyleSheet.create({
   boxText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: '#1F2937',       // ← Sửa từ '#FFFFFF' (trắng ẩn) thành màu tối
     textAlign: 'center',
     width: '100%',
+    height: '100%',
+    padding: 0,
   },
 });
 
@@ -150,6 +162,8 @@ const RegisterScreen = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  // Track xem đang link anonymous account hay đăng ký mới
+  const [isLinkingAnonymous, setIsLinkingAnonymous] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const startResendCooldown = () => {
@@ -186,18 +200,28 @@ const RegisterScreen = () => {
 
     setLoading(true);
     try {
-      // Kiểm tra xem có đang ở phiên Anonymous không (đã đặt hàng guest trước đó)
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      const isAnonymous = currentSession?.user?.is_anonymous === true;
+      // Dùng getUser() thay vì getSession() để tự động refresh token hết hạn
+      // getSession() có thể trả về null nếu session hết hạn
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
 
-      if (isAnonymous) {
+      if (userError) {
+        console.log('[Register] getUser error:', userError.message);
+      }
+
+      const isAnonymous = currentUser?.is_anonymous === true;
+      console.log('[Register] currentUser:', currentUser?.id, '| isAnonymous:', isAnonymous);
+
+      if (isAnonymous && currentUser) {
         // ── LINK ACCOUNT: Anonymous → Real ──────────────────────────────────────
         // Dùng updateUser thay vì signUp để giữ nguyên UUID → không mất đơn hàng
-        const { error } = await supabase.auth.updateUser({
+        console.log('[Register] Calling updateUser() for anonymous user:', currentUser.id);
+        const { data: updateData, error } = await supabase.auth.updateUser({
           email: email.trim(),
           password,
           data: { full_name: fullName.trim() },
         });
+
+        console.log('[Register] updateUser result:', JSON.stringify(updateData?.user?.email), '| error:', error?.message);
 
         if (error) {
           setErrorMsg(error.message);
@@ -205,18 +229,20 @@ const RegisterScreen = () => {
           return;
         }
 
-        // Cập nhật profile trong DB
+        // Cập nhật profile: KHÔNG có cột email, role phải là 'user'
         await supabase
           .from("profiles")
           .update({
             full_name: fullName.trim(),
-            email: email.trim(),
-            role: "customer", // Chuyển từ anonymous thành customer
+            role: "user",
           })
-          .eq("id", currentSession.user.id);
+          .eq("id", currentUser.id);
 
-        startResendCooldown();
-        setStep('otp');
+        // Khi "Secure email change" = OFF trong Supabase Settings:
+        // → Supabase tự động xác nhận email cho anonymous user (không cần OTP)
+        // → Chuyển thẳng sang bước thành công
+        console.log('[Register] Anonymous account linked successfully! Skipping OTP.');
+        setStep('success');
       } else {
         // ── ĐĂNG KÝ MỚI BÌNH THƯỜNG ────────────────────────────────────────────
         const { error } = await supabase.auth.signUp({
@@ -253,10 +279,13 @@ const RegisterScreen = () => {
 
     setLoading(true);
     try {
+      // Khi link anonymous account: Supabase gửi email 'email_change', không phải 'signup'
+      // Khi đăng ký mới: Supabase gửi email 'signup'
+      const otpType = isLinkingAnonymous ? 'email_change' : 'signup';
       const { error } = await supabase.auth.verifyOtp({
         email: email.trim(),
         token: otp,
-        type: 'signup',
+        type: otpType,
       });
 
       if (error) {
@@ -278,8 +307,10 @@ const RegisterScreen = () => {
     setLoading(true);
     setErrorMsg('');
     try {
+      // Dùng đúng type tương ứng với flow đang thực hiện
+      const resendType = isLinkingAnonymous ? 'email_change' : 'signup';
       const { error } = await supabase.auth.resend({
-        type: 'signup',
+        type: resendType,
         email: email.trim(),
       });
       if (error) {
