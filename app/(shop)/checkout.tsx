@@ -627,7 +627,39 @@ export default function CheckoutScreen() {
         // ── Fetch Cart (cho cả Guest và User) ─────────────────────────────────
         if (!user) {
           const guestCart = await getGuestCart();
-          setCartItems(guestCart);
+          
+          // Fetch lại thông tin giảm giá mới nhất từ DB
+          const productIds = [...new Set(guestCart.map(item => item.product_id))];
+          let discountMap: Record<string, any> = {};
+          
+          if (productIds.length > 0) {
+            const { data: productsData } = await supabase
+              .from("products")
+              .select(`
+                id, price,
+                product_discounts (
+                  id, discount_type, discount_value, is_active, start_date, end_date
+                )
+              `)
+              .in("id", productIds.map(Number));
+            
+            if (productsData) {
+              for (const p of productsData) {
+                discountMap[String(p.id)] = calculateDiscountedPrice(p);
+              }
+            }
+          }
+
+          const formattedGuestCart = guestCart.map(item => {
+            const freshDiscount = discountMap[item.product_id];
+            return {
+              ...item,
+              price: freshDiscount?.finalPrice ?? item.price,
+              originalPrice: freshDiscount?.originalPrice ?? item.originalPrice ?? item.price,
+              hasDiscount: freshDiscount?.hasDiscount ?? false,
+            };
+          });
+          setCartItems(formattedGuestCart);
         } else {
           const { data: cartData } = await supabase
             .from("cart_items")
@@ -842,6 +874,35 @@ export default function CheckoutScreen() {
         const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
         if (anonError) throw anonError;
         currentUser = anonData.user;
+      }
+
+      // ── Update profile & address for anonymous user ────────────────────────────
+      if (isGuest && currentUser) {
+        // Cập nhật profile: ghi tên, SĐT, email vào bảng profiles
+        await supabase
+          .from("profiles")
+          .update({
+            full_name: customerName.trim(),
+            phone: customerPhone.trim(),
+            email: customerEmail.trim() || null,
+          })
+          .eq("id", currentUser.id);
+
+        // Tạo địa chỉ giao hàng cho anonymous user
+        if (guestFullAddress || customerAddress.trim()) {
+          await supabase.from("user_addresses").insert({
+            user_id: currentUser.id,
+            receiver_name: customerName.trim(),
+            phone_number: customerPhone.trim(),
+            province_city: guestFullAddress?.province || "",
+            district: guestFullAddress?.district || "",
+            ward_commune: guestFullAddress?.ward || "",
+            street_address: guestFullAddress?.street || customerAddress.trim(),
+            ghn_district_id: guestDistrictId,
+            ghn_ward_code: guestWardCode,
+            is_default: true,
+          });
+        }
       }
 
       // ── Build order payload ─────────────────────────────────────────────────────

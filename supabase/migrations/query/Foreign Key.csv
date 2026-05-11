@@ -38,3 +38,4 @@ return_requests,profiles_id,profiles,id,return_requests_profiles_id_fkey
 banner_product_slots,banner_id,banners,id,banner_product_slots_banner_id_fkey
 banner_product_slots,product_id,products,id,banner_product_slots_product_id_fkey
 account_lock_logs,user_id,profiles,id,account_lock_logs_user_id_fkey
+notifications,recipient_id,profiles,id,notifications_recipient_id_fkey

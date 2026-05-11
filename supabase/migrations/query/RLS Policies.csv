@@ -16,14 +16,12 @@ public,cart_items,Users can update own cart items,PERMISSIVE,{public},UPDATE,(au
 public,wishlist,Users can view their own wishlist items,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
 public,wishlist,Users can insert into their own wishlist,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
 public,wishlist,Users can delete from their own wishlist,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,posts,Published posts are publicly readable,PERMISSIVE,{public},SELECT,(is_published = true),null
 public,categories,Categories are publicly readable,PERMISSIVE,{public},SELECT,true,null
 public,products,Enable public read access for products,PERMISSIVE,{public},SELECT,true,null
 public,user_addresses,Users can view own addresses,PERMISSIVE,{public},SELECT,(auth.uid() = user_id),null
 public,user_addresses,Users can insert own addresses,PERMISSIVE,{public},INSERT,null,(auth.uid() = user_id)
 public,user_addresses,Users can update own addresses,PERMISSIVE,{public},UPDATE,(auth.uid() = user_id),(auth.uid() = user_id)
 public,user_addresses,Users can delete own addresses,PERMISSIVE,{public},DELETE,(auth.uid() = user_id),null
-public,shipping_methods,Enable read access for all users,PERMISSIVE,{public},SELECT,true,null
 public,order_items,Users can update their own order items,PERMISSIVE,{public},UPDATE,"(EXISTS ( SELECT 1
    FROM orders
   WHERE ((orders.id = order_items.order_id) AND (orders.user_id = auth.uid()))))","(EXISTS ( SELECT 1
@@ -147,3 +145,40 @@ public,notifications,Admin and staff can insert notifications,PERMISSIVE,{authen
 public,notifications,Admins can delete notifications,PERMISSIVE,{authenticated},DELETE,"(EXISTS ( SELECT 1
    FROM profiles
   WHERE ((profiles.id = auth.uid()) AND (profiles.role = 'admin'::user_role))))",null
+public,conversations,Admin/Staff can view all conversations,PERMISSIVE,{authenticated},SELECT,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,conversations,Users can view only their own conversation,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+public,messages,Admin/Staff can view all messages,PERMISSIVE,{authenticated},SELECT,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,messages,Users can view only their own messages,PERMISSIVE,{authenticated},SELECT,"(EXISTS ( SELECT 1
+   FROM conversations
+  WHERE ((conversations.id = messages.conversation_id) AND (conversations.user_id = auth.uid()))))",null
+public,messages,Select messages policy,PERMISSIVE,{authenticated},SELECT,"((EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role]))))) OR (EXISTS ( SELECT 1
+   FROM conversations
+  WHERE ((conversations.id = messages.conversation_id) AND (conversations.user_id = auth.uid())))))",null
+public,messages,Insert messages policy,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = sender_id)
+public,conversations,Staff can view all conversations,PERMISSIVE,{public},SELECT,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,conversations,Users can create own conversations,PERMISSIVE,{authenticated},INSERT,null,(auth.uid() = user_id)
+public,conversations,Users can update own conversations,PERMISSIVE,{authenticated},UPDATE,(auth.uid() = user_id),null
+public,conversations,Staff can update all conversations,PERMISSIVE,{authenticated},UPDATE,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,messages,Staff can send messages,PERMISSIVE,{authenticated},INSERT,null,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,messages,Staff can update messages,PERMISSIVE,{authenticated},UPDATE,"(EXISTS ( SELECT 1
+   FROM profiles
+  WHERE ((profiles.id = auth.uid()) AND (profiles.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,orders,Staff can insert orders,PERMISSIVE,{authenticated},INSERT,null,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))"
+public,order_items,Staff can manage all order items,PERMISSIVE,{authenticated},ALL,"(EXISTS ( SELECT 1
+   FROM profiles p
+  WHERE ((p.id = auth.uid()) AND (p.role = ANY (ARRAY['admin'::user_role, 'staff'::user_role])))))",null
+public,ai_reports,Admin manages own reports,PERMISSIVE,{public},ALL,(auth.uid() = admin_id),(auth.uid() = admin_id)

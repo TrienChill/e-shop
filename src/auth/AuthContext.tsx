@@ -8,6 +8,7 @@ import {
   isRoleAllowedOnPlatform,
 } from "./authLogger";
 import type { UserRole } from "./types";
+import { getGuestCart, clearGuestCart, type GuestCartItem } from "@/src/services/guestCart";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -251,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       authLogger.authStateChange({
         event: _event,
         userId: session?.user?.id ?? null,
@@ -264,6 +265,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setRoleResolved(true);
         setLoading(false);
       }
+
+      // ── Merge Guest Cart khi đăng nhập thành công ─────────────────────────
+      if (_event === "SIGNED_IN" && session?.user && !session.user.is_anonymous) {
+        try {
+          const guestCart = await getGuestCart();
+          if (guestCart.length > 0) {
+            for (const item of guestCart) {
+              // Kiểm tra xem sản phẩm đã tồn tại trong cart DB chưa
+              const { data: existing } = await supabase
+                .from("cart_items")
+                .select("id, quantity")
+                .eq("user_id", session.user.id)
+                .eq("product_id", item.product_id)
+                .eq("color", item.rawColor || "")
+                .eq("size", item.rawSize || "")
+                .maybeSingle();
+
+              if (existing) {
+                // Trùng → cộng dồn quantity
+                await supabase
+                  .from("cart_items")
+                  .update({ quantity: existing.quantity + item.quantity, is_selected: true })
+                  .eq("id", existing.id);
+              } else {
+                // Chưa có → insert mới
+                await supabase.from("cart_items").insert({
+                  user_id: session.user.id,
+                  product_id: Number(item.product_id),
+                  quantity: item.quantity,
+                  color: item.rawColor || null,
+                  size: item.rawSize || null,
+                  is_selected: true,
+                });
+              }
+            }
+            // Xóa guest cart local sau khi merge thành công
+            await clearGuestCart();
+          }
+        } catch (mergeErr) {
+          console.warn("Lỗi merge guest cart:", mergeErr);
+        }
+      }
+
       setSession(session);
       setSessionInitialized(true);
     });

@@ -123,7 +123,11 @@ export default function TabsLayout() {
           data: { user },
         } = await supabase.auth.getUser();
         if (!user) {
-          setCartCount(0);
+          // Guest: đọc số lượng từ AsyncStorage
+          const { getGuestCart } = await import("@/src/services/guestCart");
+          const guestCart = await getGuestCart();
+          const guestTotal = guestCart.reduce((sum, item) => sum + (item.quantity || 0), 0);
+          setCartCount(guestTotal);
           return;
         }
 

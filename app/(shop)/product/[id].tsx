@@ -427,9 +427,9 @@ export default function ProductDetailScreen() {
         const guestItem = {
           product_id: String(product.id),
           name: product.name,
-          price: product.price,
-          originalPrice: product.price,
-          hasDiscount: false,
+          price: product.finalPrice ?? product.price,
+          originalPrice: product.originalPrice ?? product.price,
+          hasDiscount: product.hasDiscount ?? false,
           quantity: selectedQty,
           image: productImages[activeIndex] || buildImageUrl(product.product_images?.[0]?.url),
           color: COLOR_TRANSLATIONS[selectedColor || ""] || selectedColor || "",

@@ -1,37 +1,40 @@
 function_name,schema_name,return_type,argument_types
 approve_return,public,boolean,"p_return_id bigint, p_admin_id uuid, p_admin_notes text DEFAULT NULL::text"
 array_to_halfvec,public,halfvec,"double precision[], integer, boolean"
+array_to_halfvec,public,halfvec,"numeric[], integer, boolean"
 array_to_halfvec,public,halfvec,"integer[], integer, boolean"
 array_to_halfvec,public,halfvec,"real[], integer, boolean"
-array_to_halfvec,public,halfvec,"numeric[], integer, boolean"
-array_to_sparsevec,public,sparsevec,"integer[], integer, boolean"
-array_to_sparsevec,public,sparsevec,"numeric[], integer, boolean"
-array_to_sparsevec,public,sparsevec,"double precision[], integer, boolean"
 array_to_sparsevec,public,sparsevec,"real[], integer, boolean"
-array_to_vector,public,vector,"integer[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"double precision[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"numeric[], integer, boolean"
+array_to_sparsevec,public,sparsevec,"integer[], integer, boolean"
 array_to_vector,public,vector,"double precision[], integer, boolean"
-array_to_vector,public,vector,"real[], integer, boolean"
+array_to_vector,public,vector,"integer[], integer, boolean"
 array_to_vector,public,vector,"numeric[], integer, boolean"
+array_to_vector,public,vector,"real[], integer, boolean"
 avg,public,halfvec,halfvec
 avg,public,vector,vector
-binary_quantize,public,bit,vector
 binary_quantize,public,bit,halfvec
+binary_quantize,public,bit,vector
 buy_product,public,void,"variant_id uuid, quantity_to_buy integer"
 cancel_return,public,boolean,"p_return_id bigint, p_user_id uuid"
 check_user_lock_status,public,json,p_email text
 collect_voucher,public,boolean,p_voucher_id uuid
 complete_return,public,boolean,"p_return_id bigint, p_admin_id uuid DEFAULT NULL::uuid"
-cosine_distance,public,double precision,"sparsevec, sparsevec"
-cosine_distance,public,double precision,"halfvec, halfvec"
 cosine_distance,public,double precision,"vector, vector"
+cosine_distance,public,double precision,"halfvec, halfvec"
+cosine_distance,public,double precision,"sparsevec, sparsevec"
 create_return_request,public,bigint,"p_order_id bigint, p_user_id uuid, p_request_type character varying DEFAULT 'return'::character varying, p_reason_category return_reason_type DEFAULT 'other'::return_reason_type, p_reason text DEFAULT ''::text, p_description text DEFAULT NULL::text, p_evidence_images text[] DEFAULT '{}'::text[], p_refund_method character varying DEFAULT 'original'::character varying, p_bank_account_name text DEFAULT NULL::text, p_bank_account_number text DEFAULT NULL::text, p_bank_name text DEFAULT NULL::text, p_items jsonb DEFAULT '[]'::jsonb"
+get_admin_ai_reports,public,SETOF ai_reports,
 get_banner_campaign_stats,public,"TABLE(banner_id uuid, banner_title text, slot integer, sold_quantity bigint, revenue numeric)",
 get_dashboard_summary,public,json,
 get_membership_stats,public,"TABLE(level_id uuid, level_name text, member_count bigint, total_spending_sum numeric)",
 get_most_popular_products,public,SETOF products,
+get_order_count_by_status_and_days,public,"TABLE(date_str text, order_count bigint)","p_status text, p_days integer DEFAULT 7"
 get_order_status_distribution,public,"TABLE(status text, count bigint)",
 get_revenue_by_days,public,"TABLE(date_str text, daily_revenue numeric)",p_days integer DEFAULT 7
 get_revenue_last_7_days,public,"TABLE(date_str text, daily_revenue numeric)",
+get_revenue_report,public,json,"p_start_date timestamp without time zone, p_end_date timestamp without time zone"
 get_revenue_summary,public,"TABLE(total_revenue numeric, orders_count bigint)","p_from timestamp with time zone, p_to timestamp with time zone"
 get_top_selling_products,public,"TABLE(product_id bigint, name text, image_url text, total_sold bigint)",limit_num integer DEFAULT 5
 get_user_next_tier,public,"TABLE(next_level_id uuid, next_level_name text, min_spending_required numeric, current_spending numeric, spending_remaining numeric, progress_percentage numeric)",p_user_id uuid
@@ -69,29 +72,31 @@ hnsw_halfvec_support,public,internal,internal
 hnsw_sparsevec_support,public,internal,internal
 hnswhandler,public,index_am_handler,internal
 immutable_unaccent,public,text,text
-inner_product,public,double precision,"sparsevec, sparsevec"
 inner_product,public,double precision,"vector, vector"
 inner_product,public,double precision,"halfvec, halfvec"
+inner_product,public,double precision,"sparsevec, sparsevec"
 is_admin,public,boolean,
 ivfflat_bit_support,public,internal,internal
 ivfflat_halfvec_support,public,internal,internal
 ivfflathandler,public,index_am_handler,internal
 jaccard_distance,public,double precision,"bit, bit"
-l1_distance,public,double precision,"vector, vector"
-l1_distance,public,double precision,"halfvec, halfvec"
 l1_distance,public,double precision,"sparsevec, sparsevec"
+l1_distance,public,double precision,"halfvec, halfvec"
+l1_distance,public,double precision,"vector, vector"
 l2_distance,public,double precision,"halfvec, halfvec"
 l2_distance,public,double precision,"sparsevec, sparsevec"
 l2_distance,public,double precision,"vector, vector"
-l2_norm,public,double precision,halfvec
 l2_norm,public,double precision,sparsevec
-l2_normalize,public,vector,vector
-l2_normalize,public,halfvec,halfvec
+l2_norm,public,double precision,halfvec
 l2_normalize,public,sparsevec,sparsevec
+l2_normalize,public,halfvec,halfvec
+l2_normalize,public,vector,vector
 lock_user_account,public,void,"p_user_id uuid, p_reason text"
 log_account_lock_change,public,trigger,
 mark_shipping_back,public,boolean,"p_return_id bigint, p_admin_id uuid"
 match_products,public,"TABLE(id bigint, name text, price numeric, description text, similarity double precision)","query_embedding vector, match_threshold double precision, match_count integer"
+notify_admin_on_new_order,public,trigger,
+notify_order_updates,public,trigger,
 process_checkout,public,bigint,"p_user_id uuid, p_shipping_address text, p_phone_contact text, p_total_amount numeric, p_platform_discount numeric, p_platform_voucher_id uuid, p_shop_discounts jsonb"
 process_refund,public,boolean,"p_return_id bigint, p_admin_id uuid"
 recalculate_all_membership_levels,public,void,
@@ -124,6 +129,7 @@ unaccent,public,text,text
 unaccent_init,public,internal,internal
 unaccent_lexize,public,internal,"internal, internal, internal, internal"
 unlock_user_account,public,void,p_user_id uuid
+update_last_message_at,public,trigger,
 update_membership_level,public,trigger,
 update_order_timestamps,public,trigger,
 update_user_total_spending,public,trigger,

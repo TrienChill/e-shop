@@ -186,24 +186,57 @@ const RegisterScreen = () => {
 
     setLoading(true);
     try {
-      // Send OTP via Supabase signUp (will send confirmation email)
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
+      // Kiểm tra xem có đang ở phiên Anonymous không (đã đặt hàng guest trước đó)
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const isAnonymous = currentSession?.user?.is_anonymous === true;
+
+      if (isAnonymous) {
+        // ── LINK ACCOUNT: Anonymous → Real ──────────────────────────────────────
+        // Dùng updateUser thay vì signUp để giữ nguyên UUID → không mất đơn hàng
+        const { error } = await supabase.auth.updateUser({
+          email: email.trim(),
+          password,
           data: { full_name: fullName.trim() },
-          emailRedirectTo: undefined,
-        },
-      });
+        });
 
-      if (error) {
-        setErrorMsg(error.message);
-        setLoading(false);
-        return;
+        if (error) {
+          setErrorMsg(error.message);
+          setLoading(false);
+          return;
+        }
+
+        // Cập nhật profile trong DB
+        await supabase
+          .from("profiles")
+          .update({
+            full_name: fullName.trim(),
+            email: email.trim(),
+            role: "customer", // Chuyển từ anonymous thành customer
+          })
+          .eq("id", currentSession.user.id);
+
+        startResendCooldown();
+        setStep('otp');
+      } else {
+        // ── ĐĂNG KÝ MỚI BÌNH THƯỜNG ────────────────────────────────────────────
+        const { error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { full_name: fullName.trim() },
+            emailRedirectTo: undefined,
+          },
+        });
+
+        if (error) {
+          setErrorMsg(error.message);
+          setLoading(false);
+          return;
+        }
+
+        startResendCooldown();
+        setStep('otp');
       }
-
-      startResendCooldown();
-      setStep('otp');
     } catch {
       setErrorMsg('Đã xảy ra lỗi. Vui lòng thử lại.');
     } finally {

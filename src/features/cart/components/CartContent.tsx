@@ -486,10 +486,38 @@ export default function CartContent() {
 
       if (!user) {
         const guestCart = await getGuestCart();
-        const formattedGuestCart = guestCart.map(item => ({
-          ...item,
-          finalPrice: item.price
-        }));
+        
+        // Fetch lại thông tin giảm giá mới nhất từ DB cho tất cả sản phẩm trong giỏ guest
+        const productIds = [...new Set(guestCart.map(item => item.product_id))];
+        let discountMap: Record<string, any> = {};
+        
+        if (productIds.length > 0) {
+          const { data: productsData } = await supabase
+            .from("products")
+            .select(`
+              id, price,
+              product_discounts (
+                id, discount_type, discount_value, is_active, start_date, end_date
+              )
+            `)
+            .in("id", productIds.map(Number));
+          
+          if (productsData) {
+            for (const p of productsData) {
+              discountMap[String(p.id)] = calculateDiscountedPrice(p);
+            }
+          }
+        }
+
+        const formattedGuestCart = guestCart.map(item => {
+          const freshDiscount = discountMap[item.product_id];
+          return {
+            ...item,
+            finalPrice: freshDiscount?.finalPrice ?? item.price,
+            originalPrice: freshDiscount?.originalPrice ?? item.originalPrice ?? item.price,
+            hasDiscount: freshDiscount?.hasDiscount ?? false,
+          };
+        });
         setCartItems(formattedGuestCart);
         // Tự động chọn tất cả sản phẩm trong guest cart
         setSelectedIds(new Set(formattedGuestCart.map(i => i.id)));

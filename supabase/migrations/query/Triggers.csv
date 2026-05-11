@@ -1,13 +1,14 @@
 table_name,trigger_name,event,action,timing
-order_items,on_order_items_change,DELETE,EXECUTE FUNCTION update_user_total_spending(),AFTER
+messages,trigger_update_conversation_on_message,INSERT,EXECUTE FUNCTION update_last_message_at(),AFTER
 order_items,on_order_items_change,UPDATE,EXECUTE FUNCTION update_user_total_spending(),AFTER
 order_items,on_order_items_change,INSERT,EXECUTE FUNCTION update_user_total_spending(),AFTER
+order_items,on_order_items_change,DELETE,EXECUTE FUNCTION update_user_total_spending(),AFTER
 orders,on_order_change,DELETE,EXECUTE FUNCTION update_user_total_spending(),AFTER
-orders,on_order_change,UPDATE,EXECUTE FUNCTION update_user_total_spending(),AFTER
-orders,trigger_order_status_notification,UPDATE,EXECUTE FUNCTION notify_order_updates(),AFTER
-orders,trigger_update_order_timestamps,UPDATE,EXECUTE FUNCTION update_order_timestamps(),BEFORE
-orders,on_order_change,INSERT,EXECUTE FUNCTION update_user_total_spending(),AFTER
 orders,trigger_new_order_notification,INSERT,EXECUTE FUNCTION notify_admin_on_new_order(),AFTER
+orders,trigger_order_status_notification,UPDATE,EXECUTE FUNCTION notify_order_updates(),AFTER
+orders,on_order_change,INSERT,EXECUTE FUNCTION update_user_total_spending(),AFTER
+orders,on_order_change,UPDATE,EXECUTE FUNCTION update_user_total_spending(),AFTER
+orders,trigger_update_order_timestamps,UPDATE,EXECUTE FUNCTION update_order_timestamps(),BEFORE
 profiles,on_account_lock_change,UPDATE,EXECUTE FUNCTION log_account_lock_change(),AFTER
 return_requests,set_profiles_id_on_insert,INSERT,EXECUTE FUNCTION set_profiles_id_trigger(),BEFORE
 user_addresses,trigger_default_address,UPDATE,EXECUTE FUNCTION handle_default_address(),BEFORE
