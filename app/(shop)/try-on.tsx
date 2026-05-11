@@ -1,6 +1,8 @@
 import { CommonHeader } from "@/src/components/layout/Header";
+import * as FileSystem from "expo-file-system";
 import { EncodingType, readAsStringAsync } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -25,9 +27,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// API URL - có thể thay đổi theo môi trường
-const API_URL =
-  process.env.EXPO_PUBLIC_TRYON_API_URL || "http://localhost:8000/api/try-on";
+// API URL - được cấu hình trong file .env
+const API_URL = process.env.EXPO_PUBLIC_TRYON_API_URL || "";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_BOX_SIZE = (SCREEN_WIDTH - 48) / 2;
@@ -49,6 +50,18 @@ const colorTranslations: Record<string, string> = {
 
 type TryOnState = "idle" | "loading" | "result" | "error";
 
+// --- GLOBAL STATE CHO CHẠY NGẦM ---
+let globalTryOnState: TryOnState = "idle";
+let globalResultUrl: string = "";
+let globalErrorMsg: string = "";
+let globalPersonImage: any = null;
+let globalClothImage: string = "";
+
+let setMountedState: React.Dispatch<React.SetStateAction<TryOnState>> | null = null;
+let setMountedResultUrl: React.Dispatch<React.SetStateAction<string>> | null = null;
+let setMountedErrorMsg: React.Dispatch<React.SetStateAction<string>> | null = null;
+// ----------------------------------
+
 export default function VirtualTryOnScreen() {
   const { productImageUrl, selectedColor } = useLocalSearchParams<{
     productImageUrl?: string;
@@ -60,29 +73,47 @@ export default function VirtualTryOnScreen() {
     uri: string;
     name: string;
     type: string;
-  } | null>(null);
-  const [clothImage] = useState<string>(productImageUrl || "");
+  } | null>(globalPersonImage);
+  const [clothImage, setClothImage] = useState<string>(globalClothImage || productImageUrl || "");
   const [clothColor] = useState<string>(selectedColor || "");
-  const [state, setState] = useState<TryOnState>("idle");
-  const [resultUrl, setResultUrl] = useState<string>("");
-  const [errorMsg, setErrorMsg] = useState<string>("");
+  const [state, setState] = useState<TryOnState>(globalTryOnState);
+  const [resultUrl, setResultUrl] = useState<string>(globalResultUrl);
+  const [errorMsg, setErrorMsg] = useState<string>(globalErrorMsg);
 
-  const objectUrlRef = useRef<string>("");
+  const updateGlobalAndLocal = (
+    newState: TryOnState,
+    url: string = "",
+    error: string = ""
+  ) => {
+    globalTryOnState = newState;
+    globalResultUrl = url;
+    globalErrorMsg = error;
+
+    if (setMountedState) setMountedState(newState);
+    if (setMountedResultUrl) setMountedResultUrl(url);
+    if (setMountedErrorMsg) setMountedErrorMsg(error);
+  };
 
   useEffect(() => {
-    return () => {
-      if (objectUrlRef.current && Platform.OS !== "web") {
-        // revokeObjectURL chỉ cần thiết trên web
-      }
-    };
-  }, []);
+    setMountedState = setState;
+    setMountedResultUrl = setResultUrl;
+    setMountedErrorMsg = setErrorMsg;
 
-  // Helper function để revoke object URL (chỉ web)
-  const revokeObjectUrl = (url: string) => {
-    if (Platform.OS === "web" && url) {
-      URL.revokeObjectURL(url);
+    // Reset nếu vào thử sản phẩm mới khác sản phẩm cũ
+    if (productImageUrl && productImageUrl !== globalClothImage && globalTryOnState !== "loading") {
+      globalClothImage = productImageUrl;
+      updateGlobalAndLocal("idle", "", "");
+      setClothImage(productImageUrl);
     }
-  };
+
+    return () => {
+      setMountedState = null;
+      setMountedResultUrl = null;
+      setMountedErrorMsg = null;
+    };
+  }, [productImageUrl]);
+
+  // Hàm helper bị lược bỏ vì hiện tại dùng base64, không cần revoke object URL nữa
 
   const pickPersonImage = async () => {
     try {
@@ -109,9 +140,10 @@ export default function VirtualTryOnScreen() {
         const name = `photo_${Date.now()}.${ext}`;
         const type = asset.mimeType || `image/${ext}`;
 
-        setPersonImage({ uri: asset.uri, name, type });
-        setState("idle");
-        setResultUrl("");
+        const newPersonImage = { uri: asset.uri, name, type };
+        setPersonImage(newPersonImage);
+        globalPersonImage = newPersonImage;
+        updateGlobalAndLocal("idle");
       }
     } catch {
       Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại.");
@@ -167,13 +199,15 @@ export default function VirtualTryOnScreen() {
       return;
     }
 
-    setState("loading");
-    setErrorMsg("");
+    globalPersonImage = personImage;
+    globalClothImage = clothImage;
 
-    if (objectUrlRef.current) {
-      revokeObjectUrl(objectUrlRef.current);
-      objectUrlRef.current = "";
-    }
+    updateGlobalAndLocal("loading");
+
+    Alert.alert(
+      "Đang xử lý",
+      "Hệ thống đang tạo ảnh thử đồ ảo. Bạn có thể thoát ra xem sản phẩm khác, chúng tôi sẽ thông báo khi hoàn tất!"
+    );
 
     try {
       // Chuyển ảnh thành base64
@@ -205,11 +239,23 @@ export default function VirtualTryOnScreen() {
         throw new Error("Server trả về ảnh rỗng");
       }
 
-      // Tạo object URL để hiển thị
-      const objectUrl = URL.createObjectURL(blob);
-      objectUrlRef.current = objectUrl;
-      setResultUrl(objectUrl);
-      setState("result");
+      // Đọc blob thành base64 để tương thích với React Native
+      const base64Url = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      updateGlobalAndLocal("result", base64Url, "");
+      
+      // Nếu component đã unmount (người dùng thoát ra)
+      if (!setMountedState) {
+        Alert.alert(
+          "Thử đồ hoàn tất 🎉",
+          "Ảnh thử đồ ảo của bạn đã sẵn sàng! Hãy quay lại màn hình Thử đồ để xem kết quả."
+        );
+      }
     } catch (err: any) {
       let msg = "Đã xảy ra lỗi khi gọi API.";
 
@@ -226,34 +272,52 @@ export default function VirtualTryOnScreen() {
         msg = err.message;
       }
 
-      setErrorMsg(msg);
-      setState("error");
+      updateGlobalAndLocal("error", "", msg);
+      
+      if (!setMountedState) {
+        Alert.alert("Lỗi thử đồ", "Có lỗi xảy ra trong quá trình ghép đồ. Vui lòng quay lại kiểm tra.");
+      }
     }
   };
 
   const handleRetry = () => {
-    setState("idle");
-    setResultUrl("");
-    setErrorMsg("");
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current);
-      objectUrlRef.current = "";
-    }
+    updateGlobalAndLocal("idle");
   };
 
   const handleSaveImage = async () => {
     try {
-      const response = await fetch(resultUrl);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        Alert.alert(
-          "Thành công",
-          "Ảnh kết quả đã được xử lý. Bạn có thể chụp màn hình để lưu lại.",
-        );
-      };
-      reader.readAsDataURL(blob);
-    } catch {
+      if (!resultUrl) return;
+
+      if (Platform.OS === "web") {
+        const link = document.createElement("a");
+        link.href = resultUrl;
+        link.download = `try-on-${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        alert("Ảnh kết quả đã được tải xuống.");
+      } else {
+        // Tách chuỗi base64 (nếu có prefix data:image/jpeg;base64,)
+        const base64Code = resultUrl.includes("base64,") 
+          ? resultUrl.split("base64,")[1] 
+          : resultUrl;
+
+        const filename = `${FileSystem.documentDirectory}try-on-${Date.now()}.jpg`;
+        
+        await FileSystem.writeAsStringAsync(filename, base64Code, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === "granted") {
+          await MediaLibrary.saveToLibraryAsync(filename);
+          Alert.alert("Thành công", "Ảnh đã được lưu vào thư viện của bạn.");
+        } else {
+          Alert.alert("Lỗi", "Cần cấp quyền truy cập thư viện để lưu ảnh.");
+        }
+      }
+    } catch (error) {
+      console.error("Save image error:", error);
       Alert.alert("Lỗi", "Không thể lưu ảnh.");
     }
   };
