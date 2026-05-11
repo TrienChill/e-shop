@@ -30,8 +30,9 @@ import {
   getTopSellingProducts,
 } from "@/src/services/product";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
+import { tryOnStore, TryOnState } from "@/src/store/tryOnStore";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Headset } from "lucide-react-native";
+import { Headset, Shirt } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 const { width } = Dimensions.get("window");
@@ -79,11 +80,39 @@ const HomeScreen = () => {
     router.push("/(shop)/support");
   };
 
+  // --- TRY-ON BUTTON STATE ---
+  const [tryOnState, setTryOnState] = useState<TryOnState>(
+    tryOnStore.get().state
+  );
+  const [tryOnResultUrl, setTryOnResultUrl] = useState<string>(
+    tryOnStore.get().resultUrl
+  );
+
+  // Subscribe vào store để cập nhật badge kể cả khi AI đang xử lý ngầm
+  useEffect(() => {
+    const unsub = tryOnStore.subscribe((data) => {
+      setTryOnState(data.state);
+      setTryOnResultUrl(data.resultUrl);
+    });
+    return unsub;
+  }, []);
+
+  // Đồng bộ lại khi màn hình được focus
+  useFocusEffect(
+    useCallback(() => {
+      const snap = tryOnStore.get();
+      setTryOnState(snap.state);
+      setTryOnResultUrl(snap.resultUrl);
+    }, [])
+  );
+  // ----------------------------
+
   {
     /* ========== TOP PRODUCTS SECTION ========== */
   }
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
 
   // --- REALTIME HOOKS (FULL FOR INDEX) ---
   // Trang index hiển thị: top-selling (orders/order_items),
@@ -395,6 +424,44 @@ const HomeScreen = () => {
             onPress={() => router.push("/(shop)/(tabs)/search")}
           >
             <Text style={styles.searchText}>Tìm kiếm...</Text>
+          </TouchableOpacity>
+
+          {/* Nút thử đồ ảo với badge trạng thái */}
+          <TouchableOpacity
+            style={styles.tryOnButton}
+            activeOpacity={0.7}
+            onPress={() =>
+              router.push(
+                tryOnState === "idle"
+                  ? "/(shop)/try-on"
+                  : ("/(shop)/try-on" as any)
+              )
+            }
+          >
+            {tryOnState === "loading" ? (
+              // Đang xử lý: spinner
+              <>
+                <Shirt size={22} color="#3B82F6" />
+                <View style={styles.tryOnBadgeLoading}>
+                  <ActivityIndicator size={8} color="#fff" />
+                </View>
+              </>
+            ) : tryOnState === "result" && tryOnResultUrl ? (
+              // Có kết quả: hiện ảnh thu nhỏ
+              <>
+                <Shirt size={22} color="#10B981" />
+                <View style={styles.tryOnBadgeResult} />
+              </>
+            ) : tryOnState === "error" ? (
+              // Lỗi: badge đỏ
+              <>
+                <Shirt size={22} color="#EF4444" />
+                <View style={styles.tryOnBadgeError} />
+              </>
+            ) : (
+              // Idle: icon bình thường
+              <Shirt size={22} color="#6B7280" />
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1020,6 +1087,44 @@ const styles = StyleSheet.create({
   cartButton: {
     padding: 6,
     position: "relative",
+  },
+  tryOnButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  tryOnBadgeLoading: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#3B82F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tryOnBadgeResult: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#10B981",
+  },
+  tryOnBadgeError: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#EF4444",
   },
   // ... các styles cũ
   cartBadge: {

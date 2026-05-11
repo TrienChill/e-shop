@@ -2,8 +2,9 @@ import { CommonHeader } from "@/src/components/layout/Header";
 import * as FileSystem from "expo-file-system";
 import { EncodingType, readAsStringAsync } from "expo-file-system";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { tryOnStore, TryOnState } from "@/src/store/tryOnStore";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   ArrowLeft,
@@ -51,22 +52,7 @@ const colorTranslations: Record<string, string> = {
   Purple: "Tím",
 };
 
-type TryOnState = "idle" | "loading" | "result" | "error";
-
-// --- GLOBAL STATE CHO CHẠY NGẦM ---
-let globalTryOnState: TryOnState = "idle";
-let globalResultUrl: string = "";
-let globalErrorMsg: string = "";
-let globalPersonImage: any = null;
-let globalClothImage: string = "";
-let globalProductId: string = "";
-let globalProductName: string = "";
-let globalSelectedColor: string = "";
-
-let setMountedState: React.Dispatch<React.SetStateAction<TryOnState>> | null = null;
-let setMountedResultUrl: React.Dispatch<React.SetStateAction<string>> | null = null;
-let setMountedErrorMsg: React.Dispatch<React.SetStateAction<string>> | null = null;
-// ----------------------------------
+// TryOnState được import từ tryOnStore
 
 export default function VirtualTryOnScreen() {
   const { productImageUrl, selectedColor, productId, productName } = useLocalSearchParams<{
@@ -77,67 +63,80 @@ export default function VirtualTryOnScreen() {
   }>();
   const router = useRouter();
 
+  const _storeSnapshot = tryOnStore.get();
   const [personImage, setPersonImage] = useState<{
     uri: string;
     name: string;
     type: string;
-  } | null>(globalPersonImage);
-  const [clothImage, setClothImage] = useState<string>(globalClothImage || productImageUrl || "");
+  } | null>(_storeSnapshot.personImage);
+  const [clothImage, setClothImage] = useState<string>(
+    _storeSnapshot.clothImage || productImageUrl || ""
+  );
   const [clothColor] = useState<string>(selectedColor || "");
-  const [state, setState] = useState<TryOnState>(globalTryOnState);
-  const [resultUrl, setResultUrl] = useState<string>(globalResultUrl);
-  const [errorMsg, setErrorMsg] = useState<string>(globalErrorMsg);
+  const [state, setState] = useState<TryOnState>(_storeSnapshot.state);
+  const [resultUrl, setResultUrl] = useState<string>(_storeSnapshot.resultUrl);
+  const [errorMsg, setErrorMsg] = useState<string>(_storeSnapshot.errorMsg);
 
-  const updateGlobalAndLocal = (
+  // Ref để biết component còn mounted hay không (tránh setState sau unmount)
+  const isMountedRef = useRef(true);
+
+  const updateStore = (
     newState: TryOnState,
     url: string = "",
     error: string = ""
   ) => {
-    globalTryOnState = newState;
-    globalResultUrl = url;
-    globalErrorMsg = error;
+    tryOnStore.update({ state: newState, resultUrl: url, errorMsg: error });
 
-    if (setMountedState) setMountedState(newState);
-    if (setMountedResultUrl) setMountedResultUrl(url);
-    if (setMountedErrorMsg) setMountedErrorMsg(error);
+    if (isMountedRef.current) {
+      setState(newState);
+      setResultUrl(url);
+      setErrorMsg(error);
+    }
 
     // Lưu vào lịch sử khi có kết quả
-    if (newState === "result" && url && globalClothImage) {
-      AsyncStorage.getItem("tryOnHistory").then((existing) => {
-        const history = existing ? JSON.parse(existing) : [];
-        history.unshift({
-          id: Date.now().toString(),
-          productImageUrl: globalClothImage,
-          resultUrl: url,
-          productId: globalProductId,
-          productName: globalProductName,
-          selectedColor: globalSelectedColor,
-        });
-        // Giữ 20 ảnh gần nhất
-        AsyncStorage.setItem("tryOnHistory", JSON.stringify(history.slice(0, 20)));
-      }).catch(e => console.error("Lỗi lưu lịch sử thử đồ:", e));
+    if (newState === "result" && url) {
+      const { clothImage: ci, productId: pid, productName: pn, selectedColor: sc } = tryOnStore.get();
+      if (ci) {
+        AsyncStorage.getItem("tryOnHistory").then((existing) => {
+          const history = existing ? JSON.parse(existing) : [];
+          history.unshift({
+            id: Date.now().toString(),
+            productImageUrl: ci,
+            resultUrl: url,
+            productId: pid,
+            productName: pn,
+            selectedColor: sc,
+          });
+          AsyncStorage.setItem("tryOnHistory", JSON.stringify(history.slice(0, 20)));
+        }).catch(e => console.error("Lỗi lưu lịch sử thử đồ:", e));
+      }
     }
   };
 
   useEffect(() => {
-    setMountedState = setState;
-    setMountedResultUrl = setResultUrl;
-    setMountedErrorMsg = setErrorMsg;
+    isMountedRef.current = true;
+
+    // Đồng bộ state từ store khi màn hình được mount lại
+    const snap = tryOnStore.get();
+    setState(snap.state);
+    setResultUrl(snap.resultUrl);
+    setErrorMsg(snap.errorMsg);
+    if (snap.personImage) setPersonImage(snap.personImage);
 
     // Reset nếu vào thử sản phẩm mới khác sản phẩm cũ
-    if (productImageUrl && productImageUrl !== globalClothImage && globalTryOnState !== "loading") {
-      globalClothImage = productImageUrl;
-      globalProductId = productId || "";
-      globalProductName = productName || "";
-      globalSelectedColor = selectedColor || "";
-      updateGlobalAndLocal("idle", "", "");
+    if (productImageUrl && productImageUrl !== snap.clothImage && snap.state !== "loading") {
+      tryOnStore.update({
+        clothImage: productImageUrl,
+        productId: productId || "",
+        productName: productName || "",
+        selectedColor: selectedColor || "",
+      });
+      updateStore("idle", "", "");
       setClothImage(productImageUrl);
     }
 
     return () => {
-      setMountedState = null;
-      setMountedResultUrl = null;
-      setMountedErrorMsg = null;
+      isMountedRef.current = false;
     };
   }, [productImageUrl]);
 
@@ -170,8 +169,8 @@ export default function VirtualTryOnScreen() {
 
         const newPersonImage = { uri: asset.uri, name, type };
         setPersonImage(newPersonImage);
-        globalPersonImage = newPersonImage;
-        updateGlobalAndLocal("idle");
+        tryOnStore.update({ personImage: newPersonImage });
+        updateStore("idle");
       }
     } catch {
       Alert.alert("Lỗi", "Không thể chọn ảnh. Vui lòng thử lại.");
@@ -227,10 +226,8 @@ export default function VirtualTryOnScreen() {
       return;
     }
 
-    globalPersonImage = personImage;
-    globalClothImage = clothImage;
-
-    updateGlobalAndLocal("loading");
+    tryOnStore.update({ personImage, clothImage });
+    updateStore("loading");
 
     Alert.alert(
       "Đang xử lý",
@@ -275,10 +272,10 @@ export default function VirtualTryOnScreen() {
         reader.readAsDataURL(blob);
       });
 
-      updateGlobalAndLocal("result", base64Url, "");
-      
-      // Nếu component đã unmount (người dùng thoát ra)
-      if (!setMountedState) {
+      updateStore("result", base64Url, "");
+
+      // Nếu component đã unmount (người dùng thoát ra) → thông báo push
+      if (!isMountedRef.current) {
         Alert.alert(
           "Thử đồ hoàn tất 🎉",
           "Ảnh thử đồ ảo của bạn đã sẵn sàng! Hãy quay lại màn hình Thử đồ để xem kết quả."
@@ -300,16 +297,16 @@ export default function VirtualTryOnScreen() {
         msg = err.message;
       }
 
-      updateGlobalAndLocal("error", "", msg);
-      
-      if (!setMountedState) {
+      updateStore("error", "", msg);
+
+      if (!isMountedRef.current) {
         Alert.alert("Lỗi thử đồ", "Có lỗi xảy ra trong quá trình ghép đồ. Vui lòng quay lại kiểm tra.");
       }
     }
   };
 
   const handleRetry = () => {
-    updateGlobalAndLocal("idle");
+    updateStore("idle");
   };
 
   const handleSaveImage = async () => {
@@ -317,6 +314,7 @@ export default function VirtualTryOnScreen() {
       if (!resultUrl) return;
 
       if (Platform.OS === "web") {
+        // Web: tải xuống trực tiếp
         const link = document.createElement("a");
         link.href = resultUrl;
         link.download = `try-on-${Date.now()}.jpg`;
@@ -325,28 +323,33 @@ export default function VirtualTryOnScreen() {
         document.body.removeChild(link);
         alert("Ảnh kết quả đã được tải xuống.");
       } else {
-        // Tách chuỗi base64 (nếu có prefix data:image/jpeg;base64,)
-        const base64Code = resultUrl.includes("base64,") 
-          ? resultUrl.split("base64,")[1] 
+        // App: Lưu file tạm rồi mở share sheet
+        // Không cần permission nào cả → hoạt động trên Expo Go
+        const base64Code = resultUrl.includes("base64,")
+          ? resultUrl.split("base64,")[1]
           : resultUrl;
 
-        const filename = `${FileSystem.documentDirectory}try-on-${Date.now()}.jpg`;
-        
+        const filename = `${FileSystem.cacheDirectory}try-on-${Date.now()}.jpg`;
+
         await FileSystem.writeAsStringAsync(filename, base64Code, {
           encoding: FileSystem.EncodingType.Base64,
         });
 
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status === "granted") {
-          await MediaLibrary.saveToLibraryAsync(filename);
-          Alert.alert("Thành công", "Ảnh đã được lưu vào thư viện của bạn.");
-        } else {
-          Alert.alert("Lỗi", "Cần cấp quyền truy cập thư viện để lưu ảnh.");
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (!isAvailable) {
+          Alert.alert("Lỗi", "Thiết bị này không hỗ trợ chia sẻ file.");
+          return;
         }
+
+        await Sharing.shareAsync(filename, {
+          mimeType: "image/jpeg",
+          dialogTitle: "Lưu hoặc chia sẻ ảnh thử đồ",
+          UTI: "public.jpeg", // iOS
+        });
       }
     } catch (error) {
       console.error("Save image error:", error);
-      Alert.alert("Lỗi", "Không thể lưu ảnh.");
+      Alert.alert("Lỗi", "Không thể lưu ảnh. Vui lòng thử lại.");
     }
   };
 
