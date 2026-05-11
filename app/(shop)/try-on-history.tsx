@@ -1,4 +1,5 @@
 import { CommonHeader } from "@/src/components/layout/Header";
+import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { ArrowLeft, Trash2 } from "lucide-react-native";
@@ -51,11 +52,41 @@ export default function TryOnHistoryScreen() {
   const loadHistory = async () => {
     try {
       const data = await AsyncStorage.getItem("tryOnHistory");
-      if (data) {
-        setHistory(JSON.parse(data));
+      if (!data) return;
+
+      const parsed: TryOnHistoryItem[] = JSON.parse(data);
+
+      // Lọc bỏ các entry cũ lưu base64 trực tiếp (bắt đầu bằng "data:image")
+      // và các entry có file URI không còn tồn tại trên đĩa
+      const validEntries: TryOnHistoryItem[] = [];
+      for (const item of parsed) {
+        if (item.resultUrl.startsWith("data:image")) {
+          // Entry cũ dùng base64 → bỏ qua (quá lớn)
+          continue;
+        }
+        if (item.resultUrl.startsWith("file://") || item.resultUrl.startsWith("/")) {
+          // Kiểm tra file có tồn tại không
+          try {
+            const info = await FileSystem.getInfoAsync(item.resultUrl);
+            if (info.exists) {
+              validEntries.push(item);
+            }
+          } catch {
+            // File không tồn tại, bỏ qua
+          }
+        } else {
+          validEntries.push(item);
+        }
       }
+
+      // Cập nhật lại AsyncStorage nếu có thay đổi (xóa entry cũ)
+      if (validEntries.length !== parsed.length) {
+        await AsyncStorage.setItem("tryOnHistory", JSON.stringify(validEntries));
+      }
+
+      setHistory(validEntries);
     } catch (e) {
-      console.error(e);
+      console.error("Lỗi tải lịch sử thử đồ:", e);
     }
   };
 

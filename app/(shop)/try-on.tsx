@@ -97,18 +97,41 @@ export default function VirtualTryOnScreen() {
     if (newState === "result" && url) {
       const { clothImage: ci, productId: pid, productName: pn, selectedColor: sc } = tryOnStore.get();
       if (ci) {
-        AsyncStorage.getItem("tryOnHistory").then((existing) => {
-          const history = existing ? JSON.parse(existing) : [];
-          history.unshift({
-            id: Date.now().toString(),
-            productImageUrl: ci,
-            resultUrl: url,
-            productId: pid,
-            productName: pn,
-            selectedColor: sc,
-          });
-          AsyncStorage.setItem("tryOnHistory", JSON.stringify(history.slice(0, 20)));
-        }).catch(e => console.error("Lỗi lưu lịch sử thử đồ:", e));
+        // Ghi ảnh ra file system → chỉ lưu URI vào AsyncStorage (tránh lỗi CursorWindow)
+        const saveImageToFS = async (): Promise<string> => {
+          try {
+            const base64Code = url.includes("base64,")
+              ? url.split("base64,")[1]
+              : url;
+            const dir = `${FileSystem.documentDirectory}try-on-history/`;
+            await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+            const filePath = `${dir}result-${Date.now()}.jpg`;
+            await FileSystem.writeAsStringAsync(filePath, base64Code, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            return filePath;
+          } catch {
+            // Fallback: nếu lưu file thất bại thì bỏ qua việc lưu lịch sử
+            return "";
+          }
+        };
+
+        saveImageToFS().then((fileUri) => {
+          if (!fileUri) return; // Không lưu lịch sử nếu ghi file thất bại
+          AsyncStorage.getItem("tryOnHistory").then((existing) => {
+            const history = existing ? JSON.parse(existing) : [];
+            history.unshift({
+              id: Date.now().toString(),
+              productImageUrl: ci,
+              resultUrl: fileUri,  // URI file, không phải base64
+              productId: pid,
+              productName: pn,
+              selectedColor: sc,
+            });
+            // Giữ tối đa 10 ảnh (giảm từ 20 xuống 10 để tiết kiệm dung lượng)
+            AsyncStorage.setItem("tryOnHistory", JSON.stringify(history.slice(0, 10)));
+          }).catch(e => console.error("Lỗi lưu lịch sử thử đồ:", e));
+        });
       }
     }
   };
