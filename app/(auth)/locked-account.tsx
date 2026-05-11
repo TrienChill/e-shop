@@ -75,8 +75,9 @@ export default function LockedAccountScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* Header Section */}
-      <View style={styles.headerSection}>
+      <View style={styles.contentWrapper}>
+        {/* Header Section */}
+        <View style={styles.headerSection}>
         <View style={styles.lockIconContainer}>
           <View style={styles.lockIconBg}>
             {/* Lock Icon SVG */}
@@ -156,6 +157,7 @@ export default function LockedAccountScreen() {
           © 2026 E-Shop. Tất cả các quy định và chính sách được áp dụng.
         </Text>
       </View>
+      </View>
     </View>
   );
 }
@@ -175,6 +177,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  contentWrapper: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
   },
   headerSection: {
     alignItems: "center",

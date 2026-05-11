@@ -526,7 +526,7 @@ const HomeScreen = () => {
                     styles.paginationDot,
                     (index === activeBannerIndex ||
                       (index === 0 && activeBannerIndex === banners.length)) &&
-                      styles.paginationDotActive,
+                    styles.paginationDotActive,
                   ]}
                 />
               ))}
@@ -535,50 +535,54 @@ const HomeScreen = () => {
         )}
 
         {/* ========== TOP PRODUCTS SECTION ========== */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Top sản phẩm bán chạy</Text>
+        {topProducts.filter((p) => p.total_sold > 0).length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Top sản phẩm bán chạy</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.topProductsList}
+            >
+              {topProducts
+                .filter((p) => p.total_sold > 0)
+                .map((product) => (
+                  <TouchableOpacity
+                    key={product.id}
+                    style={styles.topProductItem}
+                    onPress={() => router.push(`/(shop)/product/${product.id}`)} // Chuyển đến chi tiết
+                  >
+                    <View style={styles.topProductBorder}>
+                      <Image
+                        source={{
+                          uri: Array.isArray(product.images)
+                            ? product.images[0]
+                            : product.image,
+                        }}
+                        style={styles.topProductImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    {/* Thông tin sản phẩm */}
+                    <View style={styles.productInfo}>
+                      <Text style={styles.productName} numberOfLines={1}>
+                        {product.name}
+                      </Text>
+                      <PriceDisplay
+                        hasDiscount={product.hasDiscount}
+                        finalPrice={product.finalPrice}
+                        originalPrice={product.originalPrice}
+                        size="sm"
+                        justify="center"
+                        hideDiscountBadge
+                      />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.topProductsList}
-          >
-            {topProducts.map((product) => (
-              <TouchableOpacity
-                key={product.id}
-                style={styles.topProductItem}
-                onPress={() => router.push(`/(shop)/product/${product.id}`)} // Chuyển đến chi tiết
-              >
-                <View style={styles.topProductBorder}>
-                  <Image
-                    source={{
-                      uri: Array.isArray(product.images)
-                        ? product.images[0]
-                        : product.image,
-                    }}
-                    style={styles.topProductImage}
-                    resizeMode="cover"
-                  />
-                </View>
-                {/* Thông tin sản phẩm */}
-                <View style={styles.productInfo}>
-                  <Text style={styles.productName} numberOfLines={1}>
-                    {product.name}
-                  </Text>
-                  <PriceDisplay
-                    hasDiscount={product.hasDiscount}
-                    finalPrice={product.finalPrice}
-                    originalPrice={product.originalPrice}
-                    size="sm"
-                    justify="center"
-                    hideDiscountBadge
-                  />
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        )}
 
         {/* ========== NEW ITEMS SECTION ========== */}
         <View style={styles.section}>
@@ -662,9 +666,9 @@ const HomeScreen = () => {
               const flashColumns = isWeb ? 4 : 2;
               const cardWidth = isWeb
                 ? (windowWidth -
-                    responsivePadding * 2 -
-                    16 * (flashColumns - 1)) /
-                  flashColumns
+                  responsivePadding * 2 -
+                  16 * (flashColumns - 1)) /
+                flashColumns
                 : (width - 44) / 2;
 
               return (
@@ -756,9 +760,9 @@ const HomeScreen = () => {
               .map((item) => {
                 const cardWidth = isWeb
                   ? (windowWidth -
-                      responsivePadding * 2 -
-                      16 * (popularColumns - 1)) /
-                    popularColumns
+                    responsivePadding * 2 -
+                    16 * (popularColumns - 1)) /
+                  popularColumns
                   : (width - 44) / 2;
                 return (
                   <TouchableOpacity
@@ -838,17 +842,17 @@ const HomeScreen = () => {
             columnWrapperStyle={
               isWeb
                 ? {
-                    paddingHorizontal: responsivePadding,
-                    gap: 16,
-                  }
+                  paddingHorizontal: responsivePadding,
+                  gap: 16,
+                }
                 : undefined
             }
             renderItem={({ item }) => {
               const cardWidth = isWeb
                 ? (windowWidth -
-                    responsivePadding * 2 -
-                    16 * (justForYouColumns - 1)) /
-                  justForYouColumns
+                  responsivePadding * 2 -
+                  16 * (justForYouColumns - 1)) /
+                justForYouColumns
                 : (width - 44) / 2;
               return (
                 <TouchableOpacity
@@ -890,9 +894,9 @@ const HomeScreen = () => {
             contentContainerStyle={
               !isWeb
                 ? {
-                    paddingHorizontal: 16,
-                    gap: 12,
-                  }
+                  paddingHorizontal: 16,
+                  gap: 12,
+                }
                 : undefined
             }
             style={isWeb ? { flex: 1 } : undefined}

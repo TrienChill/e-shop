@@ -288,6 +288,9 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 40,
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
 
   // Back button
@@ -327,7 +330,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
     elevation: 10,
   },
   dotTR: {
@@ -382,7 +388,10 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
     elevation: 10,
     marginBottom: 24,
   },
@@ -428,7 +437,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 8,
   },
   primaryBtnText: {
@@ -474,6 +486,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 20,
     width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   sentOrb: {
     position: 'absolute',
@@ -507,6 +521,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: COLORS.success,
     shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
     elevation: 10,
   },
   sentTitle: {

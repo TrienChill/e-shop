@@ -468,6 +468,9 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
     alignItems: "center",
+    width: "100%",
+    maxWidth: 480,
+    alignSelf: "center",
   },
 
   // Header
@@ -528,7 +531,10 @@ const styles = StyleSheet.create({
     padding: 24,
     borderWidth: 1,
     borderColor: COLORS.border,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.05,
+    shadowRadius: 15,
     elevation: 10,
   },
 
@@ -591,7 +597,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 8,
+    shadowColor: COLORS.accent,
     shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 8,
   },
   primaryBtnText: {
