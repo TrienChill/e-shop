@@ -108,3 +108,81 @@ export async function clearGuestCart(): Promise<void> {
     console.error("Lỗi khi xóa guest cart:", error);
   }
 }
+
+/**
+ * Merge giỏ hàng guest (AsyncStorage) vào DB (cart_items) sau khi đăng nhập.
+ * - Nếu cùng product_id + color + size đã có trong DB → cộng dồn quantity
+ * - Nếu chưa có → insert mới
+ * - Sau khi merge xong → xóa guest cart khỏi AsyncStorage
+ */
+export async function mergeGuestCartToDb(
+  supabase: any,
+  userId: string
+): Promise<{ merged: number; skipped: number }> {
+  const guestItems = await getGuestCart();
+  if (guestItems.length === 0) {
+    return { merged: 0, skipped: 0 };
+  }
+
+  console.log(`[CartMerge] Merging ${guestItems.length} guest items for user ${userId}`);
+
+  let merged = 0;
+  let skipped = 0;
+
+  for (const item of guestItems) {
+    try {
+      // Kiểm tra xem sản phẩm với cùng variant đã có trong DB chưa
+      const { data: existing } = await supabase
+        .from("cart_items")
+        .select("id, quantity")
+        .eq("user_id", userId)
+        .eq("product_id", Number(item.product_id))
+        .eq("color", item.rawColor || "")
+        .eq("size", item.rawSize || "")
+        .maybeSingle();
+
+      if (existing) {
+        // Cộng dồn quantity
+        const { error } = await supabase
+          .from("cart_items")
+          .update({ quantity: existing.quantity + item.quantity })
+          .eq("id", existing.id);
+
+        if (error) {
+          console.warn(`[CartMerge] Update failed for product ${item.product_id}:`, error.message);
+          skipped++;
+        } else {
+          merged++;
+        }
+      } else {
+        // Insert mới
+        const { error } = await supabase
+          .from("cart_items")
+          .insert({
+            user_id: userId,
+            product_id: Number(item.product_id),
+            quantity: item.quantity,
+            color: item.rawColor || null,
+            size: item.rawSize || null,
+            is_selected: true,
+          });
+
+        if (error) {
+          console.warn(`[CartMerge] Insert failed for product ${item.product_id}:`, error.message);
+          skipped++;
+        } else {
+          merged++;
+        }
+      }
+    } catch (err) {
+      console.warn(`[CartMerge] Error processing item ${item.product_id}:`, err);
+      skipped++;
+    }
+  }
+
+  // Xóa guest cart sau khi merge
+  await clearGuestCart();
+  console.log(`[CartMerge] Done: ${merged} merged, ${skipped} skipped`);
+
+  return { merged, skipped };
+}

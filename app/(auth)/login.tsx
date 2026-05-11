@@ -7,6 +7,7 @@ import {
 import type { UserRole } from "@/src/auth/types";
 import { AlertButton, AlertDialog } from "@/src/components/AlertDialog";
 import { supabase } from "@/src/lib/supabase";
+import { mergeGuestCartToDb } from "@/src/services/guestCart";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -229,6 +230,18 @@ const App = () => {
           console.error("Error fetching role after login:", err);
           authLogger.loginSuccess({ userId, role: null, platform });
         }
+
+        // Merge giỏ hàng guest vào DB (chạy nền, không block UI)
+        mergeGuestCartToDb(supabase, userId).then(({ merged, skipped }) => {
+          if (merged > 0) {
+            console.log(`[Login] Merged ${merged} guest cart items into DB`);
+          }
+          if (skipped > 0) {
+            console.warn(`[Login] ${skipped} guest cart items failed to merge`);
+          }
+        }).catch(err => {
+          console.warn('[Login] Cart merge error (non-critical):', err);
+        });
       }
 
       setLoading(false);
