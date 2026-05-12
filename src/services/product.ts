@@ -6,25 +6,26 @@ import { supabase } from "../lib/supabase";
 
 export const getTopSellingProducts = async () => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // 1. Gọi RPC để lấy top sản phẩm bán chạy toàn cục (bỏ qua RLS)
+    const { data: topSales, error: rpcError } = await supabase.rpc(
+      "get_global_top_selling_products",
+      { days_ago: 30, limit_count: 10 }
+    );
 
-    // 1. Lấy dữ liệu bán hàng từ order_items
-    const { data: salesData, error: salesError } = await supabase
-      .from("order_items")
-      .select(
-        `
-        product_id,
-        quantity,
-        orders!inner(status, created_at)
-      `,
-      )
-      .eq("orders.status", "completed")
-      .gte("orders.created_at", thirtyDaysAgo.toISOString());
+    if (rpcError) {
+      console.error("Lỗi gọi RPC get_global_top_selling_products:", rpcError);
+      return [];
+    }
 
-    if (salesError) throw salesError;
+    if (!topSales || topSales.length === 0) return [];
 
-    // 2. Lấy tất cả sản phẩm (để làm fallback nếu không có lượt bán)
+    const productIds = topSales
+      .map((item: any) => item.product_id)
+      .filter((id: any) => id != null);
+
+    if (productIds.length === 0) return [];
+
+    // 2. Fetch chi tiết các sản phẩm này kèm discount
     const { data: allProducts, error: productsError } = await supabase
       .from("products")
       .select(
@@ -33,44 +34,28 @@ export const getTopSellingProducts = async () => {
         product_discounts (
           id, discount_type, discount_value, is_active, start_date, end_date
         )
-      `,
+      `
       )
+      .in("id", productIds)
       .eq("is_active", true);
 
     if (productsError) throw productsError;
 
-    // 3. Tính toán tổng số lượng bán (Sales Map)
-    const salesMap: Record<string, number> = {};
-    salesData?.forEach((item: any) => {
-      salesMap[item.product_id] =
-        (salesMap[item.product_id] || 0) + item.quantity;
-    });
+    // 3. Kết hợp dữ liệu (gắn total_sold vào product) và tính giảm giá
+    const processedProducts = topSales.map((saleItem: any) => {
+      const product = (allProducts || []).find((p: any) => p.id === saleItem.product_id);
+      if (!product) return null;
+      return {
+        ...product,
+        total_sold: Number(saleItem.total_sold) || 0,
+      };
+    }).filter(Boolean);
 
-    // 4. Kết hợp dữ liệu: Gán total_sold vào danh sách sản phẩm
-    const processedProducts = (allProducts || []).map((product: any) => ({
-      ...product,
-      total_sold: salesMap[product.id] || 0,
-    }));
+    const finalProducts = processedProducts.map(calculateDiscountedPrice);
 
-    // 5. Sắp xếp:
-    // - Ưu tiên sản phẩm có lượt bán (total_sold giảm dần)
-    // - Nếu lượt bán bằng nhau (đều là 0), sắp xếp theo ngày tạo (mới nhất lên đầu)
-    const sortedProducts = processedProducts.sort((a, b) => {
-      if (b.total_sold !== a.total_sold) {
-        return b.total_sold - a.total_sold;
-      }
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    });
-
-    // 5. Tính toán giá giảm giá
-    const finalProducts = sortedProducts.map(calculateDiscountedPrice);
-
-    // Trả về 10 sản phẩm đầu tiên
-    return finalProducts.slice(0, 10);
+    return finalProducts;
   } catch (error) {
-    console.error("Lỗi lấy sản phẩm bán chạy:", error);
+    console.error("Lỗi lấy sản phẩm bán chạy toàn cầu:", error);
     return [];
   }
 };
