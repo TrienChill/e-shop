@@ -180,6 +180,50 @@ export const supabaseAdmin = serviceRoleKey
     )
   : null;
 
+// ─── Startup Session Validation ────────────────────────────────────────────────
+// Proactively validate stored session before auto-refresh runs.
+// If the stored refresh token is invalid, clear it immediately to prevent
+// the internal auto-refresh from throwing unhandled AuthApiErrors.
+async function validateStoredSession(client: SupabaseClient): Promise<void> {
+  try {
+    const { error } = await client.auth.getSession();
+    if (error && isRefreshTokenError(error)) {
+      await clearAuthStorage();
+      try {
+        await client.auth.signOut({ scope: "local" });
+      } catch {
+        // ignore signOut errors — storage is already cleared
+      }
+    }
+  } catch (err) {
+    if (isRefreshTokenError(err)) {
+      await clearAuthStorage();
+      try {
+        await client.auth.signOut({ scope: "local" });
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+// Run validation immediately on module load
+validateStoredSession(supabase);
+
+// ─── Global Auth Error Handler ─────────────────────────────────────────────────
+// Catches refresh token failures from Supabase's internal auto-refresh mechanism
+// which bypasses the wrapAuthClient wrappers.
+supabase.auth.onAuthStateChange(async (event, _session) => {
+  if (event === "TOKEN_REFRESHED" && !_session) {
+    // Token refresh was attempted but resulted in no session — corrupted token
+    await clearAuthStorage();
+  }
+  if (event === "SIGNED_OUT") {
+    // Ensure no stale auth data remains in storage after sign-out
+    await clearAuthStorage();
+  }
+});
+
 // ─── AppState Listener ─────────────────────────────────────────────────────────
 let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null =
   null;
@@ -195,14 +239,26 @@ function startAppStateListener(client: SupabaseClient) {
           const { data, error } = await client.auth.getSession();
           if (error && isRefreshTokenError(error)) {
             await clearAuthStorage();
-            await client.auth.signOut();
+            try {
+              await client.auth.signOut({ scope: "local" });
+            } catch {
+              // ignore
+            }
+            return;
           }
-          if (!data.session) {
-            // Session hết hạn hoặc bị xóa → buộc refresh
-            await client.auth.setSession(null as any);
+          // If session exists, trigger a refresh to keep it alive
+          if (data.session) {
+            await client.auth.refreshSession();
           }
-        } catch {
-          // ignore
+        } catch (err) {
+          if (isRefreshTokenError(err)) {
+            await clearAuthStorage();
+            try {
+              await client.auth.signOut({ scope: "local" });
+            } catch {
+              // ignore
+            }
+          }
         }
       }
     },

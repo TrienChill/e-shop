@@ -1,11 +1,11 @@
 // eslint-disable-next-line import/no-named-as-default
+import { useAuth } from "@/src/auth/AuthContext";
 import CommonHeader from "@/src/components/layout/Header";
 import RecentlyViewedSection from "@/src/components/shop/RecentlyViewedSection";
 import { supabase } from "@/src/lib/supabase";
 import { useSupabaseRealtime } from "@/src/services/useSupabaseRealtime";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useAuth } from "@/src/auth/AuthContext";
 import {
   ArrowRight,
   Bell,
@@ -242,8 +242,8 @@ export default function ProfileScreen() {
         </View>
 
         {isAnonymous && (
-          <TouchableOpacity 
-            style={styles.upgradeBanner} 
+          <TouchableOpacity
+            style={styles.upgradeBanner}
             activeOpacity={0.9}
             onPress={() => router.push('/(auth)/register')}
           >
@@ -257,23 +257,10 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Khung Thông báo (Announcement Card) */}
-        <TouchableOpacity style={styles.announcementCard} activeOpacity={0.9}>
-          <View style={styles.announcementTextContainer}>
-            <Text style={styles.announcementTitle}>Thông báo</Text>
-            <Text style={styles.announcementDesc}>
-              Ưu đãi đặc biệt giảm giá lên đến 50% cho tất cả các sản phẩm thời
-              trang nữ trong tuần này.
-            </Text>
-          </View>
-          <View style={styles.arrowButton}>
-            <ArrowRight size={20} color="white" strokeWidth={3} />
-          </View>
-        </TouchableOpacity>
 
         {/* Lịch sử Thử đồ ảo */}
-        <TouchableOpacity 
-          style={[styles.announcementCard, { backgroundColor: "#EEF2FF", marginBottom: 32 }]} 
+        <TouchableOpacity
+          style={[styles.announcementCard, { backgroundColor: "#EEF2FF", marginBottom: 32 }]}
           activeOpacity={0.9}
           onPress={() => router.push("/(shop)/try-on-history")}
         >

@@ -258,6 +258,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         userId: session?.user?.id ?? null,
         platform,
       });
+
+      // ── Handle refresh token failures from auto-refresh ────────────────────
+      // When the internal auto-refresh fails, it may emit TOKEN_REFRESHED with
+      // null session, or trigger SIGNED_OUT. Clean up gracefully.
+      if (_event === "TOKEN_REFRESHED" && !session) {
+        await clearAllAuthData();
+        setSession(null);
+        setRole(null);
+        setRoleError(null);
+        setRoleResolved(true);
+        setLoading(false);
+        setSessionInitialized(true);
+        return;
+      }
+
       if (!session) {
         // Đăng xuất: reset role và đánh dấu resolved
         setRole(null);
