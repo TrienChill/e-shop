@@ -142,11 +142,21 @@ export const getMostPopularProducts = async () => {
     return data.map(calculateDiscountedPrice);
   }
 
-  // Sắp xếp lại theo thứ tự của RPC ban đầu
+  // Sắp xếp lại theo thứ tự của RPC ban đầu và kết hợp các chỉ số (rating, view_count)
   const result = productIds.map((id: any) => {
     const product = (enrichedProducts || []).find((p) => p.id === id);
-    return calculateDiscountedPrice(product);
-  });
+    const rpcData = data.find((p: any) => p.id === id);
+
+    if (!product) return null;
+
+    const mergedProduct = {
+      ...product,
+      average_rating: rpcData?.average_rating || 0,
+      view_count: rpcData?.view_count || 0,
+    };
+
+    return calculateDiscountedPrice(mergedProduct);
+  }).filter(Boolean);
 
   return result;
 };
